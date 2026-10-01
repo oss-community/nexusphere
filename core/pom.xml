@@ -9,8 +9,23 @@
     <artifactId>core</artifactId>
     <packaging>pom</packaging>
     <name>NexusPhere Core</name>
+    <modules>
+        <module>shared</module>
+        <module>membership</module>
+        <module>capability</module>
+        <module>discovery</module>
+        <module>trust</module>
+        <module>federation</module>
+        <module>authorization</module>
+        <module>delegation</module>
+        <module>agreement</module>
+        <module>transaction</module>
+        <module>audit</module>
+        <module>integration</module>
+    </modules>
     <properties>
         <java.version>21</java.version>
+        <maven.compiler.release>21</maven.compiler.release>
         <spring-boot.version>4.1.1</spring-boot.version>
         <spring-modulith.version>2.1.1</spring-modulith.version>
     </properties>
@@ -32,30 +47,23 @@
             </dependency>
         </dependencies>
     </dependencyManagement>
+    <dependencies>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter</artifactId>
+        </dependency>
+
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+    </dependencies>
     <build>
         <plugins>
             <plugin>
-                <groupId>org.apache.maven.plugins</groupId>
-                <artifactId>maven-enforcer-plugin</artifactId>
-                <version>3.6.2</version>
-                <executions>
-                    <execution>
-                        <id>enforce-runtime</id>
-                        <goals>
-                            <goal>enforce</goal>
-                        </goals>
-                        <configuration>
-                            <rules>
-                                <requireJavaVersion>
-                                    <version>[21,22)</version>
-                                </requireJavaVersion>
-                                <requireMavenVersion>
-                                    <version>[3.9,)</version>
-                                </requireMavenVersion>
-                            </rules>
-                        </configuration>
-                    </execution>
-                </executions>
+                <groupId>org.springframework.boot</groupId>
+                <artifactId>spring-boot-maven-plugin</artifactId>
             </plugin>
         </plugins>
     </build>
