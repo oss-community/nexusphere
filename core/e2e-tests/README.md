@@ -45,14 +45,14 @@ repository and architecture tests live in their own modules and are not listed h
 
 </p>
 
-| Concern        | Decision                                                                                                    |
-|----------------|-------------------------------------------------------------------------------------------------------------|
-| Runtime        | One application hosts many networks; each test creates its own networks with unique names                   |
-| Database       | PostgreSQL 18 through Testcontainers; no in-memory database                                                 |
-| Client         | `ApiClient` sends JSON requests with optional `Authorization`, `X-Network-Id` and `X-Correlation-Id`        |
-| Fixtures       | `SovereigntyApi` for networks and organizations, `IdentityApi` for identities, memberships and tokens       |
-| Authentication | A test creates an identity, issues a credential and exchanges it for a bearer token at `/api/v1/auth/token` |
-| Naming         | Test classes end with `E2ETest` and every test is named after its catalog ID                                |
+| Concern        | Decision                                                                                                                                                     |
+|----------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| Runtime        | One application hosts many networks; each test creates its own networks with unique names                                                                    |
+| Database       | PostgreSQL 18 through Testcontainers; no in-memory database                                                                                                  |
+| Client         | `ApiClient` sends JSON requests with optional `Authorization`, `X-Network-Id` and `X-Correlation-Id`                                                         |
+| Fixtures       | `SovereigntyApi` for networks and organizations, `IdentityApi` for identities, memberships and tokens, `CapabilityApi` for capability types and capabilities |
+| Authentication | A test creates an identity, issues a credential and exchanges it for a bearer token at `/api/v1/auth/token`                                                  |
+| Naming         | Test classes end with `E2ETest` and every test is named after its catalog ID                                                                                 |
 
 ## Test Classes
 
@@ -63,6 +63,7 @@ repository and architecture tests live in their own modules and are not listed h
 | `NetworkIsolationE2ETest`          | `com.nexusphere.e2e.sovereignty` | E2E-SC15-02              |
 | `IdentityMembershipE2ETest`        | `com.nexusphere.e2e.identity`    | E2E-SC07-01..06          |
 | `IdentityIsolationE2ETest`         | `com.nexusphere.e2e.identity`    | E2E-SC15-01, E2E-SC15-10 |
+| `CapabilityRegistrationE2ETest`    | `com.nexusphere.e2e.capability`  | E2E-SC08-01..04          |
 
 ## Scenario Catalog
 
@@ -149,12 +150,12 @@ Status: ✓ implemented, ◐ partly implemented, ○ planned. The scenarios are 
 
 ### SC-08 Capability Registration and Visibility
 
-| ID          | Test                                                                                       | Status |
-|-------------|--------------------------------------------------------------------------------------------|--------|
-| E2E-SC08-01 | Capabilities owned by an organization, an agent and a machine are registered and published | ○      |
-| E2E-SC08-02 | A specification that does not match its capability type schema returns 400                 | ○      |
-| E2E-SC08-03 | PRIVATE is visible to its owner, NETWORK to members, FEDERATED also to federated networks  | ○      |
-| E2E-SC08-04 | A withdrawn capability disappears from discovery and cannot be used in a new agreement     | ○      |
+| ID          | Test                                                                                               | Status |
+|-------------|----------------------------------------------------------------------------------------------------|--------|
+| E2E-SC08-01 | Capabilities owned by an organization, an agent and a machine are registered and published         | ✓      |
+| E2E-SC08-02 | A specification that does not match its capability type schema returns 400                         | ✓      |
+| E2E-SC08-03 | PRIVATE is visible to its owner and NETWORK to members; FEDERATED across networks follows in SC-12 | ◐      |
+| E2E-SC08-04 | A withdrawn capability disappears from the catalog; the agreement check follows in Phase 9         | ◐      |
 
 ### SC-09 Trust and Federation Lifecycle
 
