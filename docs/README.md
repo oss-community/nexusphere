@@ -202,9 +202,9 @@ Status: ✓ implemented, ○ planned.
 | UC-AGR-03 | Accept or reject an agreement version                                    | Agreement     | 9     | ✓      |
 | UC-AGR-04 | Activate, complete or terminate agreement                                | Agreement     | 9     | ✓      |
 | UC-AGR-05 | Revise agreement, keeping the previous version                           | Agreement     | 9     | ✓      |
-| UC-TRX-01 | Request transaction                                                      | Transaction   | 10    | ○      |
-| UC-TRX-02 | Authorize or reject transaction                                          | Transaction   | 10    | ○      |
-| UC-TRX-03 | Execute, complete, fail or cancel transaction                            | Transaction   | 10    | ○      |
+| UC-TRX-01 | Request transaction                                                      | Transaction   | 10    | ✓      |
+| UC-TRX-02 | Authorize or reject transaction                                          | Transaction   | 10    | ✓      |
+| UC-TRX-03 | Execute, complete, fail or cancel transaction                            | Transaction   | 10    | ✓      |
 | UC-AUD-01 | Record an append-only audit event                                        | Audit         | 11    | ○      |
 | UC-AUD-02 | Query the audit trail                                                    | Audit         | 11    | ○      |
 | UC-AUD-03 | Reconstruct the accountability chain of a transaction                    | Audit         | 11    | ○      |
@@ -258,7 +258,7 @@ Every scenario is verified by end-to-end tests listed in [End-to-End Tests](../c
 | SC-11 | Delegation rules                       | 7     | ✓      |
 | SC-12 | Governed discovery                     | 8     | ✓      |
 | SC-13 | Agreement lifecycle and integrity      | 9     | ✓      |
-| SC-14 | Transaction lifecycle                  | 10    | ○      |
+| SC-14 | Transaction lifecycle                  | 10    | ◐      |
 | SC-15 | Network isolation and context spoofing | 2–15  | ◐      |
 | SC-16 | Accountability reconstruction          | 11    | ○      |
 | SC-17 | Agent adapter                          | 12    | ○      |
@@ -276,7 +276,7 @@ Every scenario is verified by end-to-end tests listed in [End-to-End Tests](../c
 | 7     | Delegation           | Constrained, revocable delegations                                           | ✓      |
 | 8     | Discovery            | Local and federated discovery                                                | ✓      |
 | 9     | Agreement            | Versioned agreements                                                         | ✓      |
-| 10    | Transaction          | Transactions under agreements                                                | ○      |
+| 10    | Transaction          | Transactions under agreements                                                | ✓      |
 | 11    | Audit                | Audit trail and accountability reconstruction                                | ○      |
 | 12    | Agent adapter        | External agents acting as principals                                         | ○      |
 | 13    | Machine adapter      | Simulated machine executing authorized transactions                          | ○      |

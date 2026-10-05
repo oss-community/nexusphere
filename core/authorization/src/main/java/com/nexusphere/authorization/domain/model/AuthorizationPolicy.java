@@ -33,7 +33,8 @@ public final class AuthorizationPolicy {
             Actions.TRANSACTION_INITIATE, "TRANSACTION_EXCHANGE",
             Actions.TRANSACTION_EXECUTE, "TRANSACTION_EXCHANGE");
 
-    private static final Set<String> OWNER_ACTIONS = Set.of(Actions.CAPABILITY_REGISTER, Actions.CAPABILITY_PUBLISH);
+    private static final Set<String> OWNER_ACTIONS = Set.of(Actions.CAPABILITY_REGISTER, Actions.CAPABILITY_PUBLISH,
+            Actions.TRANSACTION_EXECUTE);
 
     private AuthorizationPolicy() {
     }
