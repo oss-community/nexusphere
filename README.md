@@ -197,22 +197,23 @@ Maven module with the package `com.nexusphere.<module>`. A module is reached by 
 
 ### Modules
 
-| Module                                | Responsibility                                                                        |
-|---------------------------------------|---------------------------------------------------------------------------------------|
-| `core/shared`                         | Identifiers, execution context, correlation ID, domain event envelope, error model    |
-| `core/network`                        | Network lifecycle: PENDING, ACTIVE, SUSPENDED, ARCHIVED                               |
-| `core/organization`                   | Organizations registered inside a network                                             |
-| `core/identity`                       | Human, service, application, agent and machine identities and credentials             |
-| `core/membership`                     | Memberships, principal context and member listing                                     |
-| `core/capability`                     | Capability types with versioned schemas, capabilities, visibility and withdrawal      |
-| `core/trust`                          | Scoped, directional, revocable trust between networks, organizations and identities   |
-| `core/federation`                     | Federation lifecycle between two sovereign networks with scope and optimistic locking |
-| `core/authorization`                  | Roles, role assignments, central ALLOW/DENY decisions recorded as evidence            |
-| `core/delegation`                     | Constrained, time-bounded, revocable delegations between principals of one network    |
-| `core/discovery`                      | Governed local and federated capability discovery behind a port                       |
-| `core/agreement` … `core/integration` | Bounded contexts of the next phases                                                   |
-| `core/bootstrap`                      | Application, persistence wiring, error handling, architecture tests                   |
-| `core/e2e-tests`                      | End-to-end tests against the application and PostgreSQL                               |
+| Module                                  | Responsibility                                                                         |
+|-----------------------------------------|----------------------------------------------------------------------------------------|
+| `core/shared`                           | Identifiers, execution context, correlation ID, domain event envelope, error model     |
+| `core/network`                          | Network lifecycle: PENDING, ACTIVE, SUSPENDED, ARCHIVED                                |
+| `core/organization`                     | Organizations registered inside a network                                              |
+| `core/identity`                         | Human, service, application, agent and machine identities and credentials              |
+| `core/membership`                       | Memberships, principal context and member listing                                      |
+| `core/capability`                       | Capability types with versioned schemas, capabilities, visibility and withdrawal       |
+| `core/trust`                            | Scoped, directional, revocable trust between networks, organizations and identities    |
+| `core/federation`                       | Federation lifecycle between two sovereign networks with scope and optimistic locking  |
+| `core/authorization`                    | Roles, role assignments, central ALLOW/DENY decisions recorded as evidence             |
+| `core/delegation`                       | Constrained, time-bounded, revocable delegations between principals of one network     |
+| `core/discovery`                        | Governed local and federated capability discovery behind a port                        |
+| `core/agreement`                        | Versioned agreements between accountable parties, with acting principal and delegation |
+| `core/transaction` … `core/integration` | Bounded contexts of the next phases                                                    |
+| `core/bootstrap`                        | Application, persistence wiring, error handling, architecture tests                    |
+| `core/e2e-tests`                        | End-to-end tests against the application and PostgreSQL                                |
 
 ### Profiles
 
@@ -300,6 +301,14 @@ APP_TOKEN_TTL: 15m
 | GET    | `/api/v1/networks/{networkId}/discovery/capabilities`                    | Search by `typeCode`, `ownerType`, `organizationId`, `originNetworkId`, `scope` (bearer token) |
 | GET    | `/api/v1/networks/{networkId}/discovery/capabilities/{capabilityId}`     | Get a discoverable capability, local or federated (bearer token)                               |
 | GET    | `/api/v1/networks/{networkId}/discovery/networks`                        | Other active networks with their federation state (bearer token)                               |
+| POST   | `/api/v1/networks/{networkId}/agreements`                                | Draft an agreement for a discovered capability (`agreement:propose`)                           |
+| GET    | `/api/v1/networks/{networkId}/agreements`                                | List agreements the principal is party to (bearer token)                                       |
+| GET    | `/api/v1/networks/{networkId}/agreements/{agreementId}`                  | Get an agreement with its current version (bearer token)                                       |
+| GET    | `/api/v1/networks/{networkId}/agreements/{agreementId}/versions`         | All versions, also `/versions/{number}` (bearer token)                                         |
+| POST   | `/api/v1/networks/{networkId}/agreements/{agreementId}/propose`          | Propose the draft (`agreement:propose`)                                                        |
+| POST   | `/api/v1/networks/{networkId}/agreements/{agreementId}/revisions`        | Revise with `expectedVersion`, creating the next version (`agreement:propose`)                 |
+| POST   | `/api/v1/networks/{networkId}/agreements/{agreementId}/{decision}`       | `accept` or `reject` a version (`agreement:accept`)                                            |
+| POST   | `/api/v1/networks/{networkId}/agreements/{agreementId}/{action}`         | `activate`, `complete` or `terminate` (`agreement:manage`)                                     |
 
 Every active member holds the MEMBER role; an `ADMINISTRATOR` membership holds NETWORK_ADMINISTRATOR. Requests that name an
 action in parentheses are checked by the central authorizer, which records an ALLOW or DENY decision. Requests marked with bearer token need `Authorization: Bearer <token>` and a network context, taken from the path

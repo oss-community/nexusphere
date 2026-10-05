@@ -68,6 +68,7 @@ repository and architecture tests live in their own modules and are not listed h
 | `AuthorizationE2ETest`             | `com.nexusphere.e2e.authorization` | E2E-SC10-01..05                                                |
 | `DelegationE2ETest`                | `com.nexusphere.e2e.delegation`    | E2E-SC11-01..05, E2E-SC05-01, 03, E2E-SC15-05                  |
 | `DiscoveryE2ETest`                 | `com.nexusphere.e2e.discovery`     | E2E-SC12-01..03, E2E-SC04-01..03, E2E-SC08-03, 04, E2E-SC09-04 |
+| `AgreementE2ETest`                 | `com.nexusphere.e2e.agreement`     | E2E-SC13-01..06, E2E-SC05-01, 03, E2E-SC08-04, E2E-SC11-03     |
 
 ## Scenario Catalog
 
@@ -124,9 +125,9 @@ Status: ✓ implemented, ◐ partly implemented, ○ planned. The scenarios are 
 
 | ID          | Test                                                                | Status |
 |-------------|---------------------------------------------------------------------|--------|
-| E2E-SC05-01 | After revocation the next proposal returns 403 `DELEGATION_REVOKED` | ◐      |
+| E2E-SC05-01 | After revocation the next proposal returns 403 `DELEGATION_REVOKED` | ✓      |
 | E2E-SC05-02 | Audit events written before the revocation are unchanged            | ○      |
-| E2E-SC05-03 | After the validity ends the action returns 403 `DELEGATION_EXPIRED` | ◐      |
+| E2E-SC05-03 | After the validity ends the action returns 403 `DELEGATION_EXPIRED` | ✓      |
 
 ### SC-06 Sovereign Network Bootstrap
 
@@ -159,7 +160,7 @@ Status: ✓ implemented, ◐ partly implemented, ○ planned. The scenarios are 
 | E2E-SC08-01 | Capabilities owned by an organization, an agent and a machine are registered and published   | ✓      |
 | E2E-SC08-02 | A specification that does not match its capability type schema returns 400                   | ✓      |
 | E2E-SC08-03 | PRIVATE is visible to its owner, NETWORK to members and FEDERATED also to federated networks | ✓      |
-| E2E-SC08-04 | A withdrawn capability disappears from discovery; the agreement check follows in Phase 9     | ◐      |
+| E2E-SC08-04 | A withdrawn capability disappears from discovery and cannot be used in a new agreement       | ✓      |
 
 ### SC-09 Trust and Federation Lifecycle
 
@@ -204,12 +205,12 @@ Status: ✓ implemented, ◐ partly implemented, ○ planned. The scenarios are 
 
 | ID          | Test                                                                                        | Status |
 |-------------|---------------------------------------------------------------------------------------------|--------|
-| E2E-SC13-01 | DRAFT, PROPOSED, ACCEPTED, ACTIVE, COMPLETED                                                | ○      |
-| E2E-SC13-02 | A revision creates version 2, version 1 stays readable, and accepting version 1 returns 409 | ○      |
-| E2E-SC13-03 | DRAFT directly to ACTIVE returns 409 `AGREEMENT_INVALID_TRANSITION`                         | ○      |
-| E2E-SC13-04 | A principal outside the agreement cannot accept, revise or terminate it                     | ○      |
-| E2E-SC13-05 | Each version shows proposer, accountable party, delegation, time, changes and acceptor      | ○      |
-| E2E-SC13-06 | Of two concurrent revisions with the same expected version, one returns 409                 | ○      |
+| E2E-SC13-01 | DRAFT, PROPOSED, ACCEPTED, ACTIVE, COMPLETED                                                | ✓      |
+| E2E-SC13-02 | A revision creates version 2, version 1 stays readable, and accepting version 1 returns 409 | ✓      |
+| E2E-SC13-03 | DRAFT directly to ACTIVE returns 409 `AGREEMENT_INVALID_TRANSITION`                         | ✓      |
+| E2E-SC13-04 | A principal outside the agreement cannot accept, revise or terminate it                     | ✓      |
+| E2E-SC13-05 | Each version shows proposer, accountable party, delegation, time, changes and acceptor      | ✓      |
+| E2E-SC13-06 | Of two concurrent revisions with the same expected version, one returns 409                 | ✓      |
 
 ### SC-14 Transaction Lifecycle
 
@@ -222,18 +223,18 @@ Status: ✓ implemented, ◐ partly implemented, ○ planned. The scenarios are 
 
 ### SC-15 Network Isolation
 
-| ID          | Test                                                                                                   | Status |
-|-------------|--------------------------------------------------------------------------------------------------------|--------|
-| E2E-SC15-01 | Network A cannot read network B identities by list or by ID                                            | ✓      |
-| E2E-SC15-02 | Organizations, capabilities, agreements and audit events of B are not found from A; organizations done | ◐      |
-| E2E-SC15-03 | Unauthorized capability discovery, covered by E2E-SC04-01..03                                          | ✓      |
-| E2E-SC15-04 | Citing a federation the caller's network is not part of returns 403                                    | ○      |
-| E2E-SC15-05 | Citing another principal's delegation returns 403                                                      | ✓      |
-| E2E-SC15-06 | Delegation privilege escalation, covered by E2E-SC11-01 and 02                                         | ✓      |
-| E2E-SC15-07 | Revoked and expired delegation usage, covered by E2E-SC05-01 and 03                                    | ◐      |
-| E2E-SC15-08 | Unauthorized agreement modification, covered by E2E-SC13-04                                            | ○      |
-| E2E-SC15-09 | Unauthorized transaction execution, covered by E2E-SC03-01                                             | ○      |
-| E2E-SC15-10 | A token of A with the network context of B returns 403; the audit event comes with the audit phase     | ◐      |
+| ID          | Test                                                                                                          | Status |
+|-------------|---------------------------------------------------------------------------------------------------------------|--------|
+| E2E-SC15-01 | Network A cannot read network B identities by list or by ID                                                   | ✓      |
+| E2E-SC15-02 | Organizations, capabilities, agreements and audit events of B are not found from A; audit follows in Phase 11 | ◐      |
+| E2E-SC15-03 | Unauthorized capability discovery, covered by E2E-SC04-01..03                                                 | ✓      |
+| E2E-SC15-04 | Citing a federation the caller's network is not part of returns 403                                           | ○      |
+| E2E-SC15-05 | Citing another principal's delegation returns 403                                                             | ✓      |
+| E2E-SC15-06 | Delegation privilege escalation, covered by E2E-SC11-01 and 02                                                | ✓      |
+| E2E-SC15-07 | Revoked and expired delegation usage, covered by E2E-SC05-01 and 03                                           | ✓      |
+| E2E-SC15-08 | Unauthorized agreement modification, covered by E2E-SC13-04                                                   | ✓      |
+| E2E-SC15-09 | Unauthorized transaction execution, covered by E2E-SC03-01                                                    | ○      |
+| E2E-SC15-10 | A token of A with the network context of B returns 403; the audit event comes with the audit phase            | ◐      |
 
 ### SC-16 Accountability Reconstruction
 
