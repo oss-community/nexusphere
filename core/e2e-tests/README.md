@@ -56,16 +56,17 @@ repository and architecture tests live in their own modules and are not listed h
 
 ## Test Classes
 
-| Class                              | Package                            | Covers                   |
-|------------------------------------|------------------------------------|--------------------------|
-| `PlatformBootstrapE2ETest`         | `com.nexusphere.e2e.platform`      | E2E-PLT-01..07           |
-| `SovereignNetworkBootstrapE2ETest` | `com.nexusphere.e2e.sovereignty`   | E2E-SC06-01..08          |
-| `NetworkIsolationE2ETest`          | `com.nexusphere.e2e.sovereignty`   | E2E-SC15-02              |
-| `IdentityMembershipE2ETest`        | `com.nexusphere.e2e.identity`      | E2E-SC07-01..06          |
-| `IdentityIsolationE2ETest`         | `com.nexusphere.e2e.identity`      | E2E-SC15-01, E2E-SC15-10 |
-| `CapabilityRegistrationE2ETest`    | `com.nexusphere.e2e.capability`    | E2E-SC08-01..04          |
-| `TrustFederationE2ETest`           | `com.nexusphere.e2e.federation`    | E2E-SC09-01..06          |
-| `AuthorizationE2ETest`             | `com.nexusphere.e2e.authorization` | E2E-SC10-01..05          |
+| Class                              | Package                            | Covers                                        |
+|------------------------------------|------------------------------------|-----------------------------------------------|
+| `PlatformBootstrapE2ETest`         | `com.nexusphere.e2e.platform`      | E2E-PLT-01..07                                |
+| `SovereignNetworkBootstrapE2ETest` | `com.nexusphere.e2e.sovereignty`   | E2E-SC06-01..08                               |
+| `NetworkIsolationE2ETest`          | `com.nexusphere.e2e.sovereignty`   | E2E-SC15-02                                   |
+| `IdentityMembershipE2ETest`        | `com.nexusphere.e2e.identity`      | E2E-SC07-01..06                               |
+| `IdentityIsolationE2ETest`         | `com.nexusphere.e2e.identity`      | E2E-SC15-01, E2E-SC15-10                      |
+| `CapabilityRegistrationE2ETest`    | `com.nexusphere.e2e.capability`    | E2E-SC08-01..04                               |
+| `TrustFederationE2ETest`           | `com.nexusphere.e2e.federation`    | E2E-SC09-01..06                               |
+| `AuthorizationE2ETest`             | `com.nexusphere.e2e.authorization` | E2E-SC10-01..05                               |
+| `DelegationE2ETest`                | `com.nexusphere.e2e.delegation`    | E2E-SC11-01..05, E2E-SC05-01, 03, E2E-SC15-05 |
 
 ## Scenario Catalog
 
@@ -122,9 +123,9 @@ Status: ✓ implemented, ◐ partly implemented, ○ planned. The scenarios are 
 
 | ID          | Test                                                                | Status |
 |-------------|---------------------------------------------------------------------|--------|
-| E2E-SC05-01 | After revocation the next proposal returns 403 `DELEGATION_REVOKED` | ○      |
+| E2E-SC05-01 | After revocation the next proposal returns 403 `DELEGATION_REVOKED` | ◐      |
 | E2E-SC05-02 | Audit events written before the revocation are unchanged            | ○      |
-| E2E-SC05-03 | After the validity ends the action returns 403 `DELEGATION_EXPIRED` | ○      |
+| E2E-SC05-03 | After the validity ends the action returns 403 `DELEGATION_EXPIRED` | ◐      |
 
 ### SC-06 Sovereign Network Bootstrap
 
@@ -184,11 +185,11 @@ Status: ✓ implemented, ◐ partly implemented, ○ planned. The scenarios are 
 
 | ID          | Test                                                                                       | Status |
 |-------------|--------------------------------------------------------------------------------------------|--------|
-| E2E-SC11-01 | Delegating an action the delegator lacks returns 422 `DELEGATION_EXCEEDS_AUTHORITY`        | ○      |
-| E2E-SC11-02 | Delegating onward returns 422 `DELEGATION_DEPTH_EXCEEDED`                                  | ○      |
-| E2E-SC11-03 | Capability and network constraints narrow what the delegate may do                         | ○      |
-| E2E-SC11-04 | After the delegator loses the role, the delegate is denied with `DELEGATOR_AUTHORITY_LOST` | ○      |
-| E2E-SC11-05 | Effective delegations exclude revoked, suspended and expired ones                          | ○      |
+| E2E-SC11-01 | Delegating an action the delegator lacks returns 422 `DELEGATION_EXCEEDS_AUTHORITY`        | ✓      |
+| E2E-SC11-02 | Delegating onward returns 422 `DELEGATION_DEPTH_EXCEEDED`                                  | ✓      |
+| E2E-SC11-03 | Capability and network constraints narrow what the delegate may do                         | ✓      |
+| E2E-SC11-04 | After the delegator loses the role, the delegate is denied with `DELEGATOR_AUTHORITY_LOST` | ✓      |
+| E2E-SC11-05 | Effective delegations exclude revoked, suspended and expired ones                          | ✓      |
 
 ### SC-12 Governed Discovery
 
@@ -226,9 +227,9 @@ Status: ✓ implemented, ◐ partly implemented, ○ planned. The scenarios are 
 | E2E-SC15-02 | Organizations, capabilities, agreements and audit events of B are not found from A; organizations done | ◐      |
 | E2E-SC15-03 | Unauthorized capability discovery, covered by E2E-SC04-01..03                                          | ○      |
 | E2E-SC15-04 | Citing a federation the caller's network is not part of returns 403                                    | ○      |
-| E2E-SC15-05 | Citing another principal's delegation returns 403                                                      | ○      |
-| E2E-SC15-06 | Delegation privilege escalation, covered by E2E-SC11-01 and 02                                         | ○      |
-| E2E-SC15-07 | Revoked and expired delegation usage, covered by E2E-SC05-01 and 03                                    | ○      |
+| E2E-SC15-05 | Citing another principal's delegation returns 403                                                      | ✓      |
+| E2E-SC15-06 | Delegation privilege escalation, covered by E2E-SC11-01 and 02                                         | ✓      |
+| E2E-SC15-07 | Revoked and expired delegation usage, covered by E2E-SC05-01 and 03                                    | ◐      |
 | E2E-SC15-08 | Unauthorized agreement modification, covered by E2E-SC13-04                                            | ○      |
 | E2E-SC15-09 | Unauthorized transaction execution, covered by E2E-SC03-01                                             | ○      |
 | E2E-SC15-10 | A token of A with the network context of B returns 403; the audit event comes with the audit phase     | ◐      |

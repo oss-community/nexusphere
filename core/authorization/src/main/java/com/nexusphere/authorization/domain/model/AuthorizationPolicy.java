@@ -18,7 +18,7 @@ public final class AuthorizationPolicy {
 
     public record Outcome(boolean allowed, String reason, Role matchedRole) {
 
-        static Outcome deny(String reason) {
+        public static Outcome deny(String reason) {
             return new Outcome(false, reason, null);
         }
     }
