@@ -2,6 +2,7 @@ package com.nexusphere.membership.api.rest;
 
 import com.nexusphere.membership.application.MembershipService;
 import com.nexusphere.membership.domain.model.Membership;
+import com.nexusphere.membership.domain.model.MembershipRole;
 import com.nexusphere.shared.context.ExecutionContext;
 import com.nexusphere.shared.error.ValidationException;
 import com.nexusphere.shared.id.IdentityId;
@@ -26,17 +27,17 @@ import java.util.UUID;
 @RequestMapping("/api/v1/networks/{networkId}/memberships")
 class MembershipController {
 
-    record ActivateMembershipRequest(@NotBlank String identityId, String organizationId) {
+    record ActivateMembershipRequest(@NotBlank String identityId, String organizationId, String role) {
     }
 
     record MembershipResponse(String id, String principalId, String identityId, String networkId, String organizationId,
-                              String status, Instant joinedAt, Instant terminatedAt) {
+                              String role, String status, Instant joinedAt, Instant terminatedAt) {
 
         static MembershipResponse of(Membership membership) {
             return new MembershipResponse(membership.id().toString(), membership.principalId().toString(),
                     membership.identityId().toString(), membership.networkId().toString(),
                     membership.organizationId().map(OrganizationId::toString).orElse(null),
-                    membership.status().name(), membership.joinedAt(), membership.terminatedAt().orElse(null));
+                    membership.role().name(), membership.status().name(), membership.joinedAt(), membership.terminatedAt().orElse(null));
         }
     }
 
@@ -52,7 +53,7 @@ class MembershipController {
                                                 ExecutionContext context) {
         OrganizationId organization = request.organizationId() == null ? null : OrganizationId.of(request.organizationId());
         Membership membership = memberships.activate(NetworkId.of(networkId), IdentityId.of(request.identityId()),
-                organization, context);
+                organization, MembershipRole.parse(request.role()), context);
         return ResponseEntity.created(URI.create("/api/v1/networks/" + networkId + "/memberships/" + membership.id()))
                 .body(MembershipResponse.of(membership));
     }

@@ -1,5 +1,6 @@
 package com.nexusphere.membership.infrastructure.persistence;
 
+import com.nexusphere.membership.domain.model.MembershipRole;
 import com.nexusphere.membership.domain.model.MembershipStatus;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -30,6 +31,10 @@ class MembershipEntity {
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 20)
+    private MembershipRole role;
+
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 20)
     private MembershipStatus status;
 
     @Column(name = "joined_at", nullable = false)
@@ -44,12 +49,13 @@ class MembershipEntity {
     protected MembershipEntity() {
     }
 
-    MembershipEntity(UUID id, UUID identityId, UUID networkId, UUID organizationId, MembershipStatus status,
-                     Instant joinedAt, Instant terminatedAt, Long version) {
+    MembershipEntity(UUID id, UUID identityId, UUID networkId, UUID organizationId, MembershipRole role,
+                     MembershipStatus status, Instant joinedAt, Instant terminatedAt, Long version) {
         this.id = id;
         this.identityId = identityId;
         this.networkId = networkId;
         this.organizationId = organizationId;
+        this.role = role;
         this.status = status;
         this.joinedAt = joinedAt;
         this.terminatedAt = terminatedAt;
@@ -70,6 +76,10 @@ class MembershipEntity {
 
     UUID getOrganizationId() {
         return organizationId;
+    }
+
+    MembershipRole getRole() {
+        return role;
     }
 
     MembershipStatus getStatus() {

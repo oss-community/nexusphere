@@ -10,13 +10,14 @@ import org.springframework.web.bind.annotation.RestController;
 class PrincipalController {
 
     record PrincipalResponse(String principalId, String identityId, String identityType, String networkId,
-                             String organizationId) {
+                             String organizationId, boolean networkAdministrator) {
     }
 
     @GetMapping
     PrincipalResponse current(PrincipalContext principal) {
         return new PrincipalResponse(principal.principalId().toString(), principal.identityId().toString(),
                 principal.identityType(), principal.networkId().toString(),
-                principal.organizationId() == null ? null : principal.organizationId().toString());
+                principal.organizationId() == null ? null : principal.organizationId().toString(),
+                principal.networkAdministrator());
     }
 }

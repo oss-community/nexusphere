@@ -20,17 +20,20 @@ public final class Membership extends AggregateRoot<UUID> {
     private final IdentityId identityId;
     private final NetworkId networkId;
     private final OrganizationId organizationId;
+    private final MembershipRole role;
     private MembershipStatus status;
     private final Instant joinedAt;
     private Instant terminatedAt;
     private final Long version;
 
     private Membership(UUID id, IdentityId identityId, NetworkId networkId, OrganizationId organizationId,
-                       MembershipStatus status, Instant joinedAt, Instant terminatedAt, Long version) {
+                       MembershipRole role, MembershipStatus status, Instant joinedAt, Instant terminatedAt,
+                       Long version) {
         this.id = Objects.requireNonNull(id, "id must not be null");
         this.identityId = Objects.requireNonNull(identityId, "identityId must not be null");
         this.networkId = Objects.requireNonNull(networkId, "networkId must not be null");
         this.organizationId = organizationId;
+        this.role = Objects.requireNonNull(role, "role must not be null");
         this.status = Objects.requireNonNull(status, "status must not be null");
         this.joinedAt = Objects.requireNonNull(joinedAt, "joinedAt must not be null");
         this.terminatedAt = terminatedAt;
@@ -38,16 +41,18 @@ public final class Membership extends AggregateRoot<UUID> {
     }
 
     public static Membership activate(UUID id, IdentityId identityId, NetworkId networkId,
-                                      OrganizationId organizationId, Instant now) {
-        Membership membership = new Membership(id, identityId, networkId, organizationId, MembershipStatus.ACTIVE,
-                now, null, null);
+                                      OrganizationId organizationId, MembershipRole role, Instant now) {
+        Membership membership = new Membership(id, identityId, networkId, organizationId, role,
+                MembershipStatus.ACTIVE, now, null, null);
         membership.registerEvent(new MembershipActivated(now, id, identityId, networkId));
         return membership;
     }
 
     public static Membership restore(UUID id, IdentityId identityId, NetworkId networkId, OrganizationId organizationId,
-                                     MembershipStatus status, Instant joinedAt, Instant terminatedAt, Long version) {
-        return new Membership(id, identityId, networkId, organizationId, status, joinedAt, terminatedAt, version);
+                                     MembershipRole role, MembershipStatus status, Instant joinedAt,
+                                     Instant terminatedAt, Long version) {
+        return new Membership(id, identityId, networkId, organizationId, role, status, joinedAt, terminatedAt,
+                version);
     }
 
     public void terminate(Instant now) {
@@ -82,6 +87,14 @@ public final class Membership extends AggregateRoot<UUID> {
 
     public Optional<OrganizationId> organizationId() {
         return Optional.ofNullable(organizationId);
+    }
+
+    public MembershipRole role() {
+        return role;
+    }
+
+    public boolean isAdministrator() {
+        return role == MembershipRole.ADMINISTRATOR;
     }
 
     public MembershipStatus status() {

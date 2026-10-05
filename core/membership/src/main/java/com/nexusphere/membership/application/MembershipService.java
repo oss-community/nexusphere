@@ -5,6 +5,7 @@ import com.nexusphere.identity.contract.IdentitySnapshot;
 import com.nexusphere.membership.contract.PrincipalContext;
 import com.nexusphere.membership.contract.PrincipalResolver;
 import com.nexusphere.membership.domain.model.Membership;
+import com.nexusphere.membership.domain.model.MembershipRole;
 import com.nexusphere.membership.domain.repository.MembershipRepository;
 import com.nexusphere.network.contract.NetworkDirectory;
 import com.nexusphere.organization.contract.OrganizationDirectory;
@@ -50,7 +51,7 @@ public class MembershipService implements PrincipalResolver {
     }
 
     public Membership activate(NetworkId networkId, IdentityId identityId, OrganizationId organizationId,
-                               ExecutionContext context) {
+                               MembershipRole role, ExecutionContext context) {
         requireActiveNetwork(networkId);
         IdentitySnapshot identity = identities.find(identityId)
                 .orElseThrow(() -> new NotFoundException("Identity", identityId));
@@ -69,7 +70,8 @@ public class MembershipService implements PrincipalResolver {
             throw new ConflictException("MEMBERSHIP_ALREADY_ACTIVE",
                     "Identity " + identityId + " already has an active membership in network " + networkId);
         }
-        Membership membership = Membership.activate(UUID.randomUUID(), identityId, networkId, organization, time.now());
+        Membership membership = Membership.activate(UUID.randomUUID(), identityId, networkId, organization, role,
+                time.now());
         return persist(membership, context);
     }
 
@@ -123,7 +125,7 @@ public class MembershipService implements PrincipalResolver {
                 .orElseThrow(() -> new DomainException(ErrorCategory.AUTHORIZATION_ERROR, "NETWORK_ACCESS_DENIED",
                         "The authenticated identity has no active membership in network " + networkId));
         return new PrincipalContext(membership.principalId(), identity.id(), identity.type(), networkId,
-                membership.organizationId().orElse(null));
+                membership.organizationId().orElse(null), membership.isAdministrator());
     }
 
     private OrganizationId organizationFor(IdentitySnapshot identity, NetworkId networkId, OrganizationId requested) {

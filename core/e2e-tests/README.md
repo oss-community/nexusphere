@@ -45,14 +45,14 @@ repository and architecture tests live in their own modules and are not listed h
 
 </p>
 
-| Concern        | Decision                                                                                                                                                     |
-|----------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| Runtime        | One application hosts many networks; each test creates its own networks with unique names                                                                    |
-| Database       | PostgreSQL 18 through Testcontainers; no in-memory database                                                                                                  |
-| Client         | `ApiClient` sends JSON requests with optional `Authorization`, `X-Network-Id` and `X-Correlation-Id`                                                         |
-| Fixtures       | `SovereigntyApi` for networks and organizations, `IdentityApi` for identities, memberships and tokens, `CapabilityApi` for capability types and capabilities |
-| Authentication | A test creates an identity, issues a credential and exchanges it for a bearer token at `/api/v1/auth/token`                                                  |
-| Naming         | Test classes end with `E2ETest` and every test is named after its catalog ID                                                                                 |
+| Concern        | Decision                                                                                                                                                                                                |
+|----------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| Runtime        | One application hosts many networks; each test creates its own networks with unique names                                                                                                               |
+| Database       | PostgreSQL 18 through Testcontainers; no in-memory database                                                                                                                                             |
+| Client         | `ApiClient` sends JSON requests with optional `Authorization`, `X-Network-Id` and `X-Correlation-Id`                                                                                                    |
+| Fixtures       | `SovereigntyApi` for networks and organizations, `IdentityApi` for identities, memberships and tokens, `CapabilityApi` for capability types and capabilities, `FederationApi` for trust and federations |
+| Authentication | A test creates an identity, issues a credential and exchanges it for a bearer token at `/api/v1/auth/token`                                                                                             |
+| Naming         | Test classes end with `E2ETest` and every test is named after its catalog ID                                                                                                                            |
 
 ## Test Classes
 
@@ -64,6 +64,7 @@ repository and architecture tests live in their own modules and are not listed h
 | `IdentityMembershipE2ETest`        | `com.nexusphere.e2e.identity`    | E2E-SC07-01..06          |
 | `IdentityIsolationE2ETest`         | `com.nexusphere.e2e.identity`    | E2E-SC15-01, E2E-SC15-10 |
 | `CapabilityRegistrationE2ETest`    | `com.nexusphere.e2e.capability`  | E2E-SC08-01..04          |
+| `TrustFederationE2ETest`           | `com.nexusphere.e2e.federation`  | E2E-SC09-01..06          |
 
 ## Scenario Catalog
 
@@ -159,14 +160,14 @@ Status: ✓ implemented, ◐ partly implemented, ○ planned. The scenarios are 
 
 ### SC-09 Trust and Federation Lifecycle
 
-| ID          | Test                                                                                   | Status |
-|-------------|----------------------------------------------------------------------------------------|--------|
-| E2E-SC09-01 | Trust from A to B does not make B trusted by A                                         | ○      |
-| E2E-SC09-02 | Trust stops applying after its end                                                     | ○      |
-| E2E-SC09-03 | Federation goes PROPOSED, PENDING_ACCEPTANCE, ACTIVE; rejection is terminal            | ○      |
-| E2E-SC09-04 | Suspension blocks cross-network work, resumption restores it, termination is final     | ○      |
-| E2E-SC09-05 | Only network administrators can propose or accept a federation                         | ○      |
-| E2E-SC09-06 | A second active federation between the same networks or a stale acceptance returns 409 | ○      |
+| ID          | Test                                                                                                                             | Status |
+|-------------|----------------------------------------------------------------------------------------------------------------------------------|--------|
+| E2E-SC09-01 | Trust from A to B does not make B trusted by A                                                                                   | ✓      |
+| E2E-SC09-02 | Trust stops applying after its end                                                                                               | ✓      |
+| E2E-SC09-03 | Federation goes PROPOSED, PENDING_ACCEPTANCE, ACTIVE; rejection is terminal                                                      | ✓      |
+| E2E-SC09-04 | Suspend and resume by the suspending network, terminate is final; blocking discovery and transactions follows in Phases 8 and 10 | ◐      |
+| E2E-SC09-05 | Only network administrators can propose or accept a federation                                                                   | ✓      |
+| E2E-SC09-06 | A second active federation between the same networks or a stale acceptance returns 409                                           | ✓      |
 
 ### SC-10 Centralized Authorization
 

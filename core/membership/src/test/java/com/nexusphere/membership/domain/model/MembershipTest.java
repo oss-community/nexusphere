@@ -20,16 +20,19 @@ class MembershipTest {
     @Test
     void activatedMembershipDefinesThePrincipal() {
         UUID id = UUID.randomUUID();
-        Membership membership = Membership.activate(id, IdentityId.newId(), NetworkId.newId(), null, NOW);
+        Membership membership = Membership.activate(id, IdentityId.newId(), NetworkId.newId(), null,
+                MembershipRole.MEMBER, NOW);
 
         assertThat(membership.isActive()).isTrue();
         assertThat(membership.principalId().value()).isEqualTo(id);
+        assertThat(membership.isAdministrator()).isFalse();
         assertThat(membership.pullEvents()).singleElement().isInstanceOf(MembershipActivated.class);
     }
 
     @Test
     void terminationIsFinal() {
-        Membership membership = Membership.activate(UUID.randomUUID(), IdentityId.newId(), NetworkId.newId(), null, NOW);
+        Membership membership = Membership.activate(UUID.randomUUID(), IdentityId.newId(), NetworkId.newId(), null,
+                MembershipRole.MEMBER, NOW);
         membership.pullEvents();
 
         membership.terminate(NOW);
@@ -40,5 +43,16 @@ class MembershipTest {
         assertThatThrownBy(() -> membership.terminate(NOW))
                 .isInstanceOf(ConflictException.class)
                 .hasFieldOrPropertyWithValue("code", "MEMBERSHIP_ALREADY_TERMINATED");
+    }
+
+    @Test
+    void administratorRoleIsExplicit() {
+        Membership membership = Membership.activate(UUID.randomUUID(), IdentityId.newId(), NetworkId.newId(), null,
+                MembershipRole.parse("administrator"), NOW);
+
+        assertThat(membership.isAdministrator()).isTrue();
+        assertThat(MembershipRole.parse(null)).isEqualTo(MembershipRole.MEMBER);
+        assertThatThrownBy(() -> MembershipRole.parse("owner"))
+                .hasFieldOrPropertyWithValue("code", "INVALID_MEMBERSHIP_ROLE");
     }
 }
