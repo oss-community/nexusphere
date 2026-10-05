@@ -8,7 +8,7 @@ import com.nexusphere.shared.id.PrincipalId;
 import java.util.Objects;
 
 public record PrincipalContext(PrincipalId principalId, IdentityId identityId, String identityType,
-                               NetworkId networkId, OrganizationId organizationId) {
+                               NetworkId networkId, OrganizationId organizationId, boolean networkAdministrator) {
 
     public PrincipalContext {
         Objects.requireNonNull(principalId, "principalId must not be null");

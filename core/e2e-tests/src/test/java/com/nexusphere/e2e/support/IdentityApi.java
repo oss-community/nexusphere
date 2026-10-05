@@ -43,6 +43,13 @@ public final class IdentityApi {
         return membership.json().path("id").asString();
     }
 
+    public String administrator(String networkId, String identityId) {
+        ApiClient.Response membership = api.post("/api/v1/networks/" + networkId + "/memberships",
+                "{\"identityId\":\"" + identityId + "\",\"role\":\"ADMINISTRATOR\"}");
+        assertThat(membership.status()).isEqualTo(201);
+        return membership.json().path("id").asString();
+    }
+
     public String owned(String type, String displayName, String networkId, String organizationId) {
         ApiClient.Response created = create(type, displayName, networkId, organizationId);
         assertThat(created.status()).isEqualTo(201);

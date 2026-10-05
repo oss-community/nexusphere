@@ -51,7 +51,7 @@ The core is built on eight pillars.
 | Identity      | Something that exists: HUMAN, SERVICE, APPLICATION, AGENT or MACHINE. An identity has no authority by itself             |
 | Ownership     | Agents and machines are owned by an organization in a network, which is accountable for them                             |
 | Credential    | A secret bound to an identity and exchanged for a bearer token. The authentication method is replaceable                 |
-| Membership    | Where an identity participates: one active membership per identity and network                                           |
+| Membership    | Where an identity participates: one active membership per identity and network, as MEMBER or ADMINISTRATOR               |
 | Principal     | An identity acting through a membership inside a network. Authorization works on the principal, not on the identity      |
 | Capability    | What an organization, agent, machine, service or network can do, described by a typed and versioned specification        |
 | Trust         | A scoped, directional and revocable statement of one network about another. Trust does not grant permission              |
@@ -122,8 +122,8 @@ sovereignty is logical and enforced by the network context of every request.
 | `core/identity`      | Identities, ownership, credentials                                                | network, organization                                      |
 | `core/membership`    | Memberships and principal resolution                                              | identity, organization, network                            |
 | `core/authorization` | Roles and central authorization decisions; defines evidence ports                 | membership, identity                                       |
-| `core/trust`         | Scoped, directional trust between networks                                        | authorization, organization, network                       |
-| `core/federation`    | Federation lifecycle and scope                                                    | authorization, trust, network                              |
+| `core/trust`         | Scoped, directional trust from networks and organizations                         | identity, membership, network, organization                |
+| `core/federation`    | Federation lifecycle and scope                                                    | membership, network, trust                                 |
 | `core/delegation`    | Delegations and their constraints                                                 | authorization, membership, identity                        |
 | `core/capability`    | Capability types and capabilities                                                 | authorization, identity, membership, network, organization |
 | `core/discovery`     | Local and federated capability discovery                                          | capability, federation, trust, authorization               |
@@ -181,11 +181,11 @@ Status: ✓ implemented, ○ planned.
 | UC-CAP-01 | Register capability type with schema and version                         | Capability    | 4     | ✓      |
 | UC-CAP-02 | Register capability for an owner                                         | Capability    | 4     | ✓      |
 | UC-CAP-03 | Publish or withdraw capability and set its visibility                    | Capability    | 4     | ✓      |
-| UC-TRU-01 | Establish scoped, directional trust                                      | Trust         | 5     | ○      |
-| UC-TRU-02 | Revoke trust; trust expiry                                               | Trust         | 5     | ○      |
-| UC-FED-01 | Propose federation with scope                                            | Federation    | 5     | ○      |
-| UC-FED-02 | Accept or reject federation                                              | Federation    | 5     | ○      |
-| UC-FED-03 | Suspend, resume or terminate federation                                  | Federation    | 5     | ○      |
+| UC-TRU-01 | Establish scoped, directional trust                                      | Trust         | 5     | ✓      |
+| UC-TRU-02 | Revoke trust; trust expiry                                               | Trust         | 5     | ✓      |
+| UC-FED-01 | Propose federation with scope                                            | Federation    | 5     | ✓      |
+| UC-FED-02 | Accept or reject federation                                              | Federation    | 5     | ✓      |
+| UC-FED-03 | Suspend, resume or terminate federation                                  | Federation    | 5     | ✓      |
 | UC-AUZ-01 | Assign role to a member                                                  | Authorization | 6     | ○      |
 | UC-AUZ-02 | Evaluate an authorization request and return ALLOW or DENY with a reason | Authorization | 6     | ○      |
 | UC-AUZ-03 | Record the authorization decision as evidence                            | Authorization | 6     | ○      |
@@ -253,7 +253,7 @@ Every scenario is verified by end-to-end tests listed in [End-to-End Tests](../c
 | SC-06 | Sovereign network bootstrap            | 2     | ✓      |
 | SC-07 | Human, agent and machine identities    | 3     | ✓      |
 | SC-08 | Capability registration and visibility | 4     | ✓      |
-| SC-09 | Trust and federation lifecycle         | 5     | ○      |
+| SC-09 | Trust and federation lifecycle         | 5     | ✓      |
 | SC-10 | Centralized authorization decisions    | 6     | ○      |
 | SC-11 | Delegation rules                       | 7     | ○      |
 | SC-12 | Governed discovery                     | 8     | ○      |
@@ -271,7 +271,7 @@ Every scenario is verified by end-to-end tests listed in [End-to-End Tests](../c
 | 2     | Sovereignty          | Networks and organizations with isolation                                    | ✓      |
 | 3     | Identity             | Human, agent and machine identities, memberships, principal context, tokens  | ✓      |
 | 4     | Capability           | Capability types, capabilities and visibility                                | ✓      |
-| 5     | Trust and federation | Directional trust and federation lifecycle                                   | ○      |
+| 5     | Trust and federation | Directional trust and federation lifecycle                                   | ✓      |
 | 6     | Authorization        | Roles and central authorization decisions                                    | ○      |
 | 7     | Delegation           | Constrained, revocable delegations                                           | ○      |
 | 8     | Discovery            | Local and federated discovery                                                | ○      |
