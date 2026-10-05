@@ -146,11 +146,15 @@ public class AgreementService implements AgreementDirectory {
     @Override
     @Transactional(readOnly = true)
     public Optional<AgreementSnapshot> find(UUID agreementId) {
-        return agreements.findById(agreementId).map(agreement -> new AgreementSnapshot(agreement.id(),
-                agreement.networkId(), agreement.type(), agreement.status().name(), agreement.current().number(),
-                agreement.capabilityId(), agreement.capabilityNetworkId(), agreement.capabilityTypeCode(),
-                agreement.proposer().organizationId(), agreement.proposer().networkId(),
-                agreement.counterparty().organizationId(), agreement.counterparty().networkId()));
+        return agreements.findById(agreementId).map(AgreementService::snapshot);
+    }
+
+    static AgreementSnapshot snapshot(Agreement agreement) {
+        return new AgreementSnapshot(agreement.id(), agreement.networkId(), agreement.type(),
+                agreement.status().name(), agreement.current().number(), agreement.capabilityId(),
+                agreement.capabilityNetworkId(), agreement.capabilityTypeCode(), agreement.proposer().organizationId(),
+                agreement.proposer().networkId(), agreement.counterparty().organizationId(),
+                agreement.counterparty().networkId());
     }
 
     private boolean readable(PrincipalContext principal, Agreement agreement) {

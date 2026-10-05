@@ -20,11 +20,7 @@
         </dependency>
         <dependency>
             <groupId>com.nexusphere</groupId>
-            <artifactId>identity</artifactId>
-        </dependency>
-        <dependency>
-            <groupId>com.nexusphere</groupId>
-            <artifactId>capability</artifactId>
+            <artifactId>membership</artifactId>
         </dependency>
         <dependency>
             <groupId>com.nexusphere</groupId>
@@ -37,6 +33,15 @@
         <dependency>
             <groupId>com.nexusphere</groupId>
             <artifactId>transaction</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-webmvc</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.modulith</groupId>
+            <artifactId>spring-modulith-api</artifactId>
+            <scope>provided</scope>
         </dependency>
     </dependencies>
 </project>

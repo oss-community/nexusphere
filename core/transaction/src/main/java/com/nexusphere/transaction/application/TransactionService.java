@@ -204,7 +204,7 @@ public class TransactionService implements TransactionDirectory {
         return saved;
     }
 
-    private static TransactionSnapshot snapshot(Transaction transaction) {
+    static TransactionSnapshot snapshot(Transaction transaction) {
         Authority authority = transaction.authority();
         return new TransactionSnapshot(transaction.id(), transaction.type(), transaction.status().name(),
                 transaction.reason().orElse(null), transaction.agreementId(), transaction.agreementVersion(),

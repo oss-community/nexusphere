@@ -72,6 +72,7 @@ repository and architecture tests live in their own modules and are not listed h
 | `TransactionE2ETest`               | `com.nexusphere.e2e.transaction`   | E2E-SC14-01..04, E2E-SC03-01, E2E-SC09-04                               |
 | `PrimaryTrustedInteractionE2ETest` | `com.nexusphere.e2e.primary`       | E2E-SC01-01..05                                                         |
 | `AuditE2ETest`                     | `com.nexusphere.e2e.audit`         | E2E-SC16-01..03, E2E-SC03-02, E2E-SC05-02, E2E-SC14-01, E2E-SC15-02, 10 |
+| `AgentAdapterE2ETest`              | `com.nexusphere.e2e.agent`         | E2E-SC17-01..03                                                         |
 
 ## Scenario Catalog
 
@@ -249,9 +250,11 @@ Status: ✓ implemented, ◐ partly implemented, ○ planned. The scenarios are 
 
 ### SC-17 Agent Adapter
 
-| ID          | Test                                                                                                | Status |
-|-------------|-----------------------------------------------------------------------------------------------------|--------|
-| E2E-SC17-01 | A simulated external agent authenticates with its own credential and completes SC-01 steps 10 to 15 | ○      |
+| ID          | Test                                                                                                            | Status |
+|-------------|-----------------------------------------------------------------------------------------------------------------|--------|
+| E2E-SC17-01 | A simulated external agent authenticates with its own credential and completes SC-01 steps 10 to 15             | ✓      |
+| E2E-SC17-02 | An out-of-scope request through the adapter is denied by the core with `DELEGATION_SCOPE_VIOLATION` and audited | ✓      |
+| E2E-SC17-03 | Protocol errors are JSON-RPC errors; without the agent's own token 401, with a foreign network 403              | ✓      |
 
 ## Cross-Cutting Checks
 
