@@ -50,6 +50,11 @@ public final class ApiClient {
                 .POST(HttpRequest.BodyPublishers.ofString(jsonBody)));
     }
 
+    public Response put(String path, String jsonBody) {
+        return send(request(path).header("Content-Type", "application/json")
+                .PUT(HttpRequest.BodyPublishers.ofString(jsonBody)));
+    }
+
     public Response delete(String path) {
         return send(request(path).DELETE());
     }

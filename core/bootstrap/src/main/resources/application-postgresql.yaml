@@ -4,3 +4,7 @@ spring:
     password: ${APP_DATABASE_PASSWORD:nexusphere}
     url: jdbc:postgresql://${APP_DATABASE_HOST:localhost}:${APP_DATABASE_PORT:5432}/${APP_DATABASE_DB:nexusphere}
     driver-class-name: org.postgresql.Driver
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: validate
