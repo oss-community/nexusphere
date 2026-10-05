@@ -68,6 +68,13 @@ public class NetworkService implements NetworkDirectory {
         return networks.findById(id).map(network -> new NetworkSnapshot(network.id(), network.name(), network.isActive()));
     }
 
+    @Override
+    @Transactional(readOnly = true)
+    public List<NetworkSnapshot> findAllActive() {
+        return networks.findAll().stream().filter(Network::isActive)
+                .map(network -> new NetworkSnapshot(network.id(), network.name(), true)).toList();
+    }
+
     private Network change(NetworkId id, ExecutionContext context, BiConsumer<Network, Instant> transition) {
         Network network = get(id);
         transition.accept(network, time.now());

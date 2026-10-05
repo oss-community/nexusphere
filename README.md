@@ -209,7 +209,8 @@ Maven module with the package `com.nexusphere.<module>`. A module is reached by 
 | `core/federation`                     | Federation lifecycle between two sovereign networks with scope and optimistic locking |
 | `core/authorization`                  | Roles, role assignments, central ALLOW/DENY decisions recorded as evidence            |
 | `core/delegation`                     | Constrained, time-bounded, revocable delegations between principals of one network    |
-| `core/discovery` … `core/integration` | Bounded contexts of the next phases                                                   |
+| `core/discovery`                      | Governed local and federated capability discovery behind a port                       |
+| `core/agreement` … `core/integration` | Bounded contexts of the next phases                                                   |
 | `core/bootstrap`                      | Application, persistence wiring, error handling, architecture tests                   |
 | `core/e2e-tests`                      | End-to-end tests against the application and PostgreSQL                               |
 
@@ -296,6 +297,9 @@ APP_TOKEN_TTL: 15m
 | GET    | `/api/v1/networks/{networkId}/delegations`                               | List delegations, by `delegatePrincipalId`, `delegatorPrincipalId`, `effective` (bearer token) |
 | GET    | `/api/v1/networks/{networkId}/delegations/{delegationId}`                | Get a delegation with its derived status (bearer token)                                        |
 | POST   | `/api/v1/networks/{networkId}/delegations/{delegationId}/{action}`       | `revoke`, `suspend` or `resume` (delegator or administrator)                                   |
+| GET    | `/api/v1/networks/{networkId}/discovery/capabilities`                    | Search by `typeCode`, `ownerType`, `organizationId`, `originNetworkId`, `scope` (bearer token) |
+| GET    | `/api/v1/networks/{networkId}/discovery/capabilities/{capabilityId}`     | Get a discoverable capability, local or federated (bearer token)                               |
+| GET    | `/api/v1/networks/{networkId}/discovery/networks`                        | Other active networks with their federation state (bearer token)                               |
 
 Every active member holds the MEMBER role; an `ADMINISTRATOR` membership holds NETWORK_ADMINISTRATOR. Requests that name an
 action in parentheses are checked by the central authorizer, which records an ALLOW or DENY decision. Requests marked with bearer token need `Authorization: Bearer <token>` and a network context, taken from the path

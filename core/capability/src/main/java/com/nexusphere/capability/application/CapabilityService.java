@@ -225,7 +225,7 @@ public class CapabilityService implements CapabilityDirectory {
     private static CapabilitySnapshot snapshot(Capability capability) {
         return new CapabilitySnapshot(capability.id(), capability.networkId(), capability.owner().type().name(),
                 capability.owner().id(), capability.accountableOrganizationId().orElse(null), capability.name(),
-                capability.typeCode(), capability.typeVersion(), capability.visibility().name(),
-                capability.isAvailable());
+                capability.description(), capability.typeCode(), capability.typeVersion(),
+                capability.visibility().name(), capability.isAvailable());
     }
 }

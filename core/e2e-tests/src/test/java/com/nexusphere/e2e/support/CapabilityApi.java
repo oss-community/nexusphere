@@ -59,6 +59,13 @@ public final class CapabilityApi {
         return body.append(",\"specification\":").append(CNC_SPEC).append("}").toString();
     }
 
+    public static String published(ApiClient as, String networkId, String body) {
+        String id = registered(as, networkId, body);
+        ApiClient.Response published = publish(as, networkId, id, null);
+        assertThat(published.status()).as(published.body()).isEqualTo(200);
+        return id;
+    }
+
     public static ApiClient.Response publish(ApiClient as, String networkId, String capabilityId, String visibility) {
         return as.post(capabilities(networkId) + "/" + capabilityId + "/publish",
                 visibility == null ? "" : "{\"visibility\":\"" + visibility + "\"}");

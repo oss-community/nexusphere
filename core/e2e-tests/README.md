@@ -56,17 +56,18 @@ repository and architecture tests live in their own modules and are not listed h
 
 ## Test Classes
 
-| Class                              | Package                            | Covers                                        |
-|------------------------------------|------------------------------------|-----------------------------------------------|
-| `PlatformBootstrapE2ETest`         | `com.nexusphere.e2e.platform`      | E2E-PLT-01..07                                |
-| `SovereignNetworkBootstrapE2ETest` | `com.nexusphere.e2e.sovereignty`   | E2E-SC06-01..08                               |
-| `NetworkIsolationE2ETest`          | `com.nexusphere.e2e.sovereignty`   | E2E-SC15-02                                   |
-| `IdentityMembershipE2ETest`        | `com.nexusphere.e2e.identity`      | E2E-SC07-01..06                               |
-| `IdentityIsolationE2ETest`         | `com.nexusphere.e2e.identity`      | E2E-SC15-01, E2E-SC15-10                      |
-| `CapabilityRegistrationE2ETest`    | `com.nexusphere.e2e.capability`    | E2E-SC08-01..04                               |
-| `TrustFederationE2ETest`           | `com.nexusphere.e2e.federation`    | E2E-SC09-01..06                               |
-| `AuthorizationE2ETest`             | `com.nexusphere.e2e.authorization` | E2E-SC10-01..05                               |
-| `DelegationE2ETest`                | `com.nexusphere.e2e.delegation`    | E2E-SC11-01..05, E2E-SC05-01, 03, E2E-SC15-05 |
+| Class                              | Package                            | Covers                                                         |
+|------------------------------------|------------------------------------|----------------------------------------------------------------|
+| `PlatformBootstrapE2ETest`         | `com.nexusphere.e2e.platform`      | E2E-PLT-01..07                                                 |
+| `SovereignNetworkBootstrapE2ETest` | `com.nexusphere.e2e.sovereignty`   | E2E-SC06-01..08                                                |
+| `NetworkIsolationE2ETest`          | `com.nexusphere.e2e.sovereignty`   | E2E-SC15-02                                                    |
+| `IdentityMembershipE2ETest`        | `com.nexusphere.e2e.identity`      | E2E-SC07-01..06                                                |
+| `IdentityIsolationE2ETest`         | `com.nexusphere.e2e.identity`      | E2E-SC15-01, E2E-SC15-10                                       |
+| `CapabilityRegistrationE2ETest`    | `com.nexusphere.e2e.capability`    | E2E-SC08-01..04                                                |
+| `TrustFederationE2ETest`           | `com.nexusphere.e2e.federation`    | E2E-SC09-01..06                                                |
+| `AuthorizationE2ETest`             | `com.nexusphere.e2e.authorization` | E2E-SC10-01..05                                                |
+| `DelegationE2ETest`                | `com.nexusphere.e2e.delegation`    | E2E-SC11-01..05, E2E-SC05-01, 03, E2E-SC15-05                  |
+| `DiscoveryE2ETest`                 | `com.nexusphere.e2e.discovery`     | E2E-SC12-01..03, E2E-SC04-01..03, E2E-SC08-03, 04, E2E-SC09-04 |
 
 ## Scenario Catalog
 
@@ -115,9 +116,9 @@ Status: ✓ implemented, ◐ partly implemented, ○ planned. The scenarios are 
 
 | ID          | Test                                                                          | Status |
 |-------------|-------------------------------------------------------------------------------|--------|
-| E2E-SC04-01 | A FEDERATED capability of a network without trust and federation is not found | ○      |
-| E2E-SC04-02 | Fetching that capability by ID returns 404, identical to a random ID          | ○      |
-| E2E-SC04-03 | Trust without federation still excludes the capability                        | ○      |
+| E2E-SC04-01 | A FEDERATED capability of a network without trust and federation is not found | ✓      |
+| E2E-SC04-02 | Fetching that capability by ID returns 404, identical to a random ID          | ✓      |
+| E2E-SC04-03 | Trust without federation still excludes the capability                        | ✓      |
 
 ### SC-05 Delegation Revocation and Expiry
 
@@ -153,23 +154,23 @@ Status: ✓ implemented, ◐ partly implemented, ○ planned. The scenarios are 
 
 ### SC-08 Capability Registration and Visibility
 
-| ID          | Test                                                                                               | Status |
-|-------------|----------------------------------------------------------------------------------------------------|--------|
-| E2E-SC08-01 | Capabilities owned by an organization, an agent and a machine are registered and published         | ✓      |
-| E2E-SC08-02 | A specification that does not match its capability type schema returns 400                         | ✓      |
-| E2E-SC08-03 | PRIVATE is visible to its owner and NETWORK to members; FEDERATED across networks follows in SC-12 | ◐      |
-| E2E-SC08-04 | A withdrawn capability disappears from the catalog; the agreement check follows in Phase 9         | ◐      |
+| ID          | Test                                                                                         | Status |
+|-------------|----------------------------------------------------------------------------------------------|--------|
+| E2E-SC08-01 | Capabilities owned by an organization, an agent and a machine are registered and published   | ✓      |
+| E2E-SC08-02 | A specification that does not match its capability type schema returns 400                   | ✓      |
+| E2E-SC08-03 | PRIVATE is visible to its owner, NETWORK to members and FEDERATED also to federated networks | ✓      |
+| E2E-SC08-04 | A withdrawn capability disappears from discovery; the agreement check follows in Phase 9     | ◐      |
 
 ### SC-09 Trust and Federation Lifecycle
 
-| ID          | Test                                                                                                                             | Status |
-|-------------|----------------------------------------------------------------------------------------------------------------------------------|--------|
-| E2E-SC09-01 | Trust from A to B does not make B trusted by A                                                                                   | ✓      |
-| E2E-SC09-02 | Trust stops applying after its end                                                                                               | ✓      |
-| E2E-SC09-03 | Federation goes PROPOSED, PENDING_ACCEPTANCE, ACTIVE; rejection is terminal                                                      | ✓      |
-| E2E-SC09-04 | Suspend and resume by the suspending network, terminate is final; blocking discovery and transactions follows in Phases 8 and 10 | ◐      |
-| E2E-SC09-05 | Only network administrators can propose or accept a federation                                                                   | ✓      |
-| E2E-SC09-06 | A second active federation between the same networks or a stale acceptance returns 409                                           | ✓      |
+| ID          | Test                                                                                                                           | Status |
+|-------------|--------------------------------------------------------------------------------------------------------------------------------|--------|
+| E2E-SC09-01 | Trust from A to B does not make B trusted by A                                                                                 | ✓      |
+| E2E-SC09-02 | Trust stops applying after its end                                                                                             | ✓      |
+| E2E-SC09-03 | Federation goes PROPOSED, PENDING_ACCEPTANCE, ACTIVE; rejection is terminal                                                    | ✓      |
+| E2E-SC09-04 | Suspend and resume by the suspending network, terminate is final; suspension blocks discovery, transactions follow in Phase 10 | ◐      |
+| E2E-SC09-05 | Only network administrators can propose or accept a federation                                                                 | ✓      |
+| E2E-SC09-06 | A second active federation between the same networks or a stale acceptance returns 409                                         | ✓      |
 
 ### SC-10 Centralized Authorization
 
@@ -195,9 +196,9 @@ Status: ✓ implemented, ◐ partly implemented, ○ planned. The scenarios are 
 
 | ID          | Test                                                                                                     | Status |
 |-------------|----------------------------------------------------------------------------------------------------------|--------|
-| E2E-SC12-01 | Local search returns NETWORK and FEDERATED capabilities, never another member's PRIVATE ones             | ○      |
-| E2E-SC12-02 | Federated search returns Network B's capability with origin and owner only when scope and trust allow it | ○      |
-| E2E-SC12-03 | Filters by capability type and owner type narrow the results                                             | ○      |
+| E2E-SC12-01 | Local search returns NETWORK and FEDERATED capabilities, never another member's PRIVATE ones             | ✓      |
+| E2E-SC12-02 | Federated search returns Network B's capability with origin and owner only when scope and trust allow it | ✓      |
+| E2E-SC12-03 | Filters by capability type and owner type narrow the results                                             | ✓      |
 
 ### SC-13 Agreement Lifecycle and Integrity
 
@@ -225,7 +226,7 @@ Status: ✓ implemented, ◐ partly implemented, ○ planned. The scenarios are 
 |-------------|--------------------------------------------------------------------------------------------------------|--------|
 | E2E-SC15-01 | Network A cannot read network B identities by list or by ID                                            | ✓      |
 | E2E-SC15-02 | Organizations, capabilities, agreements and audit events of B are not found from A; organizations done | ◐      |
-| E2E-SC15-03 | Unauthorized capability discovery, covered by E2E-SC04-01..03                                          | ○      |
+| E2E-SC15-03 | Unauthorized capability discovery, covered by E2E-SC04-01..03                                          | ✓      |
 | E2E-SC15-04 | Citing a federation the caller's network is not part of returns 403                                    | ○      |
 | E2E-SC15-05 | Citing another principal's delegation returns 403                                                      | ✓      |
 | E2E-SC15-06 | Delegation privilege escalation, covered by E2E-SC11-01 and 02                                         | ✓      |

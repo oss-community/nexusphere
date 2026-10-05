@@ -126,7 +126,7 @@ sovereignty is logical and enforced by the network context of every request.
 | `core/federation`    | Federation lifecycle and scope                                                    | membership, network, trust                                 |
 | `core/delegation`    | Delegations and their constraints                                                 | authorization, membership, network                         |
 | `core/capability`    | Capability types and capabilities                                                 | authorization, identity, membership, network, organization |
-| `core/discovery`     | Local and federated capability discovery                                          | capability, federation, trust, authorization               |
+| `core/discovery`     | Local and federated capability discovery                                          | capability, federation, network, authorization             |
 | `core/agreement`     | Versioned agreements                                                              | authorization, capability, federation                      |
 | `core/transaction`   | Transactions under agreements                                                     | agreement, authorization, capability                       |
 | `core/audit`         | Append-only audit events and accountability trails                                | shared (listens to domain events)                          |
@@ -194,9 +194,9 @@ Status: ✓ implemented, ○ planned.
 | UC-DEL-03 | Revoke or suspend delegation                                             | Delegation    | 7     | ✓      |
 | UC-DEL-04 | Expire delegation                                                        | Delegation    | 7     | ✓      |
 | UC-DEL-05 | Get the effective delegations of a principal                             | Delegation    | 7     | ✓      |
-| UC-DIS-01 | Discover capabilities locally                                            | Discovery     | 8     | ○      |
-| UC-DIS-02 | Discover capabilities across federated networks                          | Discovery     | 8     | ○      |
-| UC-DIS-03 | Discover networks open to federation                                     | Discovery     | 8     | ○      |
+| UC-DIS-01 | Discover capabilities locally                                            | Discovery     | 8     | ✓      |
+| UC-DIS-02 | Discover capabilities across federated networks                          | Discovery     | 8     | ✓      |
+| UC-DIS-03 | Discover networks open to federation                                     | Discovery     | 8     | ✓      |
 | UC-AGR-01 | Create agreement draft                                                   | Agreement     | 9     | ○      |
 | UC-AGR-02 | Propose an agreement version on behalf of an accountable party           | Agreement     | 9     | ○      |
 | UC-AGR-03 | Accept or reject an agreement version                                    | Agreement     | 9     | ○      |
@@ -256,7 +256,7 @@ Every scenario is verified by end-to-end tests listed in [End-to-End Tests](../c
 | SC-09 | Trust and federation lifecycle         | 5     | ✓      |
 | SC-10 | Centralized authorization decisions    | 6     | ✓      |
 | SC-11 | Delegation rules                       | 7     | ✓      |
-| SC-12 | Governed discovery                     | 8     | ○      |
+| SC-12 | Governed discovery                     | 8     | ✓      |
 | SC-13 | Agreement lifecycle and integrity      | 9     | ○      |
 | SC-14 | Transaction lifecycle                  | 10    | ○      |
 | SC-15 | Network isolation and context spoofing | 2–15  | ◐      |
@@ -274,7 +274,7 @@ Every scenario is verified by end-to-end tests listed in [End-to-End Tests](../c
 | 5     | Trust and federation | Directional trust and federation lifecycle                                   | ✓      |
 | 6     | Authorization        | Roles and central authorization decisions                                    | ✓      |
 | 7     | Delegation           | Constrained, revocable delegations                                           | ✓      |
-| 8     | Discovery            | Local and federated discovery                                                | ○      |
+| 8     | Discovery            | Local and federated discovery                                                | ✓      |
 | 9     | Agreement            | Versioned agreements                                                         | ○      |
 | 10    | Transaction          | Transactions under agreements                                                | ○      |
 | 11    | Audit                | Audit trail and accountability reconstruction                                | ○      |
