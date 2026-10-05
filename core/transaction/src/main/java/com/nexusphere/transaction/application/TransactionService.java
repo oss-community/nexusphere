@@ -152,6 +152,16 @@ public class TransactionService implements TransactionDirectory {
                 .toList();
     }
 
+    @Transactional(readOnly = true)
+    public List<Transaction> assignedTo(PrincipalContext principal) {
+        return transactions.findInvolving(principal.networkId()).stream()
+                .filter(transaction -> transaction.provider().networkId().equals(principal.networkId()))
+                .filter(transaction -> transaction.status() == TransactionStatus.AUTHORIZED
+                        || transaction.status() == TransactionStatus.EXECUTING)
+                .filter(transaction -> principal.identityId().equals(capabilityOwner(transaction)))
+                .toList();
+    }
+
     @Override
     @Transactional(readOnly = true)
     public Optional<TransactionSnapshot> find(UUID transactionId) {
@@ -213,6 +223,7 @@ public class TransactionService implements TransactionDirectory {
                 transaction.provider().organizationId(), transaction.provider().networkId(),
                 transaction.initiatingPrincipalId(), transaction.initiatingIdentityId(), authority.decisionId(),
                 authority.delegationId(), authority.federationId(), transaction.executorPrincipalId().orElse(null),
-                transaction.executorIdentityId().orElse(null));
+                transaction.executorIdentityId().orElse(null), transaction.metadata(),
+                transaction.result().orElse(null));
     }
 }

@@ -1,7 +1,9 @@
 package com.nexusphere.e2e.sovereignty;
 
 import com.nexusphere.e2e.support.ApiClient;
+import com.nexusphere.e2e.support.CapabilityApi;
 import com.nexusphere.e2e.support.E2ETestBase;
+import com.nexusphere.e2e.support.IdentityApi;
 import com.nexusphere.e2e.support.SovereigntyApi;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -74,8 +76,26 @@ class SovereignNetworkBootstrapE2ETest extends E2ETestBase {
     void suspendedNetworkBlocksChanges() {
         String network = sovereignty.activeNetwork("Suspended");
         String acme = sovereignty.organization(network, "Acme");
+        IdentityApi identities = new IdentityApi(api());
+        String alice = identities.human("Alice");
+        identities.member(network, alice, acme);
+        ApiClient member = identities.as(identities.actor(alice), network);
+        String bob = identities.human("Bob");
+        String cnc = new CapabilityApi(api()).type(CapabilityApi.uniqueCode("manufacturing.cnc"),
+                CapabilityApi.CNC_SCHEMA);
 
         assertThat(sovereignty.transition(network, "suspend").json().path("status").asString()).isEqualTo("SUSPENDED");
+
+        ApiClient.Response agent = identities.create("AGENT", "Agent", network, acme);
+        assertThat(agent.status()).isEqualTo(409);
+        assertThat(agent.json().path("code").asString()).isEqualTo("NETWORK_NOT_ACTIVE");
+        ApiClient.Response membership = identities.activateMembership(network, bob);
+        assertThat(membership.status()).isEqualTo(409);
+        assertThat(membership.json().path("code").asString()).isEqualTo("NETWORK_NOT_ACTIVE");
+        ApiClient.Response capability = CapabilityApi.register(member, network,
+                CapabilityApi.body("Precision CNC", cnc, null, null, null));
+        assertThat(capability.status()).isEqualTo(409);
+        assertThat(capability.json().path("code").asString()).isEqualTo("NETWORK_NOT_ACTIVE");
 
         ApiClient.Response register = sovereignty.registerOrganization(network, "Initech");
         assertThat(register.status()).isEqualTo(409);
