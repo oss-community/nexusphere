@@ -127,7 +127,7 @@ sovereignty is logical and enforced by the network context of every request.
 | `core/delegation`    | Delegations and their constraints                                                 | authorization, membership, network                         |
 | `core/capability`    | Capability types and capabilities                                                 | authorization, identity, membership, network, organization |
 | `core/discovery`     | Local and federated capability discovery                                          | capability, federation, network, authorization             |
-| `core/agreement`     | Versioned agreements                                                              | authorization, capability, federation                      |
+| `core/agreement`     | Versioned agreements                                                              | authorization, discovery, membership                       |
 | `core/transaction`   | Transactions under agreements                                                     | agreement, authorization, capability                       |
 | `core/audit`         | Append-only audit events and accountability trails                                | shared (listens to domain events)                          |
 | `core/integration`   | Agent and machine adapters                                                        | identity, capability, discovery, agreement, transaction    |
@@ -197,11 +197,11 @@ Status: ✓ implemented, ○ planned.
 | UC-DIS-01 | Discover capabilities locally                                            | Discovery     | 8     | ✓      |
 | UC-DIS-02 | Discover capabilities across federated networks                          | Discovery     | 8     | ✓      |
 | UC-DIS-03 | Discover networks open to federation                                     | Discovery     | 8     | ✓      |
-| UC-AGR-01 | Create agreement draft                                                   | Agreement     | 9     | ○      |
-| UC-AGR-02 | Propose an agreement version on behalf of an accountable party           | Agreement     | 9     | ○      |
-| UC-AGR-03 | Accept or reject an agreement version                                    | Agreement     | 9     | ○      |
-| UC-AGR-04 | Activate, complete or terminate agreement                                | Agreement     | 9     | ○      |
-| UC-AGR-05 | Revise agreement, keeping the previous version                           | Agreement     | 9     | ○      |
+| UC-AGR-01 | Create agreement draft                                                   | Agreement     | 9     | ✓      |
+| UC-AGR-02 | Propose an agreement version on behalf of an accountable party           | Agreement     | 9     | ✓      |
+| UC-AGR-03 | Accept or reject an agreement version                                    | Agreement     | 9     | ✓      |
+| UC-AGR-04 | Activate, complete or terminate agreement                                | Agreement     | 9     | ✓      |
+| UC-AGR-05 | Revise agreement, keeping the previous version                           | Agreement     | 9     | ✓      |
 | UC-TRX-01 | Request transaction                                                      | Transaction   | 10    | ○      |
 | UC-TRX-02 | Authorize or reject transaction                                          | Transaction   | 10    | ○      |
 | UC-TRX-03 | Execute, complete, fail or cancel transaction                            | Transaction   | 10    | ○      |
@@ -257,7 +257,7 @@ Every scenario is verified by end-to-end tests listed in [End-to-End Tests](../c
 | SC-10 | Centralized authorization decisions    | 6     | ✓      |
 | SC-11 | Delegation rules                       | 7     | ✓      |
 | SC-12 | Governed discovery                     | 8     | ✓      |
-| SC-13 | Agreement lifecycle and integrity      | 9     | ○      |
+| SC-13 | Agreement lifecycle and integrity      | 9     | ✓      |
 | SC-14 | Transaction lifecycle                  | 10    | ○      |
 | SC-15 | Network isolation and context spoofing | 2–15  | ◐      |
 | SC-16 | Accountability reconstruction          | 11    | ○      |
@@ -275,7 +275,7 @@ Every scenario is verified by end-to-end tests listed in [End-to-End Tests](../c
 | 6     | Authorization        | Roles and central authorization decisions                                    | ✓      |
 | 7     | Delegation           | Constrained, revocable delegations                                           | ✓      |
 | 8     | Discovery            | Local and federated discovery                                                | ✓      |
-| 9     | Agreement            | Versioned agreements                                                         | ○      |
+| 9     | Agreement            | Versioned agreements                                                         | ✓      |
 | 10    | Transaction          | Transactions under agreements                                                | ○      |
 | 11    | Audit                | Audit trail and accountability reconstruction                                | ○      |
 | 12    | Agent adapter        | External agents acting as principals                                         | ○      |

@@ -50,7 +50,15 @@ public final class FederationApi {
     }
 
     public static String active(ApiClient proposer, String proposerNetwork, ApiClient partner, String partnerNetwork) {
-        String federation = proposed(proposer, proposerNetwork, partnerNetwork);
+        return activeWith(proposer, proposerNetwork, partner, partnerNetwork,
+                "\"CAPABILITY_DISCOVERY\",\"AGREEMENT_CREATION\"");
+    }
+
+    public static String activeWith(ApiClient proposer, String proposerNetwork, ApiClient partner,
+                                    String partnerNetwork, String scopes) {
+        ApiClient.Response proposed = propose(proposer, proposerNetwork, partnerNetwork, scopes);
+        assertThat(proposed.status()).as(proposed.body()).isEqualTo(201);
+        String federation = proposed.json().path("id").asString();
         assertThat(transition(proposer, proposerNetwork, federation, "submit").status()).isEqualTo(200);
         assertThat(transition(partner, partnerNetwork, federation, "accept").status()).isEqualTo(200);
         return federation;
