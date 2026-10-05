@@ -53,6 +53,9 @@ services:
       APP_DATABASE_DB: nexusphere
       APP_DATABASE_USERNAME: nexusphere
       APP_DATABASE_PASSWORD: nexusphere
+      APP_TOKEN_ISSUER: nexusphere
+      APP_TOKEN_SECRET: nexusphere-development-token-secret-change-me
+      APP_TOKEN_TTL: 15m
     depends_on:
       - postgresql
       - pgadmin

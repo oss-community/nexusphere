@@ -19,6 +19,9 @@ class ExecutionContextArgumentResolver implements HandlerMethodArgumentResolver 
     public ExecutionContext resolveArgument(MethodParameter parameter, ModelAndViewContainer mavContainer,
                                             NativeWebRequest webRequest, WebDataBinderFactory binderFactory) {
         HttpServletRequest request = webRequest.getNativeRequest(HttpServletRequest.class);
-        return ExecutionContext.anonymous(RequestCorrelation.of(request));
+        ExecutionContext context = ExecutionContext.anonymous(RequestCorrelation.of(request));
+        return AuthenticatedIdentity.current()
+                .map(identity -> new ExecutionContext(context.correlationId(), identity, null, null, null))
+                .orElse(context);
     }
 }
