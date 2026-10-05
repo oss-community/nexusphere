@@ -8,10 +8,6 @@ import tools.jackson.databind.JsonNode;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-/**
- * Phase 1 acceptance: the platform runs as one application on PostgreSQL, documents its API,
- * correlates every request and answers failures with the error model (catalog §4 cross-cutting checks).
- */
 class PlatformBootstrapE2ETest extends E2ETestBase {
 
     private static final String CORRELATION = "X-Correlation-Id";

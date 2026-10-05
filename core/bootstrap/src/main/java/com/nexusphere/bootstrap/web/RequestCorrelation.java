@@ -3,7 +3,6 @@ package com.nexusphere.bootstrap.web;
 import com.nexusphere.shared.context.CorrelationId;
 import jakarta.servlet.http.HttpServletRequest;
 
-/** Access to the correlation ID assigned by {@link CorrelationIdFilter}. */
 public final class RequestCorrelation {
 
     public static final String HEADER = "X-Correlation-Id";

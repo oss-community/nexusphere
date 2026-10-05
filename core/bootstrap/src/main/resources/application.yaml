@@ -1,22 +1,19 @@
-spring:
-  application:
-    name: nexusphere
-  datasource:
-    url: ${NEXUSPHERE_DB_URL:jdbc:postgresql://localhost:5432/nexusphere}
-    username: ${NEXUSPHERE_DB_USER:nexusphere}
-    password: ${NEXUSPHERE_DB_PASSWORD:nexusphere}
-  mvc:
-    problemdetails:
-      enabled: false
-
 server:
+  address: ${APP_HOST:0.0.0.0}
+  port: ${APP_PORT:8080}
   error:
     whitelabel:
       enabled: false
-
+spring:
+  application:
+    name: nexusphere
+  profiles:
+    active: ${APP_PROFILES:postgresql}
+  mvc:
+    problemdetails:
+      enabled: false
 nexusphere:
   persistence:
-    # Modules that own a schema, in dependency order (redesign §54).
     modules:
       - network
       - organization
@@ -30,7 +27,6 @@ nexusphere:
       - agreement
       - transaction
       - audit
-
 management:
   endpoints:
     web:
@@ -43,25 +39,12 @@ management:
   info:
     build:
       enabled: true
-
 springdoc:
   api-docs:
     path: /v3/api-docs
   swagger-ui:
     path: /swagger-ui.html
-
 logging:
   pattern:
     correlation: "[%X{correlationId:-}] "
   include-application-name: false
-
----
-# Structured JSON logs (ECS) for containers and log shippers: SPRING_PROFILES_ACTIVE=json
-spring:
-  config:
-    activate:
-      on-profile: json
-logging:
-  structured:
-    format:
-      console: ecs

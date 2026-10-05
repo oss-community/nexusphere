@@ -1,0 +1,231 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: dev
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: dev-credentials
+  namespace: dev
+type: Opaque
+data:
+  POSTGRES_USER: bmV4dXNwaGVyZQ==
+  POSTGRES_PASSWORD: bmV4dXNwaGVyZQ==
+  PGADMIN_DEFAULT_PASSWORD: cGFzc3dvcmQ=
+  APP_DATABASE_USERNAME: bmV4dXNwaGVyZQ==
+  APP_DATABASE_PASSWORD: bmV4dXNwaGVyZQ==
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: dev-config
+  namespace: dev
+data:
+  APP_DATABASE_HOST: postgresql
+  APP_DATABASE_PORT: "5432"
+  APP_DATABASE_DB: nexusphere
+  POSTGRES_DB: nexusphere
+  PGADMIN_DEFAULT_EMAIL: "pgadmin4@pgadmin.org"
+  PGADMIN_CONFIG_SERVER_MODE: "False"
+  APP_HOST: "0.0.0.0"
+  APP_PORT: "8080"
+  APP_PROFILES: postgresql
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: postgres-pvc
+  namespace: dev
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Gi
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: pgadmin-pvc
+  namespace: dev
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Gi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: postgresql
+  namespace: dev
+  labels:
+    app: postgresql
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: postgresql
+  template:
+    metadata:
+      labels:
+        app: postgresql
+    spec:
+      containers:
+        - name: postgresql
+          image: postgres:18-alpine
+          ports:
+            - containerPort: 5432
+          envFrom:
+            - secretRef:
+                name: dev-credentials
+            - configMapRef:
+                name: dev-config
+          volumeMounts:
+            - mountPath: /var/lib/postgresql
+              name: postgres-data
+      volumes:
+        - name: postgres-data
+          persistentVolumeClaim:
+            claimName: postgres-pvc
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgresql
+  namespace: dev
+spec:
+  selector:
+    app: postgresql
+  ports:
+    - protocol: TCP
+      port: 5432
+      targetPort: 5432
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: pgadmin
+  namespace: dev
+  labels:
+    app: pgadmin
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: pgadmin
+  template:
+    metadata:
+      labels:
+        app: pgadmin
+    spec:
+      containers:
+        - name: pgadmin
+          image: dpage/pgadmin4
+          ports:
+            - containerPort: 80
+          envFrom:
+            - secretRef:
+                name: dev-credentials
+            - configMapRef:
+                name: dev-config
+          volumeMounts:
+            - mountPath: /var/lib/pgadmin
+              name: pgadmin-data
+      volumes:
+        - name: pgadmin-data
+          persistentVolumeClaim:
+            claimName: pgadmin-pvc
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: pgadmin
+  namespace: dev
+spec:
+  selector:
+    app: pgadmin
+  ports:
+    - protocol: TCP
+      port: 80
+      targetPort: 80
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: adminer
+  namespace: dev
+  labels:
+    app: adminer
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: adminer
+  template:
+    metadata:
+      labels:
+        app: adminer
+    spec:
+      containers:
+        - name: adminer
+          image: adminer:latest
+          ports:
+            - containerPort: 8080
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: adminer
+  namespace: dev
+spec:
+  selector:
+    app: adminer
+  ports:
+    - protocol: TCP
+      port: 8080
+      targetPort: 8080
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: application
+  namespace: dev
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: application
+  template:
+    metadata:
+      labels:
+        app: application
+    spec:
+      containers:
+        - name: application
+          image: samanalishiri/nexusphere:latest
+          imagePullPolicy: "IfNotPresent"
+          ports:
+            - containerPort: 8080
+          envFrom:
+            - configMapRef:
+                name: dev-config
+            - secretRef:
+                name: dev-credentials
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: application
+  namespace: dev
+spec:
+  selector:
+    app: application
+  ports:
+    - name: app
+      protocol: TCP
+      port: 8080
+      targetPort: 8080

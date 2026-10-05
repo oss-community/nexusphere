@@ -3,10 +3,6 @@ package com.nexusphere.shared.error;
 import java.util.Map;
 import java.util.Objects;
 
-/**
- * Base of every expected failure. {@code code} is a stable machine-readable reason such as
- * {@code DELEGATION_SCOPE_VIOLATION}; {@code details} must never contain infrastructure internals.
- */
 public class DomainException extends RuntimeException {
 
     private final ErrorCategory category;

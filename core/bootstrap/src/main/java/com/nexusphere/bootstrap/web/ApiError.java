@@ -5,10 +5,6 @@ import com.nexusphere.shared.error.ErrorCategory;
 
 import java.util.Map;
 
-/**
- * The single error body of the public API (redesign §81). Never carries stack traces,
- * SQL or other infrastructure details.
- */
 @JsonInclude(JsonInclude.Include.NON_EMPTY)
 public record ApiError(
         String code,

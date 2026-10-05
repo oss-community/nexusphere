@@ -10,11 +10,6 @@ import org.springframework.stereotype.Component;
 import javax.sql.DataSource;
 import java.util.regex.Pattern;
 
-/**
- * Runs one Flyway instance per module schema at startup (redesign §53, §54, §74). Each module
- * owns its schema, its migrations and its own history table, so migration versions of different
- * modules never collide. Beans that need the schemas in place (e.g. JPA) must depend on this bean.
- */
 @Component(ModuleSchemaMigrations.BEAN_NAME)
 public class ModuleSchemaMigrations implements InitializingBean {
 

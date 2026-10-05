@@ -3,7 +3,6 @@ package com.nexusphere.shared.id;
 import java.util.Objects;
 import java.util.UUID;
 
-/** Globally unique identifier of a organization. Carries no business meaning. */
 public record OrganizationId(UUID value) implements Identifier {
 
     public OrganizationId {

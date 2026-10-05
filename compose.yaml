@@ -1,24 +1,62 @@
-# Local infrastructure for Nexusphere Core V1.
-# Only PostgreSQL is required; Kafka, Redis and Keycloak are not part of V1.
-name: nexusphere
-
+name: dev
 services:
-  postgres:
+  postgresql:
     image: postgres:18-alpine
-    environment:
-      POSTGRES_DB: nexusphere
-      POSTGRES_USER: nexusphere
-      POSTGRES_PASSWORD: nexusphere
+    container_name: postgresql
+    hostname: postgresql
+    restart: always
     ports:
       - "5432:5432"
+    environment:
+      POSTGRES_USER: nexusphere
+      POSTGRES_PASSWORD: nexusphere
+      POSTGRES_DB: nexusphere
     volumes:
-      - postgres-data:/var/lib/postgresql
-      - ./infrastructure/postgres/init:/docker-entrypoint-initdb.d:ro
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U nexusphere -d nexusphere"]
-      interval: 5s
-      timeout: 5s
-      retries: 10
-
+      - "postgresql-data:/var/lib/postgresql"
+      - "./infrastructure/postgres/init:/docker-entrypoint-initdb.d:ro"
+  pgadmin:
+    image: dpage/pgadmin4
+    container_name: pgadmin
+    hostname: pgadmin
+    restart: always
+    ports:
+      - "8081:80"
+    environment:
+      PGADMIN_DEFAULT_EMAIL: pgadmin4@pgadmin.org
+      PGADMIN_DEFAULT_PASSWORD: "password"
+      PGADMIN_CONFIG_SERVER_MODE: "False"
+    volumes:
+      - "pgadmin-data:/var/lib/pgadmin"
+  adminer:
+    image: adminer
+    container_name: adminer
+    hostname: adminer
+    restart: always
+    ports:
+      - "8082:8080"
+  application:
+    image: samanalishiri/nexusphere:latest
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: application
+    hostname: application
+    restart: always
+    ports:
+      - "8080:8080"
+    environment:
+      APP_HOST: "0.0.0.0"
+      APP_PORT: "8080"
+      APP_PROFILES: postgresql
+      APP_DATABASE_HOST: postgresql
+      APP_DATABASE_PORT: "5432"
+      APP_DATABASE_DB: nexusphere
+      APP_DATABASE_USERNAME: nexusphere
+      APP_DATABASE_PASSWORD: nexusphere
+    depends_on:
+      - postgresql
+      - pgadmin
+      - adminer
 volumes:
-  postgres-data:
+  postgresql-data:
+  pgadmin-data:

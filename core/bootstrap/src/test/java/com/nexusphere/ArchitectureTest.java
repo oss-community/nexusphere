@@ -14,7 +14,6 @@ import java.util.stream.Stream;
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.classes;
 import static com.tngtech.archunit.lang.syntax.ArchRuleDefinition.noClasses;
 
-/** Architecture rules of redesign §11, §71 and §80, checked on every build. */
 class ArchitectureTest {
 
     static final List<String> MODULES = List.of(

@@ -8,13 +8,6 @@ import com.nexusphere.shared.id.PrincipalId;
 import java.util.Objects;
 import java.util.Optional;
 
-/**
- * The context every scoped operation carries (redesign §57).
- *
- * <p>A network ID in here has been verified by the platform; it is never taken from the client
- * as-is. Membership, federation and delegation references are added by their modules as those
- * modules are implemented.
- */
 public record ExecutionContext(
         CorrelationId correlationId,
         IdentityId identityId,
@@ -26,7 +19,6 @@ public record ExecutionContext(
         Objects.requireNonNull(correlationId, "correlationId must not be null");
     }
 
-    /** Context for work that is not yet attributed to any identity, e.g. an unauthenticated request. */
     public static ExecutionContext anonymous(CorrelationId correlationId) {
         return new ExecutionContext(correlationId, null, null, null, null);
     }

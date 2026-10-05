@@ -5,7 +5,6 @@ import org.springframework.modulith.core.ApplicationModules;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-/** Spring Modulith view of the module boundaries: no cycles, no access to another module's internals. */
 class ModularityTest {
 
     private final ApplicationModules modules = ApplicationModules.of(NexusphereApplication.class);

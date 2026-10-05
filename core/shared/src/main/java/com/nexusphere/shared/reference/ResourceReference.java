@@ -4,10 +4,6 @@ import com.nexusphere.shared.id.NetworkId;
 
 import java.util.Objects;
 
-/**
- * Points at an aggregate owned by another module without owning it, e.g. {@code AGREEMENT / 4f…}.
- * Used by authorization and audit.
- */
 public record ResourceReference(String resourceType, String resourceId, NetworkId networkId) {
 
     public ResourceReference {

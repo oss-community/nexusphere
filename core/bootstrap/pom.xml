@@ -14,7 +14,6 @@
     <description>The single Spring Boot application that assembles every core module.</description>
 
     <dependencies>
-        <!-- Core modules -->
         <dependency><groupId>com.nexusphere</groupId><artifactId>shared</artifactId></dependency>
         <dependency><groupId>com.nexusphere</groupId><artifactId>network</artifactId></dependency>
         <dependency><groupId>com.nexusphere</groupId><artifactId>organization</artifactId></dependency>
@@ -31,7 +30,6 @@
         <dependency><groupId>com.nexusphere</groupId><artifactId>audit</artifactId></dependency>
         <dependency><groupId>com.nexusphere</groupId><artifactId>integration</artifactId></dependency>
 
-        <!-- Web, API documentation, operations -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-webmvc</artifactId>
@@ -49,7 +47,6 @@
             <artifactId>springdoc-openapi-starter-webmvc-ui</artifactId>
         </dependency>
 
-        <!-- Persistence: one PostgreSQL database, one schema per module, Flyway per schema -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-jdbc</artifactId>
@@ -68,13 +65,11 @@
             <scope>runtime</scope>
         </dependency>
 
-        <!-- Module boundaries -->
         <dependency>
             <groupId>org.springframework.modulith</groupId>
             <artifactId>spring-modulith-starter-core</artifactId>
         </dependency>
 
-        <!-- Tests -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-test</artifactId>

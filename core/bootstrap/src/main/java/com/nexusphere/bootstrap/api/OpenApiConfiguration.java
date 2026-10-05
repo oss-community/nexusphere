@@ -7,7 +7,6 @@ import org.springframework.boot.info.BuildProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
-/** The generated OpenAPI document is part of the Version 1 contract (redesign §72). */
 @Configuration(proxyBeanMethods = false)
 class OpenApiConfiguration {
 

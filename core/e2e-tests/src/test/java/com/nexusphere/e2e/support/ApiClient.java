@@ -12,7 +12,6 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Optional;
 
-/** Minimal HTTP client for black-box tests. Later phases add the caller's credential and network header. */
 public final class ApiClient {
 
     public record Response(int status, Map<String, String> headers, String body) {

@@ -4,7 +4,6 @@ import com.nexusphere.shared.error.ValidationException;
 
 import java.util.UUID;
 
-/** A typed, UUID-based identifier of an entity owned by some module. */
 public interface Identifier {
 
     UUID value();
