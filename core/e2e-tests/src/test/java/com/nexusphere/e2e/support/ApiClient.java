@@ -25,6 +25,7 @@ public final class ApiClient {
         }
     }
 
+    public static final String OPERATOR_SECRET = "nexusphere-development-operator-secret-change-me";
     private static final JsonMapper JSON = JsonMapper.builder().build();
     private final HttpClient http = HttpClient.newHttpClient();
     private final String baseUrl;
@@ -39,6 +40,15 @@ public final class ApiClient {
         copy.defaultHeaders.putAll(defaultHeaders);
         copy.defaultHeaders.put(name, value);
         return copy;
+    }
+
+    public ApiClient asOperator() {
+        Response token = new ApiClient(baseUrl).post("/api/v1/auth/operator-token",
+                "{\"secret\":\"" + OPERATOR_SECRET + "\"}");
+        if (token.status() != 200) {
+            throw new IllegalStateException("Operator token request failed: " + token.body());
+        }
+        return withHeader("Authorization", "Bearer " + token.json().path("accessToken").asString());
     }
 
     public Response get(String path) {

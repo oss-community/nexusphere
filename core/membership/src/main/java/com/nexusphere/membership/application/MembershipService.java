@@ -146,6 +146,13 @@ public class MembershipService implements PrincipalResolver {
         return memberships.findActive(identityId).stream().map(Membership::networkId).toList();
     }
 
+    @Override
+    @Transactional(readOnly = true)
+    public List<NetworkId> administeredNetworks(IdentityId identityId) {
+        return memberships.findActive(identityId).stream().filter(Membership::isAdministrator)
+                .map(Membership::networkId).toList();
+    }
+
     private OrganizationId organizationFor(IdentitySnapshot identity, NetworkId networkId, OrganizationId requested) {
         if (!identity.ownedByOrganization()) {
             return requested;

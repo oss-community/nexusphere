@@ -10,7 +10,7 @@ public final class IdentityApi {
     private final ApiClient api;
 
     public IdentityApi(ApiClient api) {
-        this.api = api;
+        this.api = api.asOperator();
     }
 
     public ApiClient.Response create(String type, String displayName, String networkId, String organizationId) {

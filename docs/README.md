@@ -83,16 +83,16 @@ The core is built on eight pillars.
 
 ## Actors
 
-| Actor                  | Identity type          | Role                                                    |
-|------------------------|------------------------|---------------------------------------------------------|
-| Platform operator      | HUMAN                  | Creates networks in V1                                  |
-| Network administrator  | HUMAN                  | Administers one network                                 |
-| Human member           | HUMAN                  | Acts inside a network through an active membership      |
-| AI agent               | AGENT                  | Owned by an organization; acts only under delegation    |
-| Machine                | MACHINE                | Owned by an organization; simulated by an adapter in V1 |
-| Application or service | APPLICATION or SERVICE | An external system acting as a principal                |
-| Counterparty           | any                    | Lives in another sovereign network                      |
-| Auditor                | HUMAN                  | Reads the audit trail                                   |
+| Actor                  | Identity type          | Role                                                                                                    |
+|------------------------|------------------------|---------------------------------------------------------------------------------------------------------|
+| Platform operator      | none (operator secret) | Creates networks, human identities and capability types, and bootstraps the first network administrator |
+| Network administrator  | HUMAN                  | Administers one network                                                                                 |
+| Human member           | HUMAN                  | Acts inside a network through an active membership                                                      |
+| AI agent               | AGENT                  | Owned by an organization; acts only under delegation                                                    |
+| Machine                | MACHINE                | Owned by an organization; simulated by an adapter in V1                                                 |
+| Application or service | APPLICATION or SERVICE | An external system acting as a principal                                                                |
+| Counterparty           | any                    | Lives in another sovereign network                                                                      |
+| Auditor                | HUMAN                  | Reads the audit trail                                                                                   |
 
 ## Architecture
 
@@ -262,24 +262,26 @@ Every scenario is verified by end-to-end tests listed in [End-to-End Tests](../c
 | SC-15 | Network isolation and context spoofing | 2–15  | ✓      |
 | SC-16 | Accountability reconstruction          | 11    | ✓      |
 | SC-17 | Agent adapter                          | 12    | ✓      |
+| SC-18 | Platform administration access         | 14    | ✓      |
 
 ## Roadmap
 
-| Phase | Name                 | Delivers                                                                     | Status |
-|-------|----------------------|------------------------------------------------------------------------------|--------|
-| 1     | Bootstrap            | Modular monolith, PostgreSQL, Flyway per module, error model, correlation ID | ✓      |
-| 2     | Sovereignty          | Networks and organizations with isolation                                    | ✓      |
-| 3     | Identity             | Human, agent and machine identities, memberships, principal context, tokens  | ✓      |
-| 4     | Capability           | Capability types, capabilities and visibility                                | ✓      |
-| 5     | Trust and federation | Directional trust and federation lifecycle                                   | ✓      |
-| 6     | Authorization        | Roles and central authorization decisions                                    | ✓      |
-| 7     | Delegation           | Constrained, revocable delegations                                           | ✓      |
-| 8     | Discovery            | Local and federated discovery                                                | ✓      |
-| 9     | Agreement            | Versioned agreements                                                         | ✓      |
-| 10    | Transaction          | Transactions under agreements                                                | ✓      |
-| 11    | Audit                | Audit trail and accountability reconstruction                                | ✓      |
-| 12    | Agent adapter        | External agents acting as principals                                         | ✓      |
-| 13    | Machine adapter      | Simulated machine executing authorized transactions                          | ✓      |
+| Phase | Name                 | Delivers                                                                            | Status |
+|-------|----------------------|-------------------------------------------------------------------------------------|--------|
+| 1     | Bootstrap            | Modular monolith, PostgreSQL, Flyway per module, error model, correlation ID        | ✓      |
+| 2     | Sovereignty          | Networks and organizations with isolation                                           | ✓      |
+| 3     | Identity             | Human, agent and machine identities, memberships, principal context, tokens         | ✓      |
+| 4     | Capability           | Capability types, capabilities and visibility                                       | ✓      |
+| 5     | Trust and federation | Directional trust and federation lifecycle                                          | ✓      |
+| 6     | Authorization        | Roles and central authorization decisions                                           | ✓      |
+| 7     | Delegation           | Constrained, revocable delegations                                                  | ✓      |
+| 8     | Discovery            | Local and federated discovery                                                       | ✓      |
+| 9     | Agreement            | Versioned agreements                                                                | ✓      |
+| 10    | Transaction          | Transactions under agreements                                                       | ✓      |
+| 11    | Audit                | Audit trail and accountability reconstruction                                       | ✓      |
+| 12    | Agent adapter        | External agents acting as principals                                                | ✓      |
+| 13    | Machine adapter      | Simulated machine executing authorized transactions                                 | ✓      |
+| 14    | Hardening            | Authenticated management endpoints, operator token, ownership limited for execution | ✓      |
 
 V1 is done when two independent networks, at least two organizations, human, agent and machine identities, memberships,
 capability discovery, an active federation, a limited delegation, authorization decisions, an accepted agreement, an

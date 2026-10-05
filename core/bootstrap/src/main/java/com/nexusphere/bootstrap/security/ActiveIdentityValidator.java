@@ -20,6 +20,10 @@ class ActiveIdentityValidator implements OAuth2TokenValidator<Jwt> {
 
     @Override
     public OAuth2TokenValidatorResult validate(Jwt token) {
+        if (LocalTokenIssuer.OPERATOR_SUBJECT.equals(token.getSubject())) {
+            return Boolean.TRUE.equals(token.getClaimAsBoolean(LocalTokenIssuer.OPERATOR_CLAIM))
+                    ? OAuth2TokenValidatorResult.success() : failure("The operator token is not valid");
+        }
         IdentityId identityId;
         try {
             identityId = IdentityId.of(token.getSubject());

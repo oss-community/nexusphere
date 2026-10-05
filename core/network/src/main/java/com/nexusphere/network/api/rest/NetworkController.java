@@ -2,6 +2,7 @@ package com.nexusphere.network.api.rest;
 
 import com.nexusphere.network.application.NetworkService;
 import com.nexusphere.network.domain.model.Network;
+import com.nexusphere.shared.context.Caller;
 import com.nexusphere.shared.context.ExecutionContext;
 import com.nexusphere.shared.id.NetworkId;
 import jakarta.validation.Valid;
@@ -44,7 +45,9 @@ class NetworkController {
     }
 
     @PostMapping
-    ResponseEntity<NetworkResponse> create(@Valid @RequestBody CreateNetworkRequest request, ExecutionContext context) {
+    ResponseEntity<NetworkResponse> create(@Valid @RequestBody CreateNetworkRequest request, Caller caller,
+                                           ExecutionContext context) {
+        caller.requireOperator();
         Network network = networks.create(request.name(), request.description(), context);
         return ResponseEntity.created(URI.create("/api/v1/networks/" + network.id()))
                 .body(NetworkResponse.of(network));
@@ -61,17 +64,20 @@ class NetworkController {
     }
 
     @PostMapping("/{networkId}/activate")
-    NetworkResponse activate(@PathVariable String networkId, ExecutionContext context) {
+    NetworkResponse activate(@PathVariable String networkId, Caller caller, ExecutionContext context) {
+        caller.requireOperator();
         return NetworkResponse.of(networks.activate(NetworkId.of(networkId), context));
     }
 
     @PostMapping("/{networkId}/suspend")
-    NetworkResponse suspend(@PathVariable String networkId, ExecutionContext context) {
+    NetworkResponse suspend(@PathVariable String networkId, Caller caller, ExecutionContext context) {
+        caller.requireOperator();
         return NetworkResponse.of(networks.suspend(NetworkId.of(networkId), context));
     }
 
     @PostMapping("/{networkId}/archive")
-    NetworkResponse archive(@PathVariable String networkId, ExecutionContext context) {
+    NetworkResponse archive(@PathVariable String networkId, Caller caller, ExecutionContext context) {
+        caller.requireOperator();
         return NetworkResponse.of(networks.archive(NetworkId.of(networkId), context));
     }
 }

@@ -75,6 +75,7 @@ repository and architecture tests live in their own modules and are not listed h
 | `AuditE2ETest`                     | `com.nexusphere.e2e.audit`         | E2E-SC16-01..03, E2E-SC03-02, E2E-SC05-02, E2E-SC14-01, E2E-SC15-02, 10 |
 | `AgentAdapterE2ETest`              | `com.nexusphere.e2e.agent`         | E2E-SC17-01..03                                                         |
 | `MachineAdapterE2ETest`            | `com.nexusphere.e2e.machine`       | E2E-SC02-01..04                                                         |
+| `ManagementAccessE2ETest`          | `com.nexusphere.e2e.security`      | E2E-SC18-01..04, E2E-SC15-11                                            |
 
 ## Scenario Catalog
 
@@ -241,6 +242,7 @@ Status: ✓ implemented, ◐ partly implemented, ○ planned. The scenarios are 
 | E2E-SC15-08 | Unauthorized agreement modification, covered by E2E-SC13-04                                                           | ✓      |
 | E2E-SC15-09 | Unauthorized transaction execution, covered by E2E-SC03-01                                                            | ✓      |
 | E2E-SC15-10 | A token of A with the network context of B returns 403 and is audited in A                                            | ✓      |
+| E2E-SC15-11 | A member of the providing organization without an execution role cannot execute its transactions (403 `NO_AUTHORITY`) | ✓      |
 
 ### SC-16 Accountability Reconstruction
 
@@ -257,6 +259,15 @@ Status: ✓ implemented, ◐ partly implemented, ○ planned. The scenarios are 
 | E2E-SC17-01 | A simulated external agent authenticates with its own credential and completes SC-01 steps 10 to 15             | ✓      |
 | E2E-SC17-02 | An out-of-scope request through the adapter is denied by the core with `DELEGATION_SCOPE_VIOLATION` and audited | ✓      |
 | E2E-SC17-03 | Protocol errors are JSON-RPC errors; without the agent's own token 401, with a foreign network 403              | ✓      |
+
+### SC-18 Platform Administration Access
+
+| ID          | Test                                                                                                    | Status |
+|-------------|---------------------------------------------------------------------------------------------------------|--------|
+| E2E-SC18-01 | Management endpoints reject requests without a token (401 `AUTHENTICATION_REQUIRED`)                    | ✓      |
+| E2E-SC18-02 | The platform operator authenticates with its own secret and has no principal in any network             | ✓      |
+| E2E-SC18-03 | A network administrator manages organizations, memberships and owned identities of its own network only | ✓      |
+| E2E-SC18-04 | An ordinary member cannot manage the network but can rotate its own credential                          | ✓      |
 
 ## Cross-Cutting Checks
 

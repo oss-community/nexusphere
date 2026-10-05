@@ -56,6 +56,7 @@ services:
       APP_TOKEN_ISSUER: nexusphere
       APP_TOKEN_SECRET: nexusphere-development-token-secret-change-me
       APP_TOKEN_TTL: 15m
+      APP_OPERATOR_SECRET: nexusphere-development-operator-secret-change-me
     depends_on:
       - postgresql
       - pgadmin

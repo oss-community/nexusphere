@@ -26,5 +26,6 @@ class WebConfiguration implements WebMvcConfigurer {
     public void addArgumentResolvers(List<HandlerMethodArgumentResolver> resolvers) {
         resolvers.add(new ExecutionContextArgumentResolver());
         resolvers.add(new PrincipalContextArgumentResolver(principals, events, time));
+        resolvers.add(new CallerArgumentResolver(principals));
     }
 }

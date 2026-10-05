@@ -9,7 +9,7 @@ public final class SovereigntyApi {
     private final ApiClient api;
 
     public SovereigntyApi(ApiClient api) {
-        this.api = api;
+        this.api = api.asOperator();
     }
 
     public static String unique(String name) {

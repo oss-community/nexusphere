@@ -17,7 +17,7 @@ public final class CapabilityApi {
     private final ApiClient api;
 
     public CapabilityApi(ApiClient api) {
-        this.api = api;
+        this.api = api.asOperator();
     }
 
     public static String uniqueCode(String prefix) {

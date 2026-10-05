@@ -55,10 +55,11 @@ curl -X GET http://localhost:8080/api/v1/platform
 ```
 
 ```shell
-curl -X POST http://localhost:8080/api/v1/networks -H "Content-Type: application/json" -d '{"name":"Network A"}'
-curl -X POST http://localhost:8080/api/v1/networks/{networkId}/activate
-curl -X POST http://localhost:8080/api/v1/networks/{networkId}/organizations -H "Content-Type: application/json" -d '{"name":"Acme"}'
-curl -X GET http://localhost:8080/api/v1/networks/{networkId}/organizations
+curl -X POST http://localhost:8080/api/v1/auth/operator-token -H "Content-Type: application/json" -d '{"secret":"nexusphere-development-operator-secret-change-me"}'
+curl -X POST http://localhost:8080/api/v1/networks -H "Authorization: Bearer {operatorToken}" -H "Content-Type: application/json" -d '{"name":"Network A"}'
+curl -X POST http://localhost:8080/api/v1/networks/{networkId}/activate -H "Authorization: Bearer {operatorToken}"
+curl -X POST http://localhost:8080/api/v1/networks/{networkId}/organizations -H "Authorization: Bearer {operatorToken}" -H "Content-Type: application/json" -d '{"name":"Acme"}'
+curl -X GET http://localhost:8080/api/v1/networks/{networkId}/organizations -H "Authorization: Bearer {operatorToken}"
 ```
 
 ### Stop
@@ -242,6 +243,7 @@ APP_DATABASE_PASSWORD: nexusphere
 APP_TOKEN_ISSUER: nexusphere
 APP_TOKEN_SECRET: nexusphere-development-token-secret-change-me
 APP_TOKEN_TTL: 15m
+APP_OPERATOR_SECRET: nexusphere-development-operator-secret-change-me
 ```
 
 ### API
@@ -249,30 +251,31 @@ APP_TOKEN_TTL: 15m
 | Method | Path                                                                     | Description                                                                                                                                                                       |
 |--------|--------------------------------------------------------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | GET    | `/api/v1/platform`                                                       | Platform information                                                                                                                                                              |
-| POST   | `/api/v1/networks`                                                       | Create a network                                                                                                                                                                  |
+| POST   | `/api/v1/networks`                                                       | Create a network (operator)                                                                                                                                                       |
 | GET    | `/api/v1/networks`                                                       | List networks                                                                                                                                                                     |
 | GET    | `/api/v1/networks/{networkId}`                                           | Get a network                                                                                                                                                                     |
-| POST   | `/api/v1/networks/{networkId}/activate`                                  | Activate a network                                                                                                                                                                |
-| POST   | `/api/v1/networks/{networkId}/suspend`                                   | Suspend a network                                                                                                                                                                 |
-| POST   | `/api/v1/networks/{networkId}/archive`                                   | Archive a network                                                                                                                                                                 |
-| POST   | `/api/v1/networks/{networkId}/organizations`                             | Register an organization                                                                                                                                                          |
-| GET    | `/api/v1/networks/{networkId}/organizations`                             | List organizations                                                                                                                                                                |
-| GET    | `/api/v1/networks/{networkId}/organizations/{organizationId}`            | Get an organization                                                                                                                                                               |
-| PUT    | `/api/v1/networks/{networkId}/organizations/{organizationId}`            | Rename an organization                                                                                                                                                            |
-| POST   | `/api/v1/networks/{networkId}/organizations/{organizationId}/deactivate` | Deactivate an organization                                                                                                                                                        |
-| POST   | `/api/v1/identities`                                                     | Create an identity                                                                                                                                                                |
-| POST   | `/api/v1/identities/{identityId}/suspend`                                | Suspend an identity                                                                                                                                                               |
-| POST   | `/api/v1/identities/{identityId}/activate`                               | Activate an identity                                                                                                                                                              |
-| POST   | `/api/v1/identities/{identityId}/credentials`                            | Issue a credential secret                                                                                                                                                         |
+| POST   | `/api/v1/networks/{networkId}/activate`                                  | Activate a network (operator)                                                                                                                                                     |
+| POST   | `/api/v1/networks/{networkId}/suspend`                                   | Suspend a network (operator)                                                                                                                                                      |
+| POST   | `/api/v1/networks/{networkId}/archive`                                   | Archive a network (operator)                                                                                                                                                      |
+| POST   | `/api/v1/networks/{networkId}/organizations`                             | Register an organization (network administrator)                                                                                                                                  |
+| GET    | `/api/v1/networks/{networkId}/organizations`                             | List organizations (member)                                                                                                                                                       |
+| GET    | `/api/v1/networks/{networkId}/organizations/{organizationId}`            | Get an organization (member)                                                                                                                                                      |
+| PUT    | `/api/v1/networks/{networkId}/organizations/{organizationId}`            | Rename an organization (network administrator)                                                                                                                                    |
+| POST   | `/api/v1/networks/{networkId}/organizations/{organizationId}/deactivate` | Deactivate an organization (network administrator)                                                                                                                                |
+| POST   | `/api/v1/identities`                                                     | Create an identity: HUMAN by the operator, owned identities by an administrator of the owning network                                                                             |
+| POST   | `/api/v1/identities/{identityId}/suspend`                                | Suspend an identity (operator, or administrator of the owning network)                                                                                                            |
+| POST   | `/api/v1/identities/{identityId}/activate`                               | Activate an identity (operator, or administrator of the owning network)                                                                                                           |
+| POST   | `/api/v1/identities/{identityId}/credentials`                            | Issue a credential secret (operator, administrator of the owning network, or the identity itself)                                                                                 |
 | POST   | `/api/v1/auth/token`                                                     | Exchange a credential for a bearer token                                                                                                                                          |
-| POST   | `/api/v1/networks/{networkId}/memberships`                               | Activate a membership, optionally as `ADMINISTRATOR`                                                                                                                              |
-| GET    | `/api/v1/networks/{networkId}/memberships`                               | List memberships                                                                                                                                                                  |
-| GET    | `/api/v1/networks/{networkId}/memberships/{membershipId}`                | Get a membership                                                                                                                                                                  |
-| POST   | `/api/v1/networks/{networkId}/memberships/{membershipId}/terminate`      | Terminate a membership                                                                                                                                                            |
+| POST   | `/api/v1/auth/operator-token`                                            | Exchange the platform operator secret (`APP_OPERATOR_SECRET`) for an operator bearer token                                                                                        |
+| POST   | `/api/v1/networks/{networkId}/memberships`                               | Activate a membership, optionally as `ADMINISTRATOR` (network administrator)                                                                                                      |
+| GET    | `/api/v1/networks/{networkId}/memberships`                               | List memberships (member)                                                                                                                                                         |
+| GET    | `/api/v1/networks/{networkId}/memberships/{membershipId}`                | Get a membership (member)                                                                                                                                                         |
+| POST   | `/api/v1/networks/{networkId}/memberships/{membershipId}/terminate`      | Terminate a membership (network administrator)                                                                                                                                    |
 | GET    | `/api/v1/networks/{networkId}/identities`                                | List member identities (bearer token)                                                                                                                                             |
 | GET    | `/api/v1/networks/{networkId}/identities/{identityId}`                   | Get a member identity (bearer token)                                                                                                                                              |
 | GET    | `/api/v1/principal`                                                      | Principal context for `X-Network-Id` (bearer token)                                                                                                                               |
-| POST   | `/api/v1/capability-types`                                               | Register a capability type or its next version                                                                                                                                    |
+| POST   | `/api/v1/capability-types`                                               | Register a capability type or its next version (operator)                                                                                                                         |
 | GET    | `/api/v1/capability-types`                                               | List capability types, optionally by `code`                                                                                                                                       |
 | GET    | `/api/v1/capability-types/{typeId}`                                      | Get a capability type                                                                                                                                                             |
 | POST   | `/api/v1/networks/{networkId}/capabilities`                              | Register a capability (bearer token)                                                                                                                                              |
@@ -323,27 +326,29 @@ APP_TOKEN_TTL: 15m
 | GET    | `/api/v1/networks/{networkId}/machine/tasks`                             | AUTHORIZED and EXECUTING transactions for capabilities the calling machine owns (machine token)                                                                                   |
 | POST   | `/api/v1/networks/{networkId}/machine/tasks/{taskId}/{action}`           | `start`, `complete` with a result, or `fail` with a reason (machine token, `transaction:execute`)                                                                                 |
 
+The platform operator creates networks, human identities and capability types and bootstraps the first network
+administrator; after that each network administrator manages its own organizations, memberships and owned identities.
 Every active member holds the MEMBER role; an `ADMINISTRATOR` membership holds NETWORK_ADMINISTRATOR. Requests that name an
 action in parentheses are checked by the central authorizer, which records an ALLOW or DENY decision. Requests marked with bearer token need `Authorization: Bearer <token>` and a network context, taken from the path
 or the `X-Network-Id` header. The identity must be active and hold an active membership in that network.
 
 ```shell
-curl -X POST http://localhost:8080/api/v1/identities -H "Content-Type: application/json" -d '{"type":"HUMAN","displayName":"Alice"}'
-curl -X POST http://localhost:8080/api/v1/networks/{networkId}/memberships -H "Content-Type: application/json" -d '{"identityId":"{identityId}"}'
-curl -X POST http://localhost:8080/api/v1/identities/{identityId}/credentials
+curl -X POST http://localhost:8080/api/v1/identities -H "Authorization: Bearer {operatorToken}" -H "Content-Type: application/json" -d '{"type":"HUMAN","displayName":"Alice"}'
+curl -X POST http://localhost:8080/api/v1/networks/{networkId}/memberships -H "Authorization: Bearer {operatorToken}" -H "Content-Type: application/json" -d '{"identityId":"{identityId}"}'
+curl -X POST http://localhost:8080/api/v1/identities/{identityId}/credentials -H "Authorization: Bearer {operatorToken}"
 curl -X POST http://localhost:8080/api/v1/auth/token -H "Content-Type: application/json" -d '{"identityId":"{identityId}","secret":"{secret}"}'
 curl -X GET http://localhost:8080/api/v1/principal -H "Authorization: Bearer {accessToken}" -H "X-Network-Id: {networkId}"
 ```
 
 ```shell
-curl -X POST http://localhost:8080/api/v1/capability-types -H "Content-Type: application/json" -d '{"code":"manufacturing.cnc","name":"CNC machining","schema":{"type":"object","required":["material"],"properties":{"material":{"type":"string"}}}}'
+curl -X POST http://localhost:8080/api/v1/capability-types -H "Authorization: Bearer {operatorToken}" -H "Content-Type: application/json" -d '{"code":"manufacturing.cnc","name":"CNC machining","schema":{"type":"object","required":["material"],"properties":{"material":{"type":"string"}}}}'
 curl -X POST http://localhost:8080/api/v1/networks/{networkId}/capabilities -H "Authorization: Bearer {accessToken}" -H "Content-Type: application/json" -d '{"name":"Precision CNC","typeCode":"manufacturing.cnc","specification":{"material":"steel"}}'
 curl -X POST http://localhost:8080/api/v1/networks/{networkId}/capabilities/{capabilityId}/publish -H "Authorization: Bearer {accessToken}" -H "Content-Type: application/json" -d '{"visibility":"NETWORK"}'
 curl -X GET http://localhost:8080/api/v1/networks/{networkId}/capabilities -H "Authorization: Bearer {accessToken}"
 ```
 
 ```shell
-curl -X POST http://localhost:8080/api/v1/networks/{networkA}/memberships -H "Content-Type: application/json" -d '{"identityId":"{identityId}","role":"ADMINISTRATOR"}'
+curl -X POST http://localhost:8080/api/v1/networks/{networkA}/memberships -H "Authorization: Bearer {operatorToken}" -H "Content-Type: application/json" -d '{"identityId":"{identityId}","role":"ADMINISTRATOR"}'
 curl -X POST http://localhost:8080/api/v1/networks/{networkA}/trust-relationships -H "Authorization: Bearer {adminA}" -H "Content-Type: application/json" -d '{"target":{"type":"NETWORK","id":"{networkB}"},"scopes":["capability:discover"]}'
 curl -X POST http://localhost:8080/api/v1/networks/{networkA}/federations -H "Authorization: Bearer {adminA}" -H "Content-Type: application/json" -d '{"partnerNetworkId":"{networkB}","scopes":["CAPABILITY_DISCOVERY","AGREEMENT_CREATION"]}'
 curl -X POST http://localhost:8080/api/v1/networks/{networkA}/federations/{federationId}/submit -H "Authorization: Bearer {adminA}"

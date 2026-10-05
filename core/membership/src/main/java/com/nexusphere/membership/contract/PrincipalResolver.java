@@ -14,4 +14,6 @@ public interface PrincipalResolver {
     Optional<PrincipalContext> find(NetworkId networkId, PrincipalId principalId);
 
     List<NetworkId> memberNetworks(IdentityId identityId);
+
+    List<NetworkId> administeredNetworks(IdentityId identityId);
 }
