@@ -118,11 +118,21 @@ public class FederationService implements FederationDirectory {
     public Optional<FederationSnapshot> findActive(NetworkId first, NetworkId second) {
         Instant now = time.now();
         return federations.findBetween(first, second).stream().filter(federation -> federation.isActive(now))
-                .findFirst()
-                .map(federation -> new FederationSnapshot(federation.id(), federation.proposerNetworkId(),
-                        federation.partnerNetworkId(),
-                        federation.scopes().stream().map(Enum::name).collect(Collectors.toUnmodifiableSet()),
-                        FederationStatus.ACTIVE.name(), federation.effectiveUntil().orElse(null)));
+                .findFirst().map(FederationService::snapshot);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<FederationSnapshot> findActiveFor(NetworkId networkId) {
+        Instant now = time.now();
+        return federations.findInvolving(networkId).stream().filter(federation -> federation.isActive(now))
+                .map(FederationService::snapshot).toList();
+    }
+
+    private static FederationSnapshot snapshot(Federation federation) {
+        return new FederationSnapshot(federation.id(), federation.proposerNetworkId(), federation.partnerNetworkId(),
+                federation.scopes().stream().map(Enum::name).collect(Collectors.toUnmodifiableSet()),
+                FederationStatus.ACTIVE.name(), federation.effectiveUntil().orElse(null));
     }
 
     private void requireActive(NetworkId networkId) {
