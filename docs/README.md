@@ -124,7 +124,7 @@ sovereignty is logical and enforced by the network context of every request.
 | `core/authorization` | Roles and central authorization decisions; defines evidence ports                 | membership, identity, network                              |
 | `core/trust`         | Scoped, directional trust from networks and organizations                         | identity, membership, network, organization                |
 | `core/federation`    | Federation lifecycle and scope                                                    | membership, network, trust                                 |
-| `core/delegation`    | Delegations and their constraints                                                 | authorization, membership, identity                        |
+| `core/delegation`    | Delegations and their constraints                                                 | authorization, membership, network                         |
 | `core/capability`    | Capability types and capabilities                                                 | authorization, identity, membership, network, organization |
 | `core/discovery`     | Local and federated capability discovery                                          | capability, federation, trust, authorization               |
 | `core/agreement`     | Versioned agreements                                                              | authorization, capability, federation                      |
@@ -189,11 +189,11 @@ Status: ✓ implemented, ○ planned.
 | UC-AUZ-01 | Assign role to a member                                                  | Authorization | 6     | ✓      |
 | UC-AUZ-02 | Evaluate an authorization request and return ALLOW or DENY with a reason | Authorization | 6     | ✓      |
 | UC-AUZ-03 | Record the authorization decision as evidence                            | Authorization | 6     | ✓      |
-| UC-DEL-01 | Grant delegation with action, capability, network and time constraints   | Delegation    | 7     | ○      |
-| UC-DEL-02 | Reject an invalid delegation                                             | Delegation    | 7     | ○      |
-| UC-DEL-03 | Revoke or suspend delegation                                             | Delegation    | 7     | ○      |
-| UC-DEL-04 | Expire delegation                                                        | Delegation    | 7     | ○      |
-| UC-DEL-05 | Get the effective delegations of a principal                             | Delegation    | 7     | ○      |
+| UC-DEL-01 | Grant delegation with action, capability, network and time constraints   | Delegation    | 7     | ✓      |
+| UC-DEL-02 | Reject an invalid delegation                                             | Delegation    | 7     | ✓      |
+| UC-DEL-03 | Revoke or suspend delegation                                             | Delegation    | 7     | ✓      |
+| UC-DEL-04 | Expire delegation                                                        | Delegation    | 7     | ✓      |
+| UC-DEL-05 | Get the effective delegations of a principal                             | Delegation    | 7     | ✓      |
 | UC-DIS-01 | Discover capabilities locally                                            | Discovery     | 8     | ○      |
 | UC-DIS-02 | Discover capabilities across federated networks                          | Discovery     | 8     | ○      |
 | UC-DIS-03 | Discover networks open to federation                                     | Discovery     | 8     | ○      |
@@ -255,7 +255,7 @@ Every scenario is verified by end-to-end tests listed in [End-to-End Tests](../c
 | SC-08 | Capability registration and visibility | 4     | ✓      |
 | SC-09 | Trust and federation lifecycle         | 5     | ✓      |
 | SC-10 | Centralized authorization decisions    | 6     | ✓      |
-| SC-11 | Delegation rules                       | 7     | ○      |
+| SC-11 | Delegation rules                       | 7     | ✓      |
 | SC-12 | Governed discovery                     | 8     | ○      |
 | SC-13 | Agreement lifecycle and integrity      | 9     | ○      |
 | SC-14 | Transaction lifecycle                  | 10    | ○      |
@@ -273,7 +273,7 @@ Every scenario is verified by end-to-end tests listed in [End-to-End Tests](../c
 | 4     | Capability           | Capability types, capabilities and visibility                                | ✓      |
 | 5     | Trust and federation | Directional trust and federation lifecycle                                   | ✓      |
 | 6     | Authorization        | Roles and central authorization decisions                                    | ✓      |
-| 7     | Delegation           | Constrained, revocable delegations                                           | ○      |
+| 7     | Delegation           | Constrained, revocable delegations                                           | ✓      |
 | 8     | Discovery            | Local and federated discovery                                                | ○      |
 | 9     | Agreement            | Versioned agreements                                                         | ○      |
 | 10    | Transaction          | Transactions under agreements                                                | ○      |
