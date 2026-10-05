@@ -1,89 +1,256 @@
-# Nexusphere
+# <p align="center">Nexusphere</p>
 
-Federated trust and coordination infrastructure for human and autonomous actors.
-The core is a Spring Boot modular monolith: one application (`core/bootstrap`) and one Maven
-module per bounded context.
+<p align="center">Federated trust and coordination infrastructure for human and autonomous actors.</p>
 
-## Prerequisites
+## <p align="center">Table of Content</p>
 
-* Java 21
-* Maven 3.9 or higher
-* Docker (for PostgreSQL locally and for Testcontainers in the tests)
+* [Getting Started](#getting-started)
+* [Dockerized](#dockerized)
+* [Kubernetes](#kubernetes)
+* [UI](#ui)
+* [Nexusphere Core](#nexusphere-core)
 
-## Layout
+## Getting Started
 
-| Path | Contents |
-|---|---|
-| `pom.xml` | Technology-neutral root: version, Java release, enforcer, plugin versions |
-| `core/pom.xml` | Spring Boot and Spring Modulith BOMs, the list of core modules |
-| `core/shared` | Cross-module primitives only: IDs, execution context, event envelope, time, error model |
-| `core/network` … `core/integration` | One library module per bounded context, package `com.nexusphere.<module>` |
-| `core/bootstrap` | The only Spring Boot application, `com.nexusphere.NexusphereApplication` |
-| `core/e2e-tests` | Black-box HTTP tests against the running application and PostgreSQL |
-| `infrastructure/postgres/init` | Database init script used by `compose.yaml` |
-| `compose.yaml`, `kube-dev.yaml`, `Dockerfile` | Development environment with Docker Compose or Kubernetes |
+### Prerequisites
 
-Inside a module, other modules may only use its `contract` package. Each module owns its
-PostgreSQL schema and its migrations under `src/main/resources/db/migration/<module>`.
+* [Java 21](https://www.oracle.com/java/technologies/downloads)
+* [Maven 3](https://maven.apache.org/index.html)
+* [Docker](https://www.docker.com)
+* [Kubernetes](https://kubernetes.io)
 
-## Build and test
+### Build
+
+```shell
+mvn validate clean compile
+```
+
+### Test
+
+```shell
+mvn test
+```
+
+### Package
+
+```shell
+mvn package -DskipTests=true
+```
+
+### Run
+
+```shell
+docker compose --file compose.yaml --project-name dev up -d postgresql pgadmin adminer
+mvn install -DskipTests=true
+mvn -pl core/bootstrap spring-boot:start
+```
+
+### E2eTest
+
+```shell
+curl -X GET http://localhost:8080/actuator/health
+curl -X GET http://localhost:8080/api/v1/platform
+```
+
+```shell
+curl -X POST http://localhost:8080/api/v1/networks -H "Content-Type: application/json" -d '{"name":"Network A"}'
+curl -X POST http://localhost:8080/api/v1/networks/{networkId}/activate
+curl -X POST http://localhost:8080/api/v1/networks/{networkId}/organizations -H "Content-Type: application/json" -d '{"name":"Acme"}'
+curl -X GET http://localhost:8080/api/v1/networks/{networkId}/organizations
+```
+
+### Stop
+
+```shell
+mvn -pl core/bootstrap spring-boot:stop
+docker compose --file compose.yaml --project-name dev down
+```
+
+### Verify
 
 ```shell
 mvn verify
+docker volume prune -f
 ```
 
-This runs unit tests, the architecture tests (Spring Modulith and ArchUnit), the integration
-test and the end-to-end tests. The last two start PostgreSQL 18 with Testcontainers, so Docker
-must be running. To build without tests:
+## Dockerized
+
+### Deploy
 
 ```shell
-mvn -DskipTests package
+mvn clean package verify -DskipTests=true
+docker compose --file compose.yaml --project-name dev up --build -d
 ```
 
-## Run locally
-
-Start PostgreSQL, pgAdmin and Adminer, then run the application from Maven:
+### E2eTest
 
 ```shell
-docker compose up -d postgresql pgadmin adminer
-mvn -DskipTests install
-mvn -pl core/bootstrap spring-boot:run
+curl -X GET http://localhost:8080/actuator/health
+curl -X GET http://localhost:8080/api/v1/platform
 ```
 
-Or build the jar and run everything, the application included, with Docker Compose:
+### Down
 
 ```shell
-mvn -DskipTests package
-docker compose up -d --build
+docker compose --file compose.yaml --project-name dev down
+docker image rm samanalishiri/nexusphere:latest
+docker volume prune -f
 ```
 
-To run on Kubernetes in the `dev` namespace:
+## Kubernetes
+
+### Deploy
 
 ```shell
-mvn -DskipTests package
-docker build -t samanalishiri/nexusphere:latest .
+mvn clean package verify -DskipTests=true
+docker build -t samanalishiri/nexusphere:latest . --no-cache
 kubectl apply -f kube-dev.yaml
 ```
 
-| Environment variable | Default |
-|---|---|
-| `APP_HOST` | `0.0.0.0` |
-| `APP_PORT` | `8080` |
-| `APP_PROFILES` | `postgresql` |
-| `APP_DATABASE_HOST` | `localhost` |
-| `APP_DATABASE_PORT` | `5432` |
-| `APP_DATABASE_DB` | `nexusphere` |
-| `APP_DATABASE_USERNAME` | `nexusphere` |
-| `APP_DATABASE_PASSWORD` | `nexusphere` |
+### Check Status
 
-Profiles: `postgresql` for the database connection, `json` for structured (ECS) logs, for example `APP_PROFILES=postgresql,json`.
+```shell
+kubectl get all -n dev
+```
 
-| URL | What |
-|---|---|
-| http://localhost:8080/api/v1/platform | Platform name, version and modules |
-| http://localhost:8080/actuator/health | Health |
-| http://localhost:8080/swagger-ui.html | OpenAPI UI (`/v3/api-docs` for JSON) |
-| http://localhost:8081 | pgAdmin |
-| http://localhost:8082 | Adminer |
+### Port Forwarding
 
-Every response carries an `X-Correlation-Id` header; send your own to trace a request.
+```shell
+# PostgreSQL
+kubectl port-forward service/postgresql 5432:5432 -n dev
+```
+
+```shell
+# PgAdmin
+kubectl port-forward service/pgadmin 8081:80 -n dev
+```
+
+```shell
+# Adminer
+kubectl port-forward service/adminer 8082:8080 -n dev
+```
+
+```shell
+# Application
+kubectl port-forward service/application 8080:8080 -n dev
+```
+
+### E2eTest
+
+```shell
+curl -X GET http://localhost:8080/actuator/health
+curl -X GET http://localhost:8080/api/v1/platform
+```
+
+### Down
+
+```shell
+kubectl delete all --all -n dev
+kubectl delete secrets dev-credentials -n dev
+kubectl delete configMap dev-config -n dev
+kubectl delete persistentvolumeclaim postgres-pvc -n dev
+kubectl delete persistentvolumeclaim pgadmin-pvc -n dev
+docker image rm samanalishiri/nexusphere:latest
+docker volume prune -f
+```
+
+## UI
+
+* Application: [http://localhost:8080](http://localhost:8080)
+* Swagger UI: [http://localhost:8080/swagger-ui.html](http://localhost:8080/swagger-ui.html)
+* OpenAPI: [http://localhost:8080/v3/api-docs](http://localhost:8080/v3/api-docs)
+* Health: [http://localhost:8080/actuator/health](http://localhost:8080/actuator/health)
+* PgAdmin: [http://localhost:8081](http://localhost:8081)
+* Adminer: [http://localhost:8082](http://localhost:8082)
+
+```yaml
+# PgAdmin
+Host: postgresql
+Port: 5432
+Maintenance_database: nexusphere
+# Adminer
+Server: postgresql:5432
+
+Username: nexusphere
+Password: nexusphere
+```
+
+---
+
+## Nexusphere Core
+
+<p style="text-align: justify;">
+
+The core is a Spring Boot modular monolith. `core/bootstrap` is the only application and every bounded context is a
+Maven module with the package `com.nexusphere.<module>`. A module is reached by other modules only through its
+`contract` package, and it owns its PostgreSQL schema and its Flyway migrations under
+`src/main/resources/db/migration/<module>`.
+
+</p>
+
+### Modules
+
+| Module                               | Responsibility                                                                     |
+|--------------------------------------|------------------------------------------------------------------------------------|
+| `core/shared`                        | Identifiers, execution context, correlation ID, domain event envelope, error model |
+| `core/network`                       | Network lifecycle: PENDING, ACTIVE, SUSPENDED, ARCHIVED                            |
+| `core/organization`                  | Organizations registered inside a network                                          |
+| `core/identity` … `core/integration` | Bounded contexts of the next phases                                                |
+| `core/bootstrap`                     | Application, persistence wiring, error handling, architecture tests                |
+| `core/e2e-tests`                     | End-to-end tests against the application and PostgreSQL                            |
+
+### Profiles
+
+| Profile      | Description                     |
+|--------------|---------------------------------|
+| `postgresql` | PostgreSQL datasource (default) |
+| `json`       | Structured (ECS) console logs   |
+
+```shell
+APP_PROFILES=postgresql,json mvn -pl core/bootstrap spring-boot:start
+```
+
+### Environment Variables
+
+```yaml
+APP_HOST: 0.0.0.0
+APP_PORT: 8080
+APP_PROFILES: postgresql
+APP_DATABASE_HOST: localhost
+APP_DATABASE_PORT: 5432
+APP_DATABASE_DB: nexusphere
+APP_DATABASE_USERNAME: nexusphere
+APP_DATABASE_PASSWORD: nexusphere
+```
+
+### API
+
+| Method | Path                                                                     | Description                |
+|--------|--------------------------------------------------------------------------|----------------------------|
+| GET    | `/api/v1/platform`                                                       | Platform information       |
+| POST   | `/api/v1/networks`                                                       | Create a network           |
+| GET    | `/api/v1/networks`                                                       | List networks              |
+| GET    | `/api/v1/networks/{networkId}`                                           | Get a network              |
+| POST   | `/api/v1/networks/{networkId}/activate`                                  | Activate a network         |
+| POST   | `/api/v1/networks/{networkId}/suspend`                                   | Suspend a network          |
+| POST   | `/api/v1/networks/{networkId}/archive`                                   | Archive a network          |
+| POST   | `/api/v1/networks/{networkId}/organizations`                             | Register an organization   |
+| GET    | `/api/v1/networks/{networkId}/organizations`                             | List organizations         |
+| GET    | `/api/v1/networks/{networkId}/organizations/{organizationId}`            | Get an organization        |
+| PUT    | `/api/v1/networks/{networkId}/organizations/{organizationId}`            | Rename an organization     |
+| POST   | `/api/v1/networks/{networkId}/organizations/{organizationId}/deactivate` | Deactivate an organization |
+
+Every response carries an `X-Correlation-Id` header. Errors use one model:
+
+```json
+{
+  "code": "NETWORK_NOT_ACTIVE",
+  "category": "CONFLICT",
+  "message": "Network 7c1e… is not active",
+  "correlationId": "4f0b…"
+}
+```
+
+##
+
+**<p align="center">[Top](#nexusphere)</p>**
