@@ -1,26 +1,61 @@
 # Nexusphere
 
+Federated trust and coordination infrastructure for human and autonomous actors.
+The core is a Spring Boot modular monolith: one application (`core/bootstrap`) and one Maven
+module per bounded context.
+
 ## Prerequisites
 
-* Java 21 or higher
+* Java 21
 * Maven 3.9 or higher
+* Docker (for PostgreSQL locally and for Testcontainers in the tests)
 
-## Clean
+## Layout
+
+| Path | Contents |
+|---|---|
+| `pom.xml` | Technology-neutral root: version, Java release, enforcer, plugin versions |
+| `core/pom.xml` | Spring Boot and Spring Modulith BOMs, the list of core modules |
+| `core/shared` | Cross-module primitives only: IDs, execution context, event envelope, time, error model |
+| `core/network` … `core/integration` | One library module per bounded context, package `com.nexusphere.<module>` |
+| `core/bootstrap` | The only Spring Boot application, `com.nexusphere.NexusphereApplication` |
+| `core/e2e-tests` | Black-box HTTP tests against the running application and PostgreSQL |
+| `infrastructure/postgres/init` | Database init script used by `compose.yaml` |
+
+Inside a module, other modules may only use its `contract` package. Each module owns its
+PostgreSQL schema and its migrations under `src/main/resources/db/migration/<module>`.
+
+## Build and test
 
 ```shell
-mvn clean
+mvn verify
 ```
 
-## Build
+This runs unit tests, the architecture tests (Spring Modulith and ArchUnit), the integration
+test and the end-to-end tests. The last two start PostgreSQL 18 with Testcontainers, so Docker
+must be running. To build without tests:
 
 ```shell
-mvn validate
-mvn clean
-mvn package
+mvn -DskipTests package
 ```
 
-## Test
+## Run locally
 
 ```shell
-mvn test
+docker compose up -d
+mvn -DskipTests install
+mvn -pl core/bootstrap spring-boot:run
 ```
+
+Or run the packaged jar: `java -jar core/bootstrap/target/bootstrap-1.0.0-SNAPSHOT-exec.jar`.
+
+The database connection can be changed with `NEXUSPHERE_DB_URL`, `NEXUSPHERE_DB_USER` and
+`NEXUSPHERE_DB_PASSWORD`. Use the `json` profile for structured (ECS) logs.
+
+| URL | What |
+|---|---|
+| http://localhost:8080/api/v1/platform | Platform name, version and modules |
+| http://localhost:8080/actuator/health | Health |
+| http://localhost:8080/swagger-ui.html | OpenAPI UI (`/v3/api-docs` for JSON) |
+
+Every response carries an `X-Correlation-Id` header; send your own to trace a request.

@@ -1,3 +1,67 @@
 spring:
   application:
-    name: bootstrap
+    name: nexusphere
+  datasource:
+    url: ${NEXUSPHERE_DB_URL:jdbc:postgresql://localhost:5432/nexusphere}
+    username: ${NEXUSPHERE_DB_USER:nexusphere}
+    password: ${NEXUSPHERE_DB_PASSWORD:nexusphere}
+  mvc:
+    problemdetails:
+      enabled: false
+
+server:
+  error:
+    whitelabel:
+      enabled: false
+
+nexusphere:
+  persistence:
+    # Modules that own a schema, in dependency order (redesign §54).
+    modules:
+      - network
+      - organization
+      - identity
+      - membership
+      - capability
+      - trust
+      - federation
+      - authorization
+      - delegation
+      - agreement
+      - transaction
+      - audit
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health, info
+  endpoint:
+    health:
+      probes:
+        enabled: true
+  info:
+    build:
+      enabled: true
+
+springdoc:
+  api-docs:
+    path: /v3/api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+
+logging:
+  pattern:
+    correlation: "[%X{correlationId:-}] "
+  include-application-name: false
+
+---
+# Structured JSON logs (ECS) for containers and log shippers: SPRING_PROFILES_ACTIVE=json
+spring:
+  config:
+    activate:
+      on-profile: json
+logging:
+  structured:
+    format:
+      console: ecs

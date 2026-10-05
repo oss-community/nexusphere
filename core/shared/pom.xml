@@ -2,11 +2,23 @@
 <project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
+
     <parent>
         <groupId>com.nexusphere</groupId>
         <artifactId>core</artifactId>
         <version>1.0.0-SNAPSHOT</version>
     </parent>
+
     <artifactId>shared</artifactId>
-    <name>NexusPhere Shared</name>
+    <name>Nexusphere Shared</name>
+    <description>Cross-module primitives only: identifiers, execution context, domain event envelope, time, error model. No business concepts, no framework.</description>
+
+    <dependencies>
+        <!-- Compile-time only: marks the package as an open Spring Modulith module (see package-info). -->
+        <dependency>
+            <groupId>org.springframework.modulith</groupId>
+            <artifactId>spring-modulith-api</artifactId>
+            <scope>provided</scope>
+        </dependency>
+    </dependencies>
 </project>

@@ -1,0 +1,37 @@
+package com.nexusphere.e2e.support;
+
+import com.nexusphere.NexusphereApplication;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.context.TestConfiguration;
+import org.springframework.boot.test.web.server.LocalServerPort;
+import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Import;
+import org.testcontainers.postgresql.PostgreSQLContainer;
+import org.testcontainers.utility.DockerImageName;
+
+/**
+ * Starts the full application on a random port against PostgreSQL 18. Tests extending this
+ * class must use only {@link #api()}, never application beans: they see the system the way an
+ * external client, agent or machine adapter does.
+ */
+@SpringBootTest(classes = NexusphereApplication.class, webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
+@Import(E2ETestBase.Containers.class)
+public abstract class E2ETestBase {
+
+    @TestConfiguration(proxyBeanMethods = false)
+    static class Containers {
+        @Bean
+        @ServiceConnection
+        PostgreSQLContainer postgres() {
+            return new PostgreSQLContainer(DockerImageName.parse("postgres:18-alpine"));
+        }
+    }
+
+    @LocalServerPort
+    private int port;
+
+    protected ApiClient api() {
+        return new ApiClient("http://localhost:" + port);
+    }
+}
