@@ -3,7 +3,6 @@ package com.nexusphere.shared.id;
 import java.util.Objects;
 import java.util.UUID;
 
-/** Globally unique identifier of a network. Carries no business meaning. */
 public record NetworkId(UUID value) implements Identifier {
 
     public NetworkId {

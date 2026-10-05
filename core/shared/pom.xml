@@ -14,7 +14,6 @@
     <description>Cross-module primitives only: identifiers, execution context, domain event envelope, time, error model. No business concepts, no framework.</description>
 
     <dependencies>
-        <!-- Compile-time only: marks the package as an open Spring Modulith module (see package-info). -->
         <dependency>
             <groupId>org.springframework.modulith</groupId>
             <artifactId>spring-modulith-api</artifactId>

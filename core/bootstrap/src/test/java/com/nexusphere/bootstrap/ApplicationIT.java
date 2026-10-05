@@ -16,7 +16,6 @@ import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-/** Starts the whole application against PostgreSQL 18 and checks the per-module schemas. */
 @SpringBootTest(classes = NexusphereApplication.class)
 @Import(ApplicationIT.Containers.class)
 class ApplicationIT {

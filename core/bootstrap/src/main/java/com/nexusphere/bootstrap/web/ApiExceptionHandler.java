@@ -20,7 +20,6 @@ import org.springframework.web.servlet.resource.NoResourceFoundException;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
-/** Translates every failure into {@link ApiError}. */
 @RestControllerAdvice
 class ApiExceptionHandler {
 

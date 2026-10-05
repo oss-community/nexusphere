@@ -7,10 +7,6 @@ import com.nexusphere.shared.event.EventEnvelope;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Component;
 
-/**
- * Version 1 event dispatch: domain events travel inside the process as {@link EventEnvelope}s.
- * Listeners in other modules subscribe with {@code @ApplicationModuleListener} or {@code @EventListener}.
- */
 @Component
 class InProcessDomainEventPublisher implements DomainEventPublisher {
 

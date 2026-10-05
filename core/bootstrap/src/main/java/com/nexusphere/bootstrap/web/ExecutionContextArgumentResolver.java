@@ -8,11 +8,6 @@ import org.springframework.web.context.request.NativeWebRequest;
 import org.springframework.web.method.support.HandlerMethodArgumentResolver;
 import org.springframework.web.method.support.ModelAndViewContainer;
 
-/**
- * Lets controllers declare an {@link ExecutionContext} parameter. Phase 1 fills only the
- * correlation ID; identity, principal and verified network context are added with the
- * identity and membership modules (Phase 3).
- */
 class ExecutionContextArgumentResolver implements HandlerMethodArgumentResolver {
 
     @Override

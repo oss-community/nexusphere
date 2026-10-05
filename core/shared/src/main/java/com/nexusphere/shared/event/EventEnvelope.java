@@ -9,7 +9,6 @@ import java.time.Instant;
 import java.util.Objects;
 import java.util.UUID;
 
-/** Common event metadata (redesign §52). Audit consumes envelopes without knowing the payload types. */
 public record EventEnvelope(
         UUID eventId,
         String eventType,

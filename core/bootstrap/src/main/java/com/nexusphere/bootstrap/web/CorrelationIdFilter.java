@@ -13,11 +13,6 @@ import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
 
-/**
- * Gives every request a correlation ID (redesign §73): the client's {@code X-Correlation-Id}
- * when well formed, otherwise a new one. It is returned in the response header, put in the
- * logging MDC and made available to handlers through {@link RequestCorrelation}.
- */
 @Component
 @Order(Ordered.HIGHEST_PRECEDENCE)
 class CorrelationIdFilter extends OncePerRequestFilter {

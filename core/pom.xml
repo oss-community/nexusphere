@@ -13,7 +13,6 @@
     <packaging>pom</packaging>
     <name>Nexusphere Core</name>
 
-    <!-- Ordered by dependency direction; see docs/architecture/module-dependencies.md. -->
     <modules>
         <module>shared</module>
         <module>network</module>
@@ -68,7 +67,6 @@
                 <version>${archunit.version}</version>
             </dependency>
 
-            <!-- Core modules -->
             <dependency><groupId>com.nexusphere</groupId><artifactId>shared</artifactId><version>${project.version}</version></dependency>
             <dependency><groupId>com.nexusphere</groupId><artifactId>network</artifactId><version>${project.version}</version></dependency>
             <dependency><groupId>com.nexusphere</groupId><artifactId>organization</artifactId><version>${project.version}</version></dependency>
@@ -88,7 +86,6 @@
         </dependencies>
     </dependencyManagement>
 
-    <!-- Every module gets plain unit-test support; Spring is added only where a module needs it. -->
     <dependencies>
         <dependency>
             <groupId>org.junit.jupiter</groupId>
@@ -121,7 +118,6 @@
                                 <goal>repackage</goal>
                             </goals>
                             <configuration>
-                                <!-- Keep the plain jar as the main artifact so tests can depend on it. -->
                                 <classifier>exec</classifier>
                             </configuration>
                         </execution>

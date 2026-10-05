@@ -1,6 +1,5 @@
 package com.nexusphere.shared.error;
 
-/** Error categories of the public API (redesign §81). The HTTP status is chosen by the API layer. */
 public enum ErrorCategory {
     VALIDATION_ERROR,
     AUTHENTICATION_ERROR,

@@ -10,7 +10,6 @@ import com.nexusphere.bootstrap.persistence.PersistenceProperties;
 
 import java.util.List;
 
-/** Describes the running platform. Public and read-only. */
 @RestController
 @RequestMapping("/api/v1/platform")
 class PlatformController {
