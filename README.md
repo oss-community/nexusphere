@@ -197,14 +197,17 @@ Maven module with the package `com.nexusphere.<module>`. A module is reached by 
 
 ### Modules
 
-| Module                               | Responsibility                                                                     |
-|--------------------------------------|------------------------------------------------------------------------------------|
-| `core/shared`                        | Identifiers, execution context, correlation ID, domain event envelope, error model |
-| `core/network`                       | Network lifecycle: PENDING, ACTIVE, SUSPENDED, ARCHIVED                            |
-| `core/organization`                  | Organizations registered inside a network                                          |
-| `core/identity` … `core/integration` | Bounded contexts of the next phases                                                |
-| `core/bootstrap`                     | Application, persistence wiring, error handling, architecture tests                |
-| `core/e2e-tests`                     | End-to-end tests against the application and PostgreSQL                            |
+| Module                                    | Responsibility                                                                     |
+|-------------------------------------------|------------------------------------------------------------------------------------|
+| `core/shared`                             | Identifiers, execution context, correlation ID, domain event envelope, error model |
+| `core/network`                            | Network lifecycle: PENDING, ACTIVE, SUSPENDED, ARCHIVED                            |
+| `core/organization`                       | Organizations registered inside a network                                          |
+| `core/identity`                           | Human, service, application, agent and machine identities and credentials          |
+| `core/membership`                         | Memberships, principal context and member listing                                  |
+| `core/capability`                         | Capability types with versioned schemas, capabilities, visibility and withdrawal   |
+| `core/authorization` … `core/integration` | Bounded contexts of the next phases                                                |
+| `core/bootstrap`                          | Application, persistence wiring, error handling, architecture tests                |
+| `core/e2e-tests`                          | End-to-end tests against the application and PostgreSQL                            |
 
 ### Profiles
 
@@ -261,6 +264,15 @@ APP_TOKEN_TTL: 15m
 | GET    | `/api/v1/networks/{networkId}/identities`                                | List member identities (bearer token)               |
 | GET    | `/api/v1/networks/{networkId}/identities/{identityId}`                   | Get a member identity (bearer token)                |
 | GET    | `/api/v1/principal`                                                      | Principal context for `X-Network-Id` (bearer token) |
+| POST   | `/api/v1/capability-types`                                               | Register a capability type or its next version      |
+| GET    | `/api/v1/capability-types`                                               | List capability types, optionally by `code`         |
+| GET    | `/api/v1/capability-types/{typeId}`                                      | Get a capability type                               |
+| POST   | `/api/v1/networks/{networkId}/capabilities`                              | Register a capability (bearer token)                |
+| GET    | `/api/v1/networks/{networkId}/capabilities`                              | List visible capabilities (bearer token)            |
+| GET    | `/api/v1/networks/{networkId}/capabilities/{capabilityId}`               | Get a visible capability (bearer token)             |
+| POST   | `/api/v1/networks/{networkId}/capabilities/{capabilityId}/publish`       | Publish a capability (bearer token)                 |
+| PUT    | `/api/v1/networks/{networkId}/capabilities/{capabilityId}/visibility`    | Change the visibility (bearer token)                |
+| POST   | `/api/v1/networks/{networkId}/capabilities/{capabilityId}/withdraw`      | Withdraw a capability (bearer token)                |
 
 Requests marked with bearer token need `Authorization: Bearer <token>` and a network context, taken from the path
 or the `X-Network-Id` header. The identity must be active and hold an active membership in that network.
@@ -271,6 +283,13 @@ curl -X POST http://localhost:8080/api/v1/networks/{networkId}/memberships -H "C
 curl -X POST http://localhost:8080/api/v1/identities/{identityId}/credentials
 curl -X POST http://localhost:8080/api/v1/auth/token -H "Content-Type: application/json" -d '{"identityId":"{identityId}","secret":"{secret}"}'
 curl -X GET http://localhost:8080/api/v1/principal -H "Authorization: Bearer {accessToken}" -H "X-Network-Id: {networkId}"
+```
+
+```shell
+curl -X POST http://localhost:8080/api/v1/capability-types -H "Content-Type: application/json" -d '{"code":"manufacturing.cnc","name":"CNC machining","schema":{"type":"object","required":["material"],"properties":{"material":{"type":"string"}}}}'
+curl -X POST http://localhost:8080/api/v1/networks/{networkId}/capabilities -H "Authorization: Bearer {accessToken}" -H "Content-Type: application/json" -d '{"name":"Precision CNC","typeCode":"manufacturing.cnc","specification":{"material":"steel"}}'
+curl -X POST http://localhost:8080/api/v1/networks/{networkId}/capabilities/{capabilityId}/publish -H "Authorization: Bearer {accessToken}" -H "Content-Type: application/json" -d '{"visibility":"NETWORK"}'
+curl -X GET http://localhost:8080/api/v1/networks/{networkId}/capabilities -H "Authorization: Bearer {accessToken}"
 ```
 
 Every response carries an `X-Correlation-Id` header. Errors use one model:

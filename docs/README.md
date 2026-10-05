@@ -114,25 +114,25 @@ sovereignty is logical and enforced by the network context of every request.
 
 ### Modules
 
-| Module               | Responsibility                                                                    | Depends on                                              |
-|----------------------|-----------------------------------------------------------------------------------|---------------------------------------------------------|
-| `core/shared`        | Identifiers, execution context, correlation ID, event envelope, time, error model | nothing                                                 |
-| `core/network`       | Network lifecycle                                                                 | shared                                                  |
-| `core/organization`  | Organizations inside a network                                                    | network                                                 |
-| `core/identity`      | Identities, ownership, credentials                                                | network, organization                                   |
-| `core/membership`    | Memberships and principal resolution                                              | identity, organization, network                         |
-| `core/authorization` | Roles and central authorization decisions; defines evidence ports                 | membership, identity                                    |
-| `core/trust`         | Scoped, directional trust between networks                                        | authorization, organization, network                    |
-| `core/federation`    | Federation lifecycle and scope                                                    | authorization, trust, network                           |
-| `core/delegation`    | Delegations and their constraints                                                 | authorization, membership, identity                     |
-| `core/capability`    | Capability types and capabilities                                                 | authorization, identity, organization                   |
-| `core/discovery`     | Local and federated capability discovery                                          | capability, federation, trust, authorization            |
-| `core/agreement`     | Versioned agreements                                                              | authorization, capability, federation                   |
-| `core/transaction`   | Transactions under agreements                                                     | agreement, authorization, capability                    |
-| `core/audit`         | Append-only audit events and accountability trails                                | shared (listens to domain events)                       |
-| `core/integration`   | Agent and machine adapters                                                        | identity, capability, discovery, agreement, transaction |
-| `core/bootstrap`     | Application, security, persistence wiring, error handling, architecture tests     | all modules                                             |
-| `core/e2e-tests`     | Black-box end-to-end tests, see [End-to-End Tests](../core/e2e-tests/README.md)   | bootstrap at test time                                  |
+| Module               | Responsibility                                                                    | Depends on                                                 |
+|----------------------|-----------------------------------------------------------------------------------|------------------------------------------------------------|
+| `core/shared`        | Identifiers, execution context, correlation ID, event envelope, time, error model | nothing                                                    |
+| `core/network`       | Network lifecycle                                                                 | shared                                                     |
+| `core/organization`  | Organizations inside a network                                                    | network                                                    |
+| `core/identity`      | Identities, ownership, credentials                                                | network, organization                                      |
+| `core/membership`    | Memberships and principal resolution                                              | identity, organization, network                            |
+| `core/authorization` | Roles and central authorization decisions; defines evidence ports                 | membership, identity                                       |
+| `core/trust`         | Scoped, directional trust between networks                                        | authorization, organization, network                       |
+| `core/federation`    | Federation lifecycle and scope                                                    | authorization, trust, network                              |
+| `core/delegation`    | Delegations and their constraints                                                 | authorization, membership, identity                        |
+| `core/capability`    | Capability types and capabilities                                                 | authorization, identity, membership, network, organization |
+| `core/discovery`     | Local and federated capability discovery                                          | capability, federation, trust, authorization               |
+| `core/agreement`     | Versioned agreements                                                              | authorization, capability, federation                      |
+| `core/transaction`   | Transactions under agreements                                                     | agreement, authorization, capability                       |
+| `core/audit`         | Append-only audit events and accountability trails                                | shared (listens to domain events)                          |
+| `core/integration`   | Agent and machine adapters                                                        | identity, capability, discovery, agreement, transaction    |
+| `core/bootstrap`     | Application, security, persistence wiring, error handling, architecture tests     | all modules                                                |
+| `core/e2e-tests`     | Black-box end-to-end tests, see [End-to-End Tests](../core/e2e-tests/README.md)   | bootstrap at test time                                     |
 
 ### Inside a Module
 
@@ -178,9 +178,9 @@ Status: ✓ implemented, ○ planned.
 | UC-PRN-01 | Resolve principal context                                                | Membership    | 3     | ✓      |
 | UC-MEM-01 | Activate membership                                                      | Membership    | 3     | ✓      |
 | UC-MEM-02 | Terminate membership                                                     | Membership    | 3     | ✓      |
-| UC-CAP-01 | Register capability type with schema and version                         | Capability    | 4     | ○      |
-| UC-CAP-02 | Register capability for an owner                                         | Capability    | 4     | ○      |
-| UC-CAP-03 | Publish or withdraw capability and set its visibility                    | Capability    | 4     | ○      |
+| UC-CAP-01 | Register capability type with schema and version                         | Capability    | 4     | ✓      |
+| UC-CAP-02 | Register capability for an owner                                         | Capability    | 4     | ✓      |
+| UC-CAP-03 | Publish or withdraw capability and set its visibility                    | Capability    | 4     | ✓      |
 | UC-TRU-01 | Establish scoped, directional trust                                      | Trust         | 5     | ○      |
 | UC-TRU-02 | Revoke trust; trust expiry                                               | Trust         | 5     | ○      |
 | UC-FED-01 | Propose federation with scope                                            | Federation    | 5     | ○      |
@@ -252,7 +252,7 @@ Every scenario is verified by end-to-end tests listed in [End-to-End Tests](../c
 |-------|----------------------------------------|-------|--------|
 | SC-06 | Sovereign network bootstrap            | 2     | ✓      |
 | SC-07 | Human, agent and machine identities    | 3     | ✓      |
-| SC-08 | Capability registration and visibility | 4     | ○      |
+| SC-08 | Capability registration and visibility | 4     | ✓      |
 | SC-09 | Trust and federation lifecycle         | 5     | ○      |
 | SC-10 | Centralized authorization decisions    | 6     | ○      |
 | SC-11 | Delegation rules                       | 7     | ○      |
@@ -270,7 +270,7 @@ Every scenario is verified by end-to-end tests listed in [End-to-End Tests](../c
 | 1     | Bootstrap            | Modular monolith, PostgreSQL, Flyway per module, error model, correlation ID | ✓      |
 | 2     | Sovereignty          | Networks and organizations with isolation                                    | ✓      |
 | 3     | Identity             | Human, agent and machine identities, memberships, principal context, tokens  | ✓      |
-| 4     | Capability           | Capability types, capabilities and visibility                                | ○      |
+| 4     | Capability           | Capability types, capabilities and visibility                                | ✓      |
 | 5     | Trust and federation | Directional trust and federation lifecycle                                   | ○      |
 | 6     | Authorization        | Roles and central authorization decisions                                    | ○      |
 | 7     | Delegation           | Constrained, revocable delegations                                           | ○      |

@@ -36,6 +36,19 @@ public final class IdentityApi {
         return membership.json().path("id").asString();
     }
 
+    public String member(String networkId, String identityId, String organizationId) {
+        ApiClient.Response membership = api.post("/api/v1/networks/" + networkId + "/memberships",
+                "{\"identityId\":\"" + identityId + "\",\"organizationId\":\"" + organizationId + "\"}");
+        assertThat(membership.status()).isEqualTo(201);
+        return membership.json().path("id").asString();
+    }
+
+    public String owned(String type, String displayName, String networkId, String organizationId) {
+        ApiClient.Response created = create(type, displayName, networkId, organizationId);
+        assertThat(created.status()).isEqualTo(201);
+        return created.json().path("id").asString();
+    }
+
     public String secret(String identityId) {
         ApiClient.Response credential = api.post("/api/v1/identities/" + identityId + "/credentials", "");
         assertThat(credential.status()).isEqualTo(201);
