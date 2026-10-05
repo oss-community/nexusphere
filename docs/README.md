@@ -80,6 +80,7 @@ The core is built on eight pillars.
 | I-12 | Cross-network operations require a valid federation context                                   |
 | I-13 | Every high-impact operation, allowed or denied, is audited with its authorization decision    |
 | I-14 | The default is DENY; a network ID supplied by a client is never trusted on its own            |
+| I-15 | Nobody can raise their own authority: no self role assignment, no delegated management        |
 
 ## Actors
 
@@ -114,25 +115,25 @@ sovereignty is logical and enforced by the network context of every request.
 
 ### Modules
 
-| Module               | Responsibility                                                                    | Depends on                                                    |
-|----------------------|-----------------------------------------------------------------------------------|---------------------------------------------------------------|
-| `core/shared`        | Identifiers, execution context, correlation ID, event envelope, time, error model | nothing                                                       |
-| `core/network`       | Network lifecycle                                                                 | shared                                                        |
-| `core/organization`  | Organizations inside a network                                                    | network                                                       |
-| `core/identity`      | Identities, ownership, credentials                                                | network, organization                                         |
-| `core/membership`    | Memberships and principal resolution                                              | identity, organization, network                               |
-| `core/authorization` | Roles and central authorization decisions; defines evidence ports                 | membership, identity, network                                 |
-| `core/trust`         | Scoped, directional trust from networks and organizations                         | identity, membership, network, organization                   |
-| `core/federation`    | Federation lifecycle and scope                                                    | membership, network, trust                                    |
-| `core/delegation`    | Delegations and their constraints                                                 | authorization, membership, network                            |
-| `core/capability`    | Capability types and capabilities                                                 | authorization, identity, membership, network, organization    |
-| `core/discovery`     | Local and federated capability discovery                                          | capability, federation, network, authorization                |
-| `core/agreement`     | Versioned agreements                                                              | authorization, discovery, membership                          |
-| `core/transaction`   | Transactions under agreements                                                     | agreement, authorization, capability                          |
-| `core/audit`         | Append-only audit events and accountability trails                                | authorization, membership, capability, agreement, transaction |
-| `core/integration`   | Agent and machine adapters                                                        | membership, discovery, agreement, transaction                 |
-| `core/bootstrap`     | Application, security, persistence wiring, error handling, architecture tests     | all modules                                                   |
-| `core/e2e-tests`     | Black-box end-to-end tests, see [End-to-End Tests](../core/e2e-tests/README.md)   | bootstrap at test time                                        |
+| Module               | Responsibility                                                                    | Depends on                                                              |
+|----------------------|-----------------------------------------------------------------------------------|-------------------------------------------------------------------------|
+| `core/shared`        | Identifiers, execution context, correlation ID, event envelope, time, error model | nothing                                                                 |
+| `core/network`       | Network lifecycle                                                                 | shared                                                                  |
+| `core/organization`  | Organizations inside a network                                                    | network                                                                 |
+| `core/identity`      | Identities, ownership, credentials                                                | network, organization                                                   |
+| `core/membership`    | Memberships and principal resolution                                              | identity, organization, network                                         |
+| `core/authorization` | Roles and central authorization decisions; defines evidence ports                 | membership, identity, network                                           |
+| `core/trust`         | Scoped, directional trust from networks and organizations                         | identity, membership, network, organization                             |
+| `core/federation`    | Federation lifecycle and scope                                                    | membership, network, trust                                              |
+| `core/delegation`    | Delegations and their constraints                                                 | authorization, membership, network                                      |
+| `core/capability`    | Capability types and capabilities                                                 | authorization, identity, membership, network, organization              |
+| `core/discovery`     | Local and federated capability discovery                                          | capability, federation, network, authorization                          |
+| `core/agreement`     | Versioned agreements                                                              | authorization, discovery, membership                                    |
+| `core/transaction`   | Transactions under agreements                                                     | agreement, authorization, capability                                    |
+| `core/audit`         | Append-only audit events and accountability trails                                | identity, authorization, membership, capability, agreement, transaction |
+| `core/integration`   | Agent and machine adapters                                                        | membership, discovery, agreement, transaction                           |
+| `core/bootstrap`     | Application, security, persistence wiring, error handling, architecture tests     | all modules                                                             |
+| `core/e2e-tests`     | Black-box end-to-end tests, see [End-to-End Tests](../core/e2e-tests/README.md)   | bootstrap at test time                                                  |
 
 ### Inside a Module
 
@@ -263,6 +264,7 @@ Every scenario is verified by end-to-end tests listed in [End-to-End Tests](../c
 | SC-16 | Accountability reconstruction          | 11    | ✓      |
 | SC-17 | Agent adapter                          | 12    | ✓      |
 | SC-18 | Platform administration access         | 14    | ✓      |
+| SC-19 | Stability and escalation guards        | 15    | ✓      |
 
 ## Roadmap
 
@@ -282,6 +284,7 @@ Every scenario is verified by end-to-end tests listed in [End-to-End Tests](../c
 | 12    | Agent adapter        | External agents acting as principals                                                | ✓      |
 | 13    | Machine adapter      | Simulated machine executing authorized transactions                                 | ✓      |
 | 14    | Hardening            | Authenticated management endpoints, operator token, ownership limited for execution | ✓      |
+| 15    | Stability            | Pool-safe audit, suspended networks, escalation guards, credential lifecycle        | ✓      |
 
 V1 is done when two independent networks, at least two organizations, human, agent and machine identities, memberships,
 capability discovery, an active federation, a limited delegation, authorization decisions, an accepted agreement, an

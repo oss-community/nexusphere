@@ -141,7 +141,7 @@ class AuthorizationE2ETest extends E2ETestBase {
         assertThat(adminA.get("/api/v1/authorization/decisions/" + id).status()).isEqualTo(200);
         assertThat(bob.get("/api/v1/authorization/decisions/" + id).status()).isEqualTo(404);
         assertThat(adminB.get("/api/v1/authorization/decisions/" + id).status()).isEqualTo(404);
-        assertThat(api().get("/api/v1/authorization/roles").json().valueStream()
+        assertThat(api().asOperator().get("/api/v1/authorization/roles").json().valueStream()
                 .map(role -> role.path("role").asString())).contains("NETWORK_ADMINISTRATOR", "AGREEMENT_MANAGER");
     }
 }

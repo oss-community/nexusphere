@@ -224,9 +224,10 @@ Maven module with the package `com.nexusphere.<module>`. A module is reached by 
 |--------------|---------------------------------|
 | `postgresql` | PostgreSQL datasource (default) |
 | `json`       | Structured (ECS) console logs   |
+| `dev`        | Published development secrets   |
 
 ```shell
-APP_PROFILES=postgresql,json mvn -pl core/bootstrap spring-boot:start
+APP_PROFILES=postgresql,dev,json mvn -pl core/bootstrap spring-boot:start
 ```
 
 ### Environment Variables
@@ -234,7 +235,7 @@ APP_PROFILES=postgresql,json mvn -pl core/bootstrap spring-boot:start
 ```yaml
 APP_HOST: 0.0.0.0
 APP_PORT: 8080
-APP_PROFILES: postgresql
+APP_PROFILES: postgresql,dev
 APP_DATABASE_HOST: localhost
 APP_DATABASE_PORT: 5432
 APP_DATABASE_DB: nexusphere
@@ -244,7 +245,16 @@ APP_TOKEN_ISSUER: nexusphere
 APP_TOKEN_SECRET: nexusphere-development-token-secret-change-me
 APP_TOKEN_TTL: 15m
 APP_OPERATOR_SECRET: nexusphere-development-operator-secret-change-me
+APP_CREDENTIAL_TTL: 90d
+APP_CREDENTIAL_MAX_TTL: 365d
+APP_HTTP_THREADS: 20
+APP_DATABASE_POOL_SIZE: 21
 ```
+
+`APP_TOKEN_SECRET` and `APP_OPERATOR_SECRET` have no default outside the `dev` profile, and the application refuses to
+start with the published development secrets unless `dev` is active. A request can hold two database connections, one
+for its work and one for its authorization decision, so the application refuses to start unless
+`APP_DATABASE_POOL_SIZE` is greater than `APP_HTTP_THREADS`.
 
 ### API
 
@@ -265,7 +275,10 @@ APP_OPERATOR_SECRET: nexusphere-development-operator-secret-change-me
 | POST   | `/api/v1/identities`                                                     | Create an identity: HUMAN by the operator, owned identities by an administrator of the owning network                                                                             |
 | POST   | `/api/v1/identities/{identityId}/suspend`                                | Suspend an identity (operator, or administrator of the owning network)                                                                                                            |
 | POST   | `/api/v1/identities/{identityId}/activate`                               | Activate an identity (operator, or administrator of the owning network)                                                                                                           |
-| POST   | `/api/v1/identities/{identityId}/credentials`                            | Issue a credential secret (operator, administrator of the owning network, or the identity itself)                                                                                 |
+| POST   | `/api/v1/identities/{identityId}/credentials`                            | Issue a credential secret with an optional `expiresAt` (operator, administrator of the owning network, or the identity itself)                                                    |
+| POST   | `/api/v1/identities/{identityId}/credentials/rotate`                     | Issue a new credential and revoke every other one, which also invalidates their tokens (same callers)                                                                             |
+| POST   | `/api/v1/identities/{identityId}/credentials/{credentialId}/revoke`      | Revoke a credential and the tokens issued from it (same callers)                                                                                                                  |
+| GET    | `/api/v1/identities/{identityId}/credentials`                            | List credentials with status ACTIVE, EXPIRED or REVOKED, never the secret (same callers)                                                                                          |
 | POST   | `/api/v1/auth/token`                                                     | Exchange a credential for a bearer token                                                                                                                                          |
 | POST   | `/api/v1/auth/operator-token`                                            | Exchange the platform operator secret (`APP_OPERATOR_SECRET`) for an operator bearer token                                                                                        |
 | POST   | `/api/v1/networks/{networkId}/memberships`                               | Activate a membership, optionally as `ADMINISTRATOR` (network administrator)                                                                                                      |
@@ -321,6 +334,7 @@ APP_OPERATOR_SECRET: nexusphere-development-operator-secret-change-me
 | GET    | `/api/v1/audit-events`                                                   | Search the network's audit by `transactionId`, `agreementId`, `delegationId`, `decisionId`, `principalId`, `correlationId`, `result`, `resourceType`, `resourceId` (`audit:read`) |
 | GET    | `/api/v1/audit-events/{auditEventId}`                                    | Get an audit event (`audit:read`)                                                                                                                                                 |
 | GET    | `/api/v1/audit-events/trail`                                             | Accountability chain and related events of a `transactionId` (`audit:read`)                                                                                                       |
+| GET    | `/api/v1/audit-events/platform`                                          | Platform audit stream of identity and credential changes, by `correlationId`, `resourceType`, `resourceId` (operator)                                                             |
 | GET    | `/api/v1/networks/{networkId}/agent/card`                                | Agent gateway card: protocol, endpoint, methods and the calling principal (bearer token)                                                                                          |
 | POST   | `/api/v1/networks/{networkId}/agent/rpc`                                 | JSON-RPC 2.0 agent gateway, single or batch (bearer token of the agent)                                                                                                           |
 | GET    | `/api/v1/networks/{networkId}/machine/tasks`                             | AUTHORIZED and EXECUTING transactions for capabilities the calling machine owns (machine token)                                                                                   |
@@ -329,7 +343,9 @@ APP_OPERATOR_SECRET: nexusphere-development-operator-secret-change-me
 The platform operator creates networks, human identities and capability types and bootstraps the first network
 administrator; after that each network administrator manages its own organizations, memberships and owned identities.
 Every active member holds the MEMBER role; an `ADMINISTRATOR` membership holds NETWORK_ADMINISTRATOR. Requests that name an
-action in parentheses are checked by the central authorizer, which records an ALLOW or DENY decision. Requests marked with bearer token need `Authorization: Bearer <token>` and a network context, taken from the path
+action in parentheses are checked by the central authorizer, which records an ALLOW or DENY decision. Every endpoint
+except `/api/v1/auth/*`, `/api/v1/platform`, health and the API docs needs a bearer token. While a network is
+suspended its members can still read, but every other authorized action is 409 `NETWORK_NOT_ACTIVE`. Requests marked with bearer token need `Authorization: Bearer <token>` and a network context, taken from the path
 or the `X-Network-Id` header. The identity must be active and hold an active membership in that network.
 
 ```shell

@@ -83,6 +83,7 @@ public class TransactionService implements TransactionDirectory {
             throw new DomainException(ErrorCategory.AUTHORIZATION_ERROR, code,
                     "Only the consuming party of agreement " + agreement.id() + " can request transactions");
         }
+        CapabilityId capability = request.capabilityId() == null ? null : CapabilityId.of(request.capabilityId());
         UUID id = UUID.randomUUID();
         AuthorizationDecision decision = authorizer.require(AuthorizationRequest.of(principal,
                         Actions.TRANSACTION_INITIATE, new ResourceReference("transaction", id.toString(),
@@ -91,7 +92,7 @@ public class TransactionService implements TransactionDirectory {
         Transaction transaction = Transaction.request(id, request.type(), new Transaction.AgreementCoverage(
                         agreement.id(), agreement.currentVersion(), agreement.active(), agreement.capabilityId(),
                         agreement.capabilityNetworkId(), requester, provider),
-                request.capabilityId() == null ? null : CapabilityId.of(request.capabilityId()), participant,
+                capability, participant,
                 new Authority(decision.id(), decision.delegationId(), decision.federationId(),
                         decision.trustRelationshipId()),
                 request.metadata(), time.now());

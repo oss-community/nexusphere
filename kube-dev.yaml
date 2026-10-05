@@ -33,7 +33,7 @@ data:
   PGADMIN_CONFIG_SERVER_MODE: "False"
   APP_HOST: "0.0.0.0"
   APP_PORT: "8080"
-  APP_PROFILES: postgresql
+  APP_PROFILES: postgresql,dev
   APP_TOKEN_ISSUER: nexusphere
   APP_TOKEN_TTL: 15m
 ---

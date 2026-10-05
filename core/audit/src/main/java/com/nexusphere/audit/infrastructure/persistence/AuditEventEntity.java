@@ -74,7 +74,7 @@ class AuditEventEntity {
     @Column(length = 200, updatable = false)
     private String reason;
 
-    @Column(name = "correlation_id", nullable = false, length = 100, updatable = false)
+    @Column(name = "correlation_id", nullable = false, length = 128, updatable = false)
     private String correlationId;
 
     @Column(name = "causation_id", updatable = false)

@@ -32,7 +32,8 @@ class SovereignNetworkBootstrapE2ETest extends E2ETestBase {
         String acme = sovereignty.organization(networkA, "Acme");
         String globex = sovereignty.organization(networkB, "Globex");
 
-        assertThat(api().get("/api/v1/networks/" + networkA).json().path("status").asString()).isEqualTo("ACTIVE");
+        assertThat(api().asOperator().get("/api/v1/networks/" + networkA).json().path("status").asString())
+                .isEqualTo("ACTIVE");
         assertThat(ids(sovereignty.listOrganizations(networkA))).containsExactly(acme);
         assertThat(ids(sovereignty.listOrganizations(networkB))).containsExactly(globex);
     }
@@ -103,7 +104,7 @@ class SovereignNetworkBootstrapE2ETest extends E2ETestBase {
         assertThat(sovereignty.renameOrganization(network, acme, "Acme 2").status()).isEqualTo(409);
         assertThat(sovereignty.deactivateOrganization(network, acme).status()).isEqualTo(409);
 
-        assertThat(api().get("/api/v1/networks/" + network).status()).isEqualTo(200);
+        assertThat(api().asOperator().get("/api/v1/networks/" + network).status()).isEqualTo(200);
         assertThat(ids(sovereignty.listOrganizations(network))).containsExactly(acme);
         assertThat(sovereignty.getOrganization(network, acme).json().path("name").asString()).isEqualTo("Acme");
 
@@ -146,8 +147,8 @@ class SovereignNetworkBootstrapE2ETest extends E2ETestBase {
 
         ApiClient.Response duplicate = sovereignty.createNetwork(name.toUpperCase());
         ApiClient.Response blank = sovereignty.createNetwork(" ");
-        ApiClient.Response unknown = api().get("/api/v1/networks/00000000-0000-0000-0000-000000000000");
-        ApiClient.Response malformed = api().get("/api/v1/networks/not-a-uuid");
+        ApiClient.Response unknown = api().asOperator().get("/api/v1/networks/00000000-0000-0000-0000-000000000000");
+        ApiClient.Response malformed = api().asOperator().get("/api/v1/networks/not-a-uuid");
 
         assertThat(duplicate.status()).isEqualTo(409);
         assertThat(duplicate.json().path("code").asString()).isEqualTo("NETWORK_NAME_TAKEN");

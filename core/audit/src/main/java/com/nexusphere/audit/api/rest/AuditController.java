@@ -5,6 +5,7 @@ import com.nexusphere.audit.contract.AuditRecord;
 import com.nexusphere.audit.domain.model.AuditQuery;
 import com.nexusphere.audit.domain.model.TrailLink;
 import com.nexusphere.membership.contract.PrincipalContext;
+import com.nexusphere.shared.context.Caller;
 import com.nexusphere.shared.context.ExecutionContext;
 import com.nexusphere.shared.id.Identifier;
 import com.nexusphere.shared.id.PrincipalId;
@@ -64,6 +65,15 @@ class AuditController {
                 uuid(decisionId), principalId == null ? null : PrincipalId.of(principalId), correlationId, result,
                 resourceType, resourceId);
         return audit.search(principal, query, context).stream().map(AuditEventResponse::of).toList();
+    }
+
+    @GetMapping("/platform")
+    List<AuditEventResponse> platform(Caller caller, @RequestParam(required = false) String correlationId,
+                                      @RequestParam(required = false) String resourceType,
+                                      @RequestParam(required = false) String resourceId) {
+        AuditQuery query = new AuditQuery(null, null, null, null, null, correlationId, null, resourceType,
+                resourceId);
+        return audit.platform(caller, query).stream().map(AuditEventResponse::of).toList();
     }
 
     @GetMapping("/{auditEventId}")

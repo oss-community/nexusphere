@@ -1,6 +1,9 @@
 server:
   address: ${APP_HOST:0.0.0.0}
   port: ${APP_PORT:8080}
+  tomcat:
+    threads:
+      max: ${APP_HTTP_THREADS:20}
   error:
     whitelabel:
       enabled: false
@@ -16,10 +19,14 @@ nexusphere:
   security:
     token:
       issuer: ${APP_TOKEN_ISSUER:nexusphere}
-      secret: ${APP_TOKEN_SECRET:nexusphere-development-token-secret-change-me}
+      secret: ${APP_TOKEN_SECRET:}
       ttl: ${APP_TOKEN_TTL:15m}
     operator:
-      secret: ${APP_OPERATOR_SECRET:nexusphere-development-operator-secret-change-me}
+      secret: ${APP_OPERATOR_SECRET:}
+  identity:
+    credential:
+      ttl: ${APP_CREDENTIAL_TTL:90d}
+      max-ttl: ${APP_CREDENTIAL_MAX_TTL:365d}
   persistence:
     modules:
       - network

@@ -1,0 +1,6 @@
+nexusphere:
+  security:
+    token:
+      secret: ${APP_TOKEN_SECRET:nexusphere-development-token-secret-change-me}
+    operator:
+      secret: ${APP_OPERATOR_SECRET:nexusphere-development-operator-secret-change-me}

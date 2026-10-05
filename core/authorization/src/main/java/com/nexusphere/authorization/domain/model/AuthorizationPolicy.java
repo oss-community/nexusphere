@@ -12,9 +12,12 @@ import java.util.UUID;
 
 public final class AuthorizationPolicy {
 
-    public record Facts(String action, Set<Role> roles, Ownership owner, NetworkId homeNetwork, NetworkId targetNetwork,
-                        boolean targetNetworkActive, FederationContext federation, UUID trustRelationshipId) {
+    public record Facts(String action, Set<Role> roles, Ownership owner, NetworkId homeNetwork,
+                        boolean homeNetworkActive, NetworkId targetNetwork, boolean targetNetworkActive,
+                        FederationContext federation, UUID trustRelationshipId) {
     }
+
+    public static final String NETWORK_NOT_ACTIVE = "NETWORK_NOT_ACTIVE";
 
     public record Outcome(boolean allowed, String reason, Role matchedRole) {
 
@@ -38,6 +41,9 @@ public final class AuthorizationPolicy {
 
     private static final Set<String> IDENTITY_OWNER_ACTIONS = Set.of(Actions.TRANSACTION_EXECUTE);
 
+    private static final Set<String> READ_ACTIONS = Set.of(Actions.CAPABILITY_DISCOVER, Actions.IDENTITY_READ,
+            Actions.AUDIT_READ);
+
     private AuthorizationPolicy() {
     }
 
@@ -57,6 +63,9 @@ public final class AuthorizationPolicy {
     public static Outcome evaluate(Facts facts) {
         if (!Actions.ALL.contains(facts.action())) {
             return Outcome.deny("UNKNOWN_ACTION");
+        }
+        if (!facts.homeNetworkActive() && !READ_ACTIONS.contains(facts.action())) {
+            return Outcome.deny(NETWORK_NOT_ACTIVE);
         }
         if (isCrossNetwork(facts)) {
             Optional<Outcome> federationDenial = crossNetworkDenial(facts);

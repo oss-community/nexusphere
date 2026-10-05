@@ -5,6 +5,7 @@ import com.nexusphere.agreement.contract.AgreementSnapshot;
 import com.nexusphere.audit.contract.AuditRecord;
 import com.nexusphere.audit.contract.AuditTrail;
 import com.nexusphere.audit.domain.model.AuditQuery;
+import com.nexusphere.audit.domain.model.AuditStreams;
 import com.nexusphere.audit.domain.model.TrailLink;
 import com.nexusphere.audit.domain.repository.AuditEventRepository;
 import com.nexusphere.authorization.contract.Actions;
@@ -16,6 +17,7 @@ import com.nexusphere.capability.contract.CapabilitySnapshot;
 import com.nexusphere.capability.contract.CapabilityDirectory;
 import com.nexusphere.membership.contract.PrincipalContext;
 import com.nexusphere.membership.contract.PrincipalResolver;
+import com.nexusphere.shared.context.Caller;
 import com.nexusphere.shared.context.ExecutionContext;
 import com.nexusphere.shared.error.NotFoundException;
 import com.nexusphere.shared.id.NetworkId;
@@ -64,6 +66,11 @@ public class AuditService implements AuditTrail {
     public List<AuditRecord> search(PrincipalContext principal, AuditQuery query, ExecutionContext context) {
         requireAuditor(principal, context);
         return events.search(principal.networkId(), query);
+    }
+
+    public List<AuditRecord> platform(Caller caller, AuditQuery query) {
+        caller.requireOperator();
+        return events.search(AuditStreams.PLATFORM, query);
     }
 
     public AuditRecord get(PrincipalContext principal, UUID id, ExecutionContext context) {

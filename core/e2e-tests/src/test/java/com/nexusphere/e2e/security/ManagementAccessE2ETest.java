@@ -62,7 +62,7 @@ class ManagementAccessE2ETest extends E2ETestBase {
         assertError(anonymous.post("/api/v1/capability-types",
                 "{\"code\":\"rogue\",\"name\":\"Rogue\",\"schema\":{\"type\":\"object\"}}"), 401,
                 "AUTHENTICATION_REQUIRED");
-        assertThat(anonymous.get("/api/v1/networks/" + network).status()).isEqualTo(200);
+        assertError(anonymous.get("/api/v1/networks/" + network), 401, "AUTHENTICATION_REQUIRED");
     }
 
     @Test

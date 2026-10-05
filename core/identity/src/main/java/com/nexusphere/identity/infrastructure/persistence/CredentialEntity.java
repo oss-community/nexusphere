@@ -24,14 +24,23 @@ class CredentialEntity {
     @Column(name = "created_at", nullable = false)
     private Instant createdAt;
 
+    @Column(name = "expires_at", nullable = false)
+    private Instant expiresAt;
+
+    @Column(name = "revoked_at")
+    private Instant revokedAt;
+
     protected CredentialEntity() {
     }
 
-    CredentialEntity(UUID id, UUID identityId, String secretHash, Instant createdAt) {
+    CredentialEntity(UUID id, UUID identityId, String secretHash, Instant createdAt, Instant expiresAt,
+                     Instant revokedAt) {
         this.id = id;
         this.identityId = identityId;
         this.secretHash = secretHash;
         this.createdAt = createdAt;
+        this.expiresAt = expiresAt;
+        this.revokedAt = revokedAt;
     }
 
     UUID getId() {
@@ -48,5 +57,13 @@ class CredentialEntity {
 
     Instant getCreatedAt() {
         return createdAt;
+    }
+
+    Instant getExpiresAt() {
+        return expiresAt;
+    }
+
+    Instant getRevokedAt() {
+        return revokedAt;
     }
 }

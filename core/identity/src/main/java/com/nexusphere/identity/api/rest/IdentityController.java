@@ -2,12 +2,14 @@ package com.nexusphere.identity.api.rest;
 
 import com.nexusphere.identity.application.CredentialService;
 import com.nexusphere.identity.application.IdentityService;
+import com.nexusphere.identity.domain.model.Credential;
 import com.nexusphere.identity.domain.model.Identity;
 import com.nexusphere.identity.domain.model.IdentityType;
 import com.nexusphere.identity.domain.model.Ownership;
 import com.nexusphere.shared.context.Caller;
 import com.nexusphere.shared.context.ExecutionContext;
 import com.nexusphere.shared.error.ValidationException;
+import com.nexusphere.shared.id.Identifier;
 import com.nexusphere.shared.id.IdentityId;
 import com.nexusphere.shared.id.NetworkId;
 import com.nexusphere.shared.id.OrganizationId;
@@ -17,6 +19,7 @@ import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -25,6 +28,7 @@ import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.time.Instant;
+import java.util.List;
 
 @RestController
 @RequestMapping("/api/v1/identities")
@@ -63,7 +67,31 @@ class IdentityController {
         }
     }
 
-    record CredentialResponse(String credentialId, String identityId, String secret) {
+    record CredentialRequest(Instant expiresAt) {
+
+        static Instant expiresAt(CredentialRequest request) {
+            return request == null ? null : request.expiresAt();
+        }
+    }
+
+    record CredentialResponse(String credentialId, String identityId, String status, Instant createdAt,
+                              Instant expiresAt, Instant revokedAt) {
+
+        static CredentialResponse of(Credential credential, Instant now) {
+            return new CredentialResponse(credential.id().toString(), credential.identityId().toString(),
+                    credential.status(now).name(), credential.createdAt(), credential.expiresAt(),
+                    credential.revokedAt());
+        }
+    }
+
+    record IssuedCredentialResponse(String credentialId, String identityId, String secret, String status,
+                                    Instant expiresAt) {
+
+        static IssuedCredentialResponse of(CredentialService.IssuedCredential issued, Instant now) {
+            Credential credential = issued.credential();
+            return new IssuedCredentialResponse(credential.id().toString(), credential.identityId().toString(),
+                    issued.secret(), credential.status(now).name(), credential.expiresAt());
+        }
     }
 
     private final IdentityService identities;
@@ -100,13 +128,40 @@ class IdentityController {
     }
 
     @PostMapping("/{identityId}/credentials")
-    ResponseEntity<CredentialResponse> issueCredential(@PathVariable String identityId, Caller caller,
-                                                       ExecutionContext context) {
+    ResponseEntity<IssuedCredentialResponse> issueCredential(
+            @PathVariable String identityId, Caller caller, ExecutionContext context,
+            @RequestBody(required = false) CredentialRequest request) {
+        CredentialService.IssuedCredential issued = credentials.issue(self(identityId, caller),
+                CredentialRequest.expiresAt(request), context);
+        return ResponseEntity.status(HttpStatus.CREATED).body(IssuedCredentialResponse.of(issued, credentials.now()));
+    }
+
+    @PostMapping("/{identityId}/credentials/rotate")
+    ResponseEntity<IssuedCredentialResponse> rotateCredential(
+            @PathVariable String identityId, Caller caller, ExecutionContext context,
+            @RequestBody(required = false) CredentialRequest request) {
+        CredentialService.IssuedCredential issued = credentials.rotate(self(identityId, caller),
+                CredentialRequest.expiresAt(request), context);
+        return ResponseEntity.status(HttpStatus.CREATED).body(IssuedCredentialResponse.of(issued, credentials.now()));
+    }
+
+    @PostMapping("/{identityId}/credentials/{credentialId}/revoke")
+    CredentialResponse revokeCredential(@PathVariable String identityId, @PathVariable String credentialId,
+                                        Caller caller, ExecutionContext context) {
+        return CredentialResponse.of(credentials.revoke(self(identityId, caller),
+                Identifier.parse(credentialId, "CredentialId"), context), credentials.now());
+    }
+
+    @GetMapping("/{identityId}/credentials")
+    List<CredentialResponse> listCredentials(@PathVariable String identityId, Caller caller) {
+        Instant now = credentials.now();
+        return credentials.list(self(identityId, caller)).stream()
+                .map(credential -> CredentialResponse.of(credential, now)).toList();
+    }
+
+    private IdentityId self(String identityId, Caller caller) {
         IdentityId id = IdentityId.of(identityId);
-        CredentialService.IssuedCredential issued = credentials.issue(caller.is(id) ? id : managed(identityId, caller),
-                context);
-        return ResponseEntity.status(HttpStatus.CREATED).body(new CredentialResponse(
-                issued.credentialId().toString(), issued.identityId().toString(), issued.secret()));
+        return caller.is(id) ? id : managed(identityId, caller);
     }
 
     private IdentityId managed(String identityId, Caller caller) {

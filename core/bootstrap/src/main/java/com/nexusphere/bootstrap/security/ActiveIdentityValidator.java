@@ -1,5 +1,6 @@
 package com.nexusphere.bootstrap.security;
 
+import com.nexusphere.identity.contract.CredentialVerifier;
 import com.nexusphere.identity.contract.IdentityDirectory;
 import com.nexusphere.identity.contract.IdentitySnapshot;
 import com.nexusphere.shared.error.DomainException;
@@ -10,12 +11,16 @@ import org.springframework.security.oauth2.core.OAuth2TokenValidator;
 import org.springframework.security.oauth2.core.OAuth2TokenValidatorResult;
 import org.springframework.security.oauth2.jwt.Jwt;
 
+import java.util.UUID;
+
 class ActiveIdentityValidator implements OAuth2TokenValidator<Jwt> {
 
     private final IdentityDirectory identities;
+    private final CredentialVerifier credentials;
 
-    ActiveIdentityValidator(IdentityDirectory identities) {
+    ActiveIdentityValidator(IdentityDirectory identities, CredentialVerifier credentials) {
         this.identities = identities;
+        this.credentials = credentials;
     }
 
     @Override
@@ -31,7 +36,17 @@ class ActiveIdentityValidator implements OAuth2TokenValidator<Jwt> {
             return failure("The token subject is not an identity");
         }
         boolean active = identities.find(identityId).map(IdentitySnapshot::active).orElse(false);
-        return active ? OAuth2TokenValidatorResult.success() : failure("Identity " + identityId + " is not active");
+        if (!active) {
+            return failure("Identity " + identityId + " is not active");
+        }
+        UUID credentialId;
+        try {
+            credentialId = UUID.fromString(token.getClaimAsString(LocalTokenIssuer.CREDENTIAL_CLAIM));
+        } catch (IllegalArgumentException | NullPointerException e) {
+            return failure("The token names no credential");
+        }
+        return credentials.usable(identityId, credentialId) ? OAuth2TokenValidatorResult.success()
+                : failure("The credential of the token is revoked or expired");
     }
 
     private static OAuth2TokenValidatorResult failure(String description) {

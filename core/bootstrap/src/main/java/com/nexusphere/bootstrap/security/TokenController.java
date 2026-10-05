@@ -11,6 +11,8 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.util.UUID;
+
 @RestController
 @RequestMapping("/api/v1/auth")
 class TokenController {
@@ -43,10 +45,9 @@ class TokenController {
     @PostMapping("/token")
     LocalTokenIssuer.IssuedToken token(@Valid @RequestBody TokenRequest request) {
         IdentityId identityId = IdentityId.of(request.identityId());
-        if (!credentials.verify(identityId, request.secret())) {
-            throw new DomainException(ErrorCategory.AUTHENTICATION_ERROR, "INVALID_CREDENTIALS",
-                    "The identity or secret is not valid");
-        }
-        return issuer.issue(identityId);
+        UUID credentialId = credentials.verify(identityId, request.secret())
+                .orElseThrow(() -> new DomainException(ErrorCategory.AUTHENTICATION_ERROR, "INVALID_CREDENTIALS",
+                        "The identity or secret is not valid"));
+        return issuer.issue(identityId, credentialId);
     }
 }
