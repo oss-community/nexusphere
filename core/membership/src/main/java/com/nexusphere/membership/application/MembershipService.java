@@ -19,11 +19,13 @@ import com.nexusphere.shared.event.DomainEventPublisher;
 import com.nexusphere.shared.id.IdentityId;
 import com.nexusphere.shared.id.NetworkId;
 import com.nexusphere.shared.id.OrganizationId;
+import com.nexusphere.shared.id.PrincipalId;
 import com.nexusphere.shared.time.TimeProvider;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 @Service
@@ -126,6 +128,16 @@ public class MembershipService implements PrincipalResolver {
                         "The authenticated identity has no active membership in network " + networkId));
         return new PrincipalContext(membership.principalId(), identity.id(), identity.type(), networkId,
                 membership.organizationId().orElse(null), membership.isAdministrator());
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Optional<PrincipalContext> find(NetworkId networkId, PrincipalId principalId) {
+        return memberships.findById(networkId, principalId.value()).filter(Membership::isActive)
+                .flatMap(membership -> identities.find(membership.identityId()).filter(IdentitySnapshot::active)
+                        .map(identity -> new PrincipalContext(membership.principalId(), identity.id(), identity.type(),
+                                networkId, membership.organizationId().orElse(null),
+                                membership.isAdministrator())));
     }
 
     private OrganizationId organizationFor(IdentitySnapshot identity, NetworkId networkId, OrganizationId requested) {

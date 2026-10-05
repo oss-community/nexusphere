@@ -121,7 +121,7 @@ sovereignty is logical and enforced by the network context of every request.
 | `core/organization`  | Organizations inside a network                                                    | network                                                    |
 | `core/identity`      | Identities, ownership, credentials                                                | network, organization                                      |
 | `core/membership`    | Memberships and principal resolution                                              | identity, organization, network                            |
-| `core/authorization` | Roles and central authorization decisions; defines evidence ports                 | membership, identity                                       |
+| `core/authorization` | Roles and central authorization decisions; defines evidence ports                 | membership, identity, network                              |
 | `core/trust`         | Scoped, directional trust from networks and organizations                         | identity, membership, network, organization                |
 | `core/federation`    | Federation lifecycle and scope                                                    | membership, network, trust                                 |
 | `core/delegation`    | Delegations and their constraints                                                 | authorization, membership, identity                        |
@@ -186,9 +186,9 @@ Status: ✓ implemented, ○ planned.
 | UC-FED-01 | Propose federation with scope                                            | Federation    | 5     | ✓      |
 | UC-FED-02 | Accept or reject federation                                              | Federation    | 5     | ✓      |
 | UC-FED-03 | Suspend, resume or terminate federation                                  | Federation    | 5     | ✓      |
-| UC-AUZ-01 | Assign role to a member                                                  | Authorization | 6     | ○      |
-| UC-AUZ-02 | Evaluate an authorization request and return ALLOW or DENY with a reason | Authorization | 6     | ○      |
-| UC-AUZ-03 | Record the authorization decision as evidence                            | Authorization | 6     | ○      |
+| UC-AUZ-01 | Assign role to a member                                                  | Authorization | 6     | ✓      |
+| UC-AUZ-02 | Evaluate an authorization request and return ALLOW or DENY with a reason | Authorization | 6     | ✓      |
+| UC-AUZ-03 | Record the authorization decision as evidence                            | Authorization | 6     | ✓      |
 | UC-DEL-01 | Grant delegation with action, capability, network and time constraints   | Delegation    | 7     | ○      |
 | UC-DEL-02 | Reject an invalid delegation                                             | Delegation    | 7     | ○      |
 | UC-DEL-03 | Revoke or suspend delegation                                             | Delegation    | 7     | ○      |
@@ -254,7 +254,7 @@ Every scenario is verified by end-to-end tests listed in [End-to-End Tests](../c
 | SC-07 | Human, agent and machine identities    | 3     | ✓      |
 | SC-08 | Capability registration and visibility | 4     | ✓      |
 | SC-09 | Trust and federation lifecycle         | 5     | ✓      |
-| SC-10 | Centralized authorization decisions    | 6     | ○      |
+| SC-10 | Centralized authorization decisions    | 6     | ✓      |
 | SC-11 | Delegation rules                       | 7     | ○      |
 | SC-12 | Governed discovery                     | 8     | ○      |
 | SC-13 | Agreement lifecycle and integrity      | 9     | ○      |
@@ -272,7 +272,7 @@ Every scenario is verified by end-to-end tests listed in [End-to-End Tests](../c
 | 3     | Identity             | Human, agent and machine identities, memberships, principal context, tokens  | ✓      |
 | 4     | Capability           | Capability types, capabilities and visibility                                | ✓      |
 | 5     | Trust and federation | Directional trust and federation lifecycle                                   | ✓      |
-| 6     | Authorization        | Roles and central authorization decisions                                    | ○      |
+| 6     | Authorization        | Roles and central authorization decisions                                    | ✓      |
 | 7     | Delegation           | Constrained, revocable delegations                                           | ○      |
 | 8     | Discovery            | Local and federated discovery                                                | ○      |
 | 9     | Agreement            | Versioned agreements                                                         | ○      |
