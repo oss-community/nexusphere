@@ -26,6 +26,8 @@ public final class TrustedInteraction {
     public final ApiClient humanA;
     public final ApiClient agentA;
     public final ApiClient humanB;
+    public final String humanAIdentity;
+    public final String humanBIdentity;
     public final String humanAPrincipal;
     public final String agentAPrincipal;
     public final String agentAIdentity;
@@ -47,6 +49,7 @@ public final class TrustedInteraction {
         organizationA = sovereignty.organization(networkA, "Organization A");
         adminA = administrator(networkA, "Admin A");
         String humanAId = identities.human("Human A");
+        humanAIdentity = humanAId;
         humanAPrincipal = identities.member(networkA, humanAId, organizationA);
         humanA = identities.as(identities.actor(humanAId), networkA);
         assertThat(assign(adminA, networkA, humanAPrincipal, "AGREEMENT_MANAGER").status()).isEqualTo(201);
@@ -59,6 +62,7 @@ public final class TrustedInteraction {
         organizationB = sovereignty.organization(networkB, "Organization B");
         adminB = administrator(networkB, "Admin B");
         String humanBId = identities.human("Human B");
+        humanBIdentity = humanBId;
         humanBPrincipal = identities.member(networkB, humanBId, organizationB);
         humanB = identities.as(identities.actor(humanBId), networkB);
         assertThat(assign(adminB, networkB, humanBPrincipal, "AGREEMENT_MANAGER").status()).isEqualTo(201);
@@ -109,6 +113,22 @@ public final class TrustedInteraction {
         ApiClient.Response proposed = agentA.post(agreements(networkA) + "/" + agreement + "/propose", "");
         assertThat(proposed.status()).as(proposed.body()).isEqualTo(200);
         return agreement;
+    }
+
+    public static String transactions(String networkId) {
+        return "/api/v1/networks/" + networkId + "/transactions";
+    }
+
+    public String completedTransaction(String agreement) {
+        ApiClient.Response requested = agentA.post(transactions(networkA), "{\"agreementId\":\"" + agreement
+                + "\",\"type\":\"capability.invocation\"}");
+        assertThat(requested.status()).as(requested.body()).isEqualTo(201);
+        String transaction = requested.json().path("id").asString();
+        assertThat(humanB.post(transactions(networkB) + "/" + transaction + "/execute", "").status()).isEqualTo(200);
+        ApiClient.Response completed = humanB.post(transactions(networkB) + "/" + transaction + "/complete",
+                "{\"result\":{\"delivered\":100}}");
+        assertThat(completed.json().path("status").asString()).isEqualTo("COMPLETED");
+        return transaction;
     }
 
     public String activeAgreement() {

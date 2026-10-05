@@ -197,24 +197,25 @@ Maven module with the package `com.nexusphere.<module>`. A module is reached by 
 
 ### Modules
 
-| Module                           | Responsibility                                                                               |
-|----------------------------------|----------------------------------------------------------------------------------------------|
-| `core/shared`                    | Identifiers, execution context, correlation ID, domain event envelope, error model           |
-| `core/network`                   | Network lifecycle: PENDING, ACTIVE, SUSPENDED, ARCHIVED                                      |
-| `core/organization`              | Organizations registered inside a network                                                    |
-| `core/identity`                  | Human, service, application, agent and machine identities and credentials                    |
-| `core/membership`                | Memberships, principal context and member listing                                            |
-| `core/capability`                | Capability types with versioned schemas, capabilities, visibility and withdrawal             |
-| `core/trust`                     | Scoped, directional, revocable trust between networks, organizations and identities          |
-| `core/federation`                | Federation lifecycle between two sovereign networks with scope and optimistic locking        |
-| `core/authorization`             | Roles, role assignments, central ALLOW/DENY decisions recorded as evidence                   |
-| `core/delegation`                | Constrained, time-bounded, revocable delegations between principals of one network           |
-| `core/discovery`                 | Governed local and federated capability discovery behind a port                              |
-| `core/agreement`                 | Versioned agreements between accountable parties, with acting principal and delegation       |
-| `core/transaction`               | Transactions under agreements: request, authorize or reject, execute, complete, fail, cancel |
-| `core/audit`, `core/integration` | Bounded contexts of the next phases                                                          |
-| `core/bootstrap`                 | Application, persistence wiring, error handling, architecture tests                          |
-| `core/e2e-tests`                 | End-to-end tests against the application and PostgreSQL                                      |
+| Module               | Responsibility                                                                               |
+|----------------------|----------------------------------------------------------------------------------------------|
+| `core/shared`        | Identifiers, execution context, correlation ID, domain event envelope, error model           |
+| `core/network`       | Network lifecycle: PENDING, ACTIVE, SUSPENDED, ARCHIVED                                      |
+| `core/organization`  | Organizations registered inside a network                                                    |
+| `core/identity`      | Human, service, application, agent and machine identities and credentials                    |
+| `core/membership`    | Memberships, principal context and member listing                                            |
+| `core/capability`    | Capability types with versioned schemas, capabilities, visibility and withdrawal             |
+| `core/trust`         | Scoped, directional, revocable trust between networks, organizations and identities          |
+| `core/federation`    | Federation lifecycle between two sovereign networks with scope and optimistic locking        |
+| `core/authorization` | Roles, role assignments, central ALLOW/DENY decisions recorded as evidence                   |
+| `core/delegation`    | Constrained, time-bounded, revocable delegations between principals of one network           |
+| `core/discovery`     | Governed local and federated capability discovery behind a port                              |
+| `core/agreement`     | Versioned agreements between accountable parties, with acting principal and delegation       |
+| `core/transaction`   | Transactions under agreements: request, authorize or reject, execute, complete, fail, cancel |
+| `core/audit`         | Append-only audit events, search and the accountability trail of a transaction               |
+| `core/integration`   | Bounded context of the next phases                                                           |
+| `core/bootstrap`     | Application, persistence wiring, error handling, architecture tests                          |
+| `core/e2e-tests`     | End-to-end tests against the application and PostgreSQL                                      |
 
 ### Profiles
 
@@ -245,75 +246,78 @@ APP_TOKEN_TTL: 15m
 
 ### API
 
-| Method | Path                                                                     | Description                                                                                        |
-|--------|--------------------------------------------------------------------------|----------------------------------------------------------------------------------------------------|
-| GET    | `/api/v1/platform`                                                       | Platform information                                                                               |
-| POST   | `/api/v1/networks`                                                       | Create a network                                                                                   |
-| GET    | `/api/v1/networks`                                                       | List networks                                                                                      |
-| GET    | `/api/v1/networks/{networkId}`                                           | Get a network                                                                                      |
-| POST   | `/api/v1/networks/{networkId}/activate`                                  | Activate a network                                                                                 |
-| POST   | `/api/v1/networks/{networkId}/suspend`                                   | Suspend a network                                                                                  |
-| POST   | `/api/v1/networks/{networkId}/archive`                                   | Archive a network                                                                                  |
-| POST   | `/api/v1/networks/{networkId}/organizations`                             | Register an organization                                                                           |
-| GET    | `/api/v1/networks/{networkId}/organizations`                             | List organizations                                                                                 |
-| GET    | `/api/v1/networks/{networkId}/organizations/{organizationId}`            | Get an organization                                                                                |
-| PUT    | `/api/v1/networks/{networkId}/organizations/{organizationId}`            | Rename an organization                                                                             |
-| POST   | `/api/v1/networks/{networkId}/organizations/{organizationId}/deactivate` | Deactivate an organization                                                                         |
-| POST   | `/api/v1/identities`                                                     | Create an identity                                                                                 |
-| POST   | `/api/v1/identities/{identityId}/suspend`                                | Suspend an identity                                                                                |
-| POST   | `/api/v1/identities/{identityId}/activate`                               | Activate an identity                                                                               |
-| POST   | `/api/v1/identities/{identityId}/credentials`                            | Issue a credential secret                                                                          |
-| POST   | `/api/v1/auth/token`                                                     | Exchange a credential for a bearer token                                                           |
-| POST   | `/api/v1/networks/{networkId}/memberships`                               | Activate a membership, optionally as `ADMINISTRATOR`                                               |
-| GET    | `/api/v1/networks/{networkId}/memberships`                               | List memberships                                                                                   |
-| GET    | `/api/v1/networks/{networkId}/memberships/{membershipId}`                | Get a membership                                                                                   |
-| POST   | `/api/v1/networks/{networkId}/memberships/{membershipId}/terminate`      | Terminate a membership                                                                             |
-| GET    | `/api/v1/networks/{networkId}/identities`                                | List member identities (bearer token)                                                              |
-| GET    | `/api/v1/networks/{networkId}/identities/{identityId}`                   | Get a member identity (bearer token)                                                               |
-| GET    | `/api/v1/principal`                                                      | Principal context for `X-Network-Id` (bearer token)                                                |
-| POST   | `/api/v1/capability-types`                                               | Register a capability type or its next version                                                     |
-| GET    | `/api/v1/capability-types`                                               | List capability types, optionally by `code`                                                        |
-| GET    | `/api/v1/capability-types/{typeId}`                                      | Get a capability type                                                                              |
-| POST   | `/api/v1/networks/{networkId}/capabilities`                              | Register a capability (bearer token)                                                               |
-| GET    | `/api/v1/networks/{networkId}/capabilities`                              | List visible capabilities (bearer token)                                                           |
-| GET    | `/api/v1/networks/{networkId}/capabilities/{capabilityId}`               | Get a visible capability (bearer token)                                                            |
-| POST   | `/api/v1/networks/{networkId}/capabilities/{capabilityId}/publish`       | Publish a capability (bearer token)                                                                |
-| PUT    | `/api/v1/networks/{networkId}/capabilities/{capabilityId}/visibility`    | Change the visibility (bearer token)                                                               |
-| POST   | `/api/v1/networks/{networkId}/capabilities/{capabilityId}/withdraw`      | Withdraw a capability (bearer token)                                                               |
-| POST   | `/api/v1/networks/{networkId}/trust-relationships`                       | Establish trust from the network or an organization (bearer token)                                 |
-| GET    | `/api/v1/networks/{networkId}/trust-relationships`                       | List trust relationships, optionally by `direction` (bearer token)                                 |
-| GET    | `/api/v1/networks/{networkId}/trust-relationships/{trustId}`             | Get a trust relationship (bearer token)                                                            |
-| POST   | `/api/v1/networks/{networkId}/trust-relationships/{trustId}/revoke`      | Revoke a trust relationship (bearer token)                                                         |
-| GET    | `/api/v1/networks/{networkId}/trust-relationships/evaluation`            | Check whether a source trusts a target for a scope (bearer token)                                  |
-| POST   | `/api/v1/networks/{networkId}/federations`                               | Propose a federation (administrator)                                                               |
-| GET    | `/api/v1/networks/{networkId}/federations`                               | List federations of the network (bearer token)                                                     |
-| GET    | `/api/v1/networks/{networkId}/federations/{federationId}`                | Get a federation (bearer token)                                                                    |
-| POST   | `/api/v1/networks/{networkId}/federations/{federationId}/{action}`       | `submit`, `accept`, `reject`, `suspend`, `resume` or `terminate` (administrator)                   |
-| GET    | `/api/v1/authorization/roles`                                            | Role catalog with the actions of each role                                                         |
-| POST   | `/api/v1/authorization/evaluate`                                         | Evaluate an action and record the decision (bearer token)                                          |
-| GET    | `/api/v1/authorization/decisions/{decisionId}`                           | Read a recorded decision (bearer token)                                                            |
-| POST   | `/api/v1/networks/{networkId}/role-assignments`                          | Assign a role to a principal (`role:assign`)                                                       |
-| GET    | `/api/v1/networks/{networkId}/role-assignments`                          | List role assignments, optionally by `principalId` (bearer token)                                  |
-| POST   | `/api/v1/networks/{networkId}/role-assignments/{assignmentId}/revoke`    | Revoke a role assignment (`role:assign`)                                                           |
-| POST   | `/api/v1/networks/{networkId}/delegations`                               | Grant a delegation with actions, constraints and validity (`delegation:grant`)                     |
-| GET    | `/api/v1/networks/{networkId}/delegations`                               | List delegations, by `delegatePrincipalId`, `delegatorPrincipalId`, `effective` (bearer token)     |
-| GET    | `/api/v1/networks/{networkId}/delegations/{delegationId}`                | Get a delegation with its derived status (bearer token)                                            |
-| POST   | `/api/v1/networks/{networkId}/delegations/{delegationId}/{action}`       | `revoke`, `suspend` or `resume` (delegator or administrator)                                       |
-| GET    | `/api/v1/networks/{networkId}/discovery/capabilities`                    | Search by `typeCode`, `ownerType`, `organizationId`, `originNetworkId`, `scope` (bearer token)     |
-| GET    | `/api/v1/networks/{networkId}/discovery/capabilities/{capabilityId}`     | Get a discoverable capability, local or federated (bearer token)                                   |
-| GET    | `/api/v1/networks/{networkId}/discovery/networks`                        | Other active networks with their federation state (bearer token)                                   |
-| POST   | `/api/v1/networks/{networkId}/agreements`                                | Draft an agreement for a discovered capability (`agreement:propose`)                               |
-| GET    | `/api/v1/networks/{networkId}/agreements`                                | List agreements the principal is party to (bearer token)                                           |
-| GET    | `/api/v1/networks/{networkId}/agreements/{agreementId}`                  | Get an agreement with its current version (bearer token)                                           |
-| GET    | `/api/v1/networks/{networkId}/agreements/{agreementId}/versions`         | All versions, also `/versions/{number}` (bearer token)                                             |
-| POST   | `/api/v1/networks/{networkId}/agreements/{agreementId}/propose`          | Propose the draft (`agreement:propose`)                                                            |
-| POST   | `/api/v1/networks/{networkId}/agreements/{agreementId}/revisions`        | Revise with `expectedVersion`, creating the next version (`agreement:propose`)                     |
-| POST   | `/api/v1/networks/{networkId}/agreements/{agreementId}/{decision}`       | `accept` or `reject` a version (`agreement:accept`)                                                |
-| POST   | `/api/v1/networks/{networkId}/agreements/{agreementId}/{action}`         | `activate`, `complete` or `terminate` (`agreement:manage`)                                         |
-| POST   | `/api/v1/networks/{networkId}/transactions`                              | Request a transaction under an agreement (`transaction:initiate`)                                  |
-| GET    | `/api/v1/networks/{networkId}/transactions`                              | List by `status`, `agreementId`, `capabilityId` (bearer token)                                     |
-| GET    | `/api/v1/networks/{networkId}/transactions/{transactionId}`              | Get a transaction (bearer token)                                                                   |
-| POST   | `/api/v1/networks/{networkId}/transactions/{transactionId}/{action}`     | `execute`, `complete` or `fail` by the provider (`transaction:execute`), `cancel` by the requester |
+| Method | Path                                                                     | Description                                                                                                                                                                       |
+|--------|--------------------------------------------------------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| GET    | `/api/v1/platform`                                                       | Platform information                                                                                                                                                              |
+| POST   | `/api/v1/networks`                                                       | Create a network                                                                                                                                                                  |
+| GET    | `/api/v1/networks`                                                       | List networks                                                                                                                                                                     |
+| GET    | `/api/v1/networks/{networkId}`                                           | Get a network                                                                                                                                                                     |
+| POST   | `/api/v1/networks/{networkId}/activate`                                  | Activate a network                                                                                                                                                                |
+| POST   | `/api/v1/networks/{networkId}/suspend`                                   | Suspend a network                                                                                                                                                                 |
+| POST   | `/api/v1/networks/{networkId}/archive`                                   | Archive a network                                                                                                                                                                 |
+| POST   | `/api/v1/networks/{networkId}/organizations`                             | Register an organization                                                                                                                                                          |
+| GET    | `/api/v1/networks/{networkId}/organizations`                             | List organizations                                                                                                                                                                |
+| GET    | `/api/v1/networks/{networkId}/organizations/{organizationId}`            | Get an organization                                                                                                                                                               |
+| PUT    | `/api/v1/networks/{networkId}/organizations/{organizationId}`            | Rename an organization                                                                                                                                                            |
+| POST   | `/api/v1/networks/{networkId}/organizations/{organizationId}/deactivate` | Deactivate an organization                                                                                                                                                        |
+| POST   | `/api/v1/identities`                                                     | Create an identity                                                                                                                                                                |
+| POST   | `/api/v1/identities/{identityId}/suspend`                                | Suspend an identity                                                                                                                                                               |
+| POST   | `/api/v1/identities/{identityId}/activate`                               | Activate an identity                                                                                                                                                              |
+| POST   | `/api/v1/identities/{identityId}/credentials`                            | Issue a credential secret                                                                                                                                                         |
+| POST   | `/api/v1/auth/token`                                                     | Exchange a credential for a bearer token                                                                                                                                          |
+| POST   | `/api/v1/networks/{networkId}/memberships`                               | Activate a membership, optionally as `ADMINISTRATOR`                                                                                                                              |
+| GET    | `/api/v1/networks/{networkId}/memberships`                               | List memberships                                                                                                                                                                  |
+| GET    | `/api/v1/networks/{networkId}/memberships/{membershipId}`                | Get a membership                                                                                                                                                                  |
+| POST   | `/api/v1/networks/{networkId}/memberships/{membershipId}/terminate`      | Terminate a membership                                                                                                                                                            |
+| GET    | `/api/v1/networks/{networkId}/identities`                                | List member identities (bearer token)                                                                                                                                             |
+| GET    | `/api/v1/networks/{networkId}/identities/{identityId}`                   | Get a member identity (bearer token)                                                                                                                                              |
+| GET    | `/api/v1/principal`                                                      | Principal context for `X-Network-Id` (bearer token)                                                                                                                               |
+| POST   | `/api/v1/capability-types`                                               | Register a capability type or its next version                                                                                                                                    |
+| GET    | `/api/v1/capability-types`                                               | List capability types, optionally by `code`                                                                                                                                       |
+| GET    | `/api/v1/capability-types/{typeId}`                                      | Get a capability type                                                                                                                                                             |
+| POST   | `/api/v1/networks/{networkId}/capabilities`                              | Register a capability (bearer token)                                                                                                                                              |
+| GET    | `/api/v1/networks/{networkId}/capabilities`                              | List visible capabilities (bearer token)                                                                                                                                          |
+| GET    | `/api/v1/networks/{networkId}/capabilities/{capabilityId}`               | Get a visible capability (bearer token)                                                                                                                                           |
+| POST   | `/api/v1/networks/{networkId}/capabilities/{capabilityId}/publish`       | Publish a capability (bearer token)                                                                                                                                               |
+| PUT    | `/api/v1/networks/{networkId}/capabilities/{capabilityId}/visibility`    | Change the visibility (bearer token)                                                                                                                                              |
+| POST   | `/api/v1/networks/{networkId}/capabilities/{capabilityId}/withdraw`      | Withdraw a capability (bearer token)                                                                                                                                              |
+| POST   | `/api/v1/networks/{networkId}/trust-relationships`                       | Establish trust from the network or an organization (bearer token)                                                                                                                |
+| GET    | `/api/v1/networks/{networkId}/trust-relationships`                       | List trust relationships, optionally by `direction` (bearer token)                                                                                                                |
+| GET    | `/api/v1/networks/{networkId}/trust-relationships/{trustId}`             | Get a trust relationship (bearer token)                                                                                                                                           |
+| POST   | `/api/v1/networks/{networkId}/trust-relationships/{trustId}/revoke`      | Revoke a trust relationship (bearer token)                                                                                                                                        |
+| GET    | `/api/v1/networks/{networkId}/trust-relationships/evaluation`            | Check whether a source trusts a target for a scope (bearer token)                                                                                                                 |
+| POST   | `/api/v1/networks/{networkId}/federations`                               | Propose a federation (administrator)                                                                                                                                              |
+| GET    | `/api/v1/networks/{networkId}/federations`                               | List federations of the network (bearer token)                                                                                                                                    |
+| GET    | `/api/v1/networks/{networkId}/federations/{federationId}`                | Get a federation (bearer token)                                                                                                                                                   |
+| POST   | `/api/v1/networks/{networkId}/federations/{federationId}/{action}`       | `submit`, `accept`, `reject`, `suspend`, `resume` or `terminate` (administrator)                                                                                                  |
+| GET    | `/api/v1/authorization/roles`                                            | Role catalog with the actions of each role                                                                                                                                        |
+| POST   | `/api/v1/authorization/evaluate`                                         | Evaluate an action and record the decision (bearer token)                                                                                                                         |
+| GET    | `/api/v1/authorization/decisions/{decisionId}`                           | Read a recorded decision (bearer token)                                                                                                                                           |
+| POST   | `/api/v1/networks/{networkId}/role-assignments`                          | Assign a role to a principal (`role:assign`)                                                                                                                                      |
+| GET    | `/api/v1/networks/{networkId}/role-assignments`                          | List role assignments, optionally by `principalId` (bearer token)                                                                                                                 |
+| POST   | `/api/v1/networks/{networkId}/role-assignments/{assignmentId}/revoke`    | Revoke a role assignment (`role:assign`)                                                                                                                                          |
+| POST   | `/api/v1/networks/{networkId}/delegations`                               | Grant a delegation with actions, constraints and validity (`delegation:grant`)                                                                                                    |
+| GET    | `/api/v1/networks/{networkId}/delegations`                               | List delegations, by `delegatePrincipalId`, `delegatorPrincipalId`, `effective` (bearer token)                                                                                    |
+| GET    | `/api/v1/networks/{networkId}/delegations/{delegationId}`                | Get a delegation with its derived status (bearer token)                                                                                                                           |
+| POST   | `/api/v1/networks/{networkId}/delegations/{delegationId}/{action}`       | `revoke`, `suspend` or `resume` (delegator or administrator)                                                                                                                      |
+| GET    | `/api/v1/networks/{networkId}/discovery/capabilities`                    | Search by `typeCode`, `ownerType`, `organizationId`, `originNetworkId`, `scope` (bearer token)                                                                                    |
+| GET    | `/api/v1/networks/{networkId}/discovery/capabilities/{capabilityId}`     | Get a discoverable capability, local or federated (bearer token)                                                                                                                  |
+| GET    | `/api/v1/networks/{networkId}/discovery/networks`                        | Other active networks with their federation state (bearer token)                                                                                                                  |
+| POST   | `/api/v1/networks/{networkId}/agreements`                                | Draft an agreement for a discovered capability (`agreement:propose`)                                                                                                              |
+| GET    | `/api/v1/networks/{networkId}/agreements`                                | List agreements the principal is party to (bearer token)                                                                                                                          |
+| GET    | `/api/v1/networks/{networkId}/agreements/{agreementId}`                  | Get an agreement with its current version (bearer token)                                                                                                                          |
+| GET    | `/api/v1/networks/{networkId}/agreements/{agreementId}/versions`         | All versions, also `/versions/{number}` (bearer token)                                                                                                                            |
+| POST   | `/api/v1/networks/{networkId}/agreements/{agreementId}/propose`          | Propose the draft (`agreement:propose`)                                                                                                                                           |
+| POST   | `/api/v1/networks/{networkId}/agreements/{agreementId}/revisions`        | Revise with `expectedVersion`, creating the next version (`agreement:propose`)                                                                                                    |
+| POST   | `/api/v1/networks/{networkId}/agreements/{agreementId}/{decision}`       | `accept` or `reject` a version (`agreement:accept`)                                                                                                                               |
+| POST   | `/api/v1/networks/{networkId}/agreements/{agreementId}/{action}`         | `activate`, `complete` or `terminate` (`agreement:manage`)                                                                                                                        |
+| POST   | `/api/v1/networks/{networkId}/transactions`                              | Request a transaction under an agreement (`transaction:initiate`)                                                                                                                 |
+| GET    | `/api/v1/networks/{networkId}/transactions`                              | List by `status`, `agreementId`, `capabilityId` (bearer token)                                                                                                                    |
+| GET    | `/api/v1/networks/{networkId}/transactions/{transactionId}`              | Get a transaction (bearer token)                                                                                                                                                  |
+| POST   | `/api/v1/networks/{networkId}/transactions/{transactionId}/{action}`     | `execute`, `complete` or `fail` by the provider (`transaction:execute`), `cancel` by the requester                                                                                |
+| GET    | `/api/v1/audit-events`                                                   | Search the network's audit by `transactionId`, `agreementId`, `delegationId`, `decisionId`, `principalId`, `correlationId`, `result`, `resourceType`, `resourceId` (`audit:read`) |
+| GET    | `/api/v1/audit-events/{auditEventId}`                                    | Get an audit event (`audit:read`)                                                                                                                                                 |
+| GET    | `/api/v1/audit-events/trail`                                             | Accountability chain and related events of a `transactionId` (`audit:read`)                                                                                                       |
 
 Every active member holds the MEMBER role; an `ADMINISTRATOR` membership holds NETWORK_ADMINISTRATOR. Requests that name an
 action in parentheses are checked by the central authorizer, which records an ALLOW or DENY decision. Requests marked with bearer token need `Authorization: Bearer <token>` and a network context, taken from the path

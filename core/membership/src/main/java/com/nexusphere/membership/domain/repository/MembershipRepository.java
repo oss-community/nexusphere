@@ -19,4 +19,6 @@ public interface MembershipRepository {
     List<Membership> findAll(NetworkId networkId);
 
     List<Membership> findActive(NetworkId networkId);
+
+    List<Membership> findActive(IdentityId identityId);
 }

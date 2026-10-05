@@ -2,6 +2,7 @@ package com.nexusphere.shared.event;
 
 import com.nexusphere.shared.context.CorrelationId;
 import com.nexusphere.shared.context.ExecutionContext;
+import com.nexusphere.shared.id.IdentityId;
 import com.nexusphere.shared.id.NetworkId;
 import com.nexusphere.shared.id.PrincipalId;
 
@@ -15,6 +16,7 @@ public record EventEnvelope(
         int eventVersion,
         Instant timestamp,
         NetworkId networkId,
+        IdentityId identityId,
         PrincipalId principalId,
         CorrelationId correlationId,
         UUID causationId,
@@ -35,6 +37,7 @@ public record EventEnvelope(
                 event.eventVersion(),
                 event.occurredAt(),
                 event.networkId().orElse(context.networkId()),
+                context.identityId(),
                 context.principalId(),
                 context.correlationId(),
                 causationId,

@@ -1,12 +1,16 @@
 package com.nexusphere.bootstrap.web;
 
+import com.nexusphere.membership.contract.NetworkAccessDenied;
 import com.nexusphere.membership.contract.PrincipalContext;
 import com.nexusphere.membership.contract.PrincipalResolver;
+import com.nexusphere.shared.context.ExecutionContext;
 import com.nexusphere.shared.error.DomainException;
 import com.nexusphere.shared.error.ErrorCategory;
 import com.nexusphere.shared.error.ValidationException;
+import com.nexusphere.shared.event.DomainEventPublisher;
 import com.nexusphere.shared.id.IdentityId;
 import com.nexusphere.shared.id.NetworkId;
+import com.nexusphere.shared.time.TimeProvider;
 import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.core.MethodParameter;
 import org.springframework.web.bind.support.WebDataBinderFactory;
@@ -22,9 +26,13 @@ class PrincipalContextArgumentResolver implements HandlerMethodArgumentResolver 
     static final String NETWORK_HEADER = "X-Network-Id";
 
     private final PrincipalResolver principals;
+    private final DomainEventPublisher events;
+    private final TimeProvider time;
 
-    PrincipalContextArgumentResolver(PrincipalResolver principals) {
+    PrincipalContextArgumentResolver(PrincipalResolver principals, DomainEventPublisher events, TimeProvider time) {
         this.principals = principals;
+        this.events = events;
+        this.time = time;
     }
 
     @Override
@@ -38,7 +46,18 @@ class PrincipalContextArgumentResolver implements HandlerMethodArgumentResolver 
         HttpServletRequest request = webRequest.getNativeRequest(HttpServletRequest.class);
         IdentityId identity = AuthenticatedIdentity.current().orElseThrow(() -> new DomainException(
                 ErrorCategory.AUTHENTICATION_ERROR, "AUTHENTICATION_REQUIRED", "A bearer token is required"));
-        return principals.resolve(identity, network(request));
+        NetworkId network = network(request);
+        try {
+            return principals.resolve(identity, network);
+        } catch (DomainException e) {
+            if ("NETWORK_ACCESS_DENIED".equals(e.code())) {
+                ExecutionContext context = new ExecutionContext(RequestCorrelation.of(request), identity, null, null,
+                        null);
+                principals.memberNetworks(identity).forEach(home -> events.publish(
+                        new NetworkAccessDenied(time.now(), identity, home, network, e.code()), context));
+            }
+            throw e;
+        }
     }
 
     private static NetworkId network(HttpServletRequest request) {
