@@ -4,6 +4,8 @@
 
 ## <p align="center">Table of Content</p>
 
+* [Project Description](docs/README.md)
+* [End-to-End Tests](core/e2e-tests/README.md)
 * [Getting Started](#getting-started)
 * [Dockerized](#dockerized)
 * [Kubernetes](#kubernetes)
@@ -178,6 +180,11 @@ Password: nexusphere
 ---
 
 ## Nexusphere Core
+
+The vision, concepts, invariants, architecture, use cases, scenarios and roadmap are described in the
+[Project Description](docs/README.md). The end-to-end test scenarios are listed in
+[End-to-End Tests](core/e2e-tests/README.md).
+
 
 <p style="text-align: justify;">
 
