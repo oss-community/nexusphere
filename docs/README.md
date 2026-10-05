@@ -130,7 +130,7 @@ sovereignty is logical and enforced by the network context of every request.
 | `core/agreement`     | Versioned agreements                                                              | authorization, discovery, membership                          |
 | `core/transaction`   | Transactions under agreements                                                     | agreement, authorization, capability                          |
 | `core/audit`         | Append-only audit events and accountability trails                                | authorization, membership, capability, agreement, transaction |
-| `core/integration`   | Agent and machine adapters                                                        | identity, capability, discovery, agreement, transaction       |
+| `core/integration`   | Agent and machine adapters                                                        | membership, discovery, agreement, transaction                 |
 | `core/bootstrap`     | Application, security, persistence wiring, error handling, architecture tests     | all modules                                                   |
 | `core/e2e-tests`     | Black-box end-to-end tests, see [End-to-End Tests](../core/e2e-tests/README.md)   | bootstrap at test time                                        |
 
@@ -208,7 +208,7 @@ Status: ✓ implemented, ○ planned.
 | UC-AUD-01 | Record an append-only audit event                                        | Audit         | 11    | ✓      |
 | UC-AUD-02 | Query the audit trail                                                    | Audit         | 11    | ✓      |
 | UC-AUD-03 | Reconstruct the accountability chain of a transaction                    | Audit         | 11    | ✓      |
-| UC-INT-01 | An external agent acts as a principal through the API                    | Integration   | 12    | ○      |
+| UC-INT-01 | An external agent acts as a principal through the API                    | Integration   | 12    | ✓      |
 | UC-INT-02 | A simulated machine executes an authorized transaction                   | Integration   | 13    | ○      |
 
 ## Scenarios
@@ -261,7 +261,7 @@ Every scenario is verified by end-to-end tests listed in [End-to-End Tests](../c
 | SC-14 | Transaction lifecycle                  | 10    | ✓      |
 | SC-15 | Network isolation and context spoofing | 2–15  | ◐      |
 | SC-16 | Accountability reconstruction          | 11    | ✓      |
-| SC-17 | Agent adapter                          | 12    | ○      |
+| SC-17 | Agent adapter                          | 12    | ✓      |
 
 ## Roadmap
 
@@ -278,7 +278,7 @@ Every scenario is verified by end-to-end tests listed in [End-to-End Tests](../c
 | 9     | Agreement            | Versioned agreements                                                         | ✓      |
 | 10    | Transaction          | Transactions under agreements                                                | ✓      |
 | 11    | Audit                | Audit trail and accountability reconstruction                                | ✓      |
-| 12    | Agent adapter        | External agents acting as principals                                         | ○      |
+| 12    | Agent adapter        | External agents acting as principals                                         | ✓      |
 | 13    | Machine adapter      | Simulated machine executing authorized transactions                          | ○      |
 
 V1 is done when two independent networks, at least two organizations, human, agent and machine identities, memberships,
