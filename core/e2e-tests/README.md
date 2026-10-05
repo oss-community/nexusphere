@@ -56,15 +56,16 @@ repository and architecture tests live in their own modules and are not listed h
 
 ## Test Classes
 
-| Class                              | Package                          | Covers                   |
-|------------------------------------|----------------------------------|--------------------------|
-| `PlatformBootstrapE2ETest`         | `com.nexusphere.e2e.platform`    | E2E-PLT-01..07           |
-| `SovereignNetworkBootstrapE2ETest` | `com.nexusphere.e2e.sovereignty` | E2E-SC06-01..08          |
-| `NetworkIsolationE2ETest`          | `com.nexusphere.e2e.sovereignty` | E2E-SC15-02              |
-| `IdentityMembershipE2ETest`        | `com.nexusphere.e2e.identity`    | E2E-SC07-01..06          |
-| `IdentityIsolationE2ETest`         | `com.nexusphere.e2e.identity`    | E2E-SC15-01, E2E-SC15-10 |
-| `CapabilityRegistrationE2ETest`    | `com.nexusphere.e2e.capability`  | E2E-SC08-01..04          |
-| `TrustFederationE2ETest`           | `com.nexusphere.e2e.federation`  | E2E-SC09-01..06          |
+| Class                              | Package                            | Covers                   |
+|------------------------------------|------------------------------------|--------------------------|
+| `PlatformBootstrapE2ETest`         | `com.nexusphere.e2e.platform`      | E2E-PLT-01..07           |
+| `SovereignNetworkBootstrapE2ETest` | `com.nexusphere.e2e.sovereignty`   | E2E-SC06-01..08          |
+| `NetworkIsolationE2ETest`          | `com.nexusphere.e2e.sovereignty`   | E2E-SC15-02              |
+| `IdentityMembershipE2ETest`        | `com.nexusphere.e2e.identity`      | E2E-SC07-01..06          |
+| `IdentityIsolationE2ETest`         | `com.nexusphere.e2e.identity`      | E2E-SC15-01, E2E-SC15-10 |
+| `CapabilityRegistrationE2ETest`    | `com.nexusphere.e2e.capability`    | E2E-SC08-01..04          |
+| `TrustFederationE2ETest`           | `com.nexusphere.e2e.federation`    | E2E-SC09-01..06          |
+| `AuthorizationE2ETest`             | `com.nexusphere.e2e.authorization` | E2E-SC10-01..05          |
 
 ## Scenario Catalog
 
@@ -173,11 +174,11 @@ Status: ✓ implemented, ◐ partly implemented, ○ planned. The scenarios are 
 
 | ID          | Test                                                                                     | Status |
 |-------------|------------------------------------------------------------------------------------------|--------|
-| E2E-SC10-01 | An in-network action granted by a role is ALLOW with reason and matched role             | ○      |
-| E2E-SC10-02 | The same action against another network without federation is DENY `FEDERATION_REQUIRED` | ○      |
-| E2E-SC10-03 | An action outside the federation scope is DENY `FEDERATION_SCOPE_VIOLATION`              | ○      |
-| E2E-SC10-04 | Trust without a role or delegation is DENY                                               | ○      |
-| E2E-SC10-05 | Every evaluation can be read back as an authorization decision                           | ○      |
+| E2E-SC10-01 | An in-network action granted by a role is ALLOW with reason and matched role             | ✓      |
+| E2E-SC10-02 | The same action against another network without federation is DENY `FEDERATION_REQUIRED` | ✓      |
+| E2E-SC10-03 | An action outside the federation scope is DENY `FEDERATION_SCOPE_VIOLATION`              | ✓      |
+| E2E-SC10-04 | Trust without a role or delegation is DENY                                               | ✓      |
+| E2E-SC10-05 | Every evaluation can be read back as an authorization decision                           | ✓      |
 
 ### SC-11 Delegation Rules
 

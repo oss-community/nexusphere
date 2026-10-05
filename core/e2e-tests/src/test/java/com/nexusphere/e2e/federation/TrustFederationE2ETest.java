@@ -72,7 +72,7 @@ class TrustFederationE2ETest extends E2ETestBase {
         assertThat(duplicate.json().path("code").asString()).isEqualTo("TRUST_ALREADY_ESTABLISHED");
         ApiClient.Response byMember = trustNetwork(memberA, networkA, networkB, "\"capability:discover\"", null);
         assertThat(byMember.status()).isEqualTo(403);
-        assertThat(byMember.json().path("code").asString()).isEqualTo("NETWORK_ADMINISTRATOR_REQUIRED");
+        assertThat(byMember.json().path("code").asString()).isEqualTo("NO_AUTHORITY");
 
         String trustId = established.json().path("id").asString();
         ApiClient.Response revokedByTarget = adminB.post(trustRelationships(networkB) + "/" + trustId + "/revoke", "");
@@ -169,7 +169,7 @@ class TrustFederationE2ETest extends E2ETestBase {
 
         ApiClient.Response byMember = propose(memberA, networkA, networkB, "\"CAPABILITY_DISCOVERY\"");
         assertThat(byMember.status()).isEqualTo(403);
-        assertThat(byMember.json().path("code").asString()).isEqualTo("NETWORK_ADMINISTRATOR_REQUIRED");
+        assertThat(byMember.json().path("code").asString()).isEqualTo("NO_AUTHORITY");
 
         String federation = proposed(adminA, networkA, networkB);
         transition(adminA, networkA, federation, "submit");
@@ -178,7 +178,7 @@ class TrustFederationE2ETest extends E2ETestBase {
         ApiClient memberB = identities.as(identities.actor(member), networkB);
         ApiClient.Response acceptedByMember = transition(memberB, networkB, federation, "accept");
         assertThat(acceptedByMember.status()).isEqualTo(403);
-        assertThat(acceptedByMember.json().path("code").asString()).isEqualTo("NETWORK_ADMINISTRATOR_REQUIRED");
+        assertThat(acceptedByMember.json().path("code").asString()).isEqualTo("NO_AUTHORITY");
         assertThat(memberB.get(federations(networkB) + "/" + federation).status()).isEqualTo(200);
 
         String networkC = sovereignty.activeNetwork("Trust outsider");

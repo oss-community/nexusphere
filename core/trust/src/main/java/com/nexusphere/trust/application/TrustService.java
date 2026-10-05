@@ -1,5 +1,8 @@
 package com.nexusphere.trust.application;
 
+import com.nexusphere.authorization.contract.Actions;
+import com.nexusphere.authorization.contract.AuthorizationRequest;
+import com.nexusphere.authorization.contract.Authorizer;
 import com.nexusphere.identity.contract.IdentityDirectory;
 import com.nexusphere.identity.contract.IdentitySnapshot;
 import com.nexusphere.membership.contract.PrincipalContext;
@@ -17,6 +20,7 @@ import com.nexusphere.shared.id.IdentityId;
 import com.nexusphere.shared.id.Identifier;
 import com.nexusphere.shared.id.NetworkId;
 import com.nexusphere.shared.id.OrganizationId;
+import com.nexusphere.shared.reference.ResourceReference;
 import com.nexusphere.shared.time.TimeProvider;
 import com.nexusphere.trust.contract.PartyReference;
 import com.nexusphere.trust.contract.TrustDirectory;
@@ -54,6 +58,7 @@ public class TrustService implements TrustDirectory {
     }
 
     private final TrustRelationshipRepository relationships;
+    private final Authorizer authorizer;
     private final NetworkDirectory networks;
     private final OrganizationDirectory organizations;
     private final IdentityDirectory identities;
@@ -61,10 +66,11 @@ public class TrustService implements TrustDirectory {
     private final DomainEventPublisher events;
     private final TimeProvider time;
 
-    TrustService(TrustRelationshipRepository relationships, NetworkDirectory networks,
+    TrustService(TrustRelationshipRepository relationships, Authorizer authorizer, NetworkDirectory networks,
                  OrganizationDirectory organizations, IdentityDirectory identities, PrincipalResolver principals,
                  DomainEventPublisher events, TimeProvider time) {
         this.relationships = relationships;
+        this.authorizer = authorizer;
         this.networks = networks;
         this.organizations = organizations;
         this.identities = identities;
@@ -78,7 +84,7 @@ public class TrustService implements TrustDirectory {
         requireActiveNetwork(principal.networkId());
         Party source = establishment.source() == null ? Party.network(principal.networkId())
                 : party(principal, establishment.source());
-        requireManagedSource(principal, source);
+        requireManagedSource(principal, source, context);
         if (establishment.target() == null) {
             throw new ValidationException("TRUST_TARGET_REQUIRED", "The trusted party must be specified");
         }
@@ -100,7 +106,7 @@ public class TrustService implements TrustDirectory {
             throw new DomainException(ErrorCategory.AUTHORIZATION_ERROR, "TRUST_SOURCE_NOT_MANAGED",
                     "Only the trusting side can revoke a trust relationship");
         }
-        requireManagedSource(principal, trust.source());
+        requireManagedSource(principal, trust.source(), context);
         trust.revoke(time.now());
         return persist(trust, context);
     }
@@ -184,22 +190,18 @@ public class TrustService implements TrustDirectory {
         return new Party(type, id, networkId);
     }
 
-    private static void requireManagedSource(PrincipalContext principal, Party source) {
+    private void requireManagedSource(PrincipalContext principal, Party source, ExecutionContext context) {
         if (!source.networkId().equals(principal.networkId())) {
             throw new DomainException(ErrorCategory.AUTHORIZATION_ERROR, "TRUST_SOURCE_OUTSIDE_NETWORK",
                     "Trust can only be established from a party of the current network");
         }
         switch (source.type()) {
-            case NETWORK -> {
-                if (!principal.networkAdministrator()) {
-                    throw new DomainException(ErrorCategory.AUTHORIZATION_ERROR, "NETWORK_ADMINISTRATOR_REQUIRED",
-                            "Only a network administrator can manage the network's trust");
-                }
-            }
+            case NETWORK -> authorizer.require(AuthorizationRequest.of(principal, Actions.TRUST_MANAGE,
+                    new ResourceReference("network", source.id().toString(), principal.networkId())), context);
             case ORGANIZATION -> {
                 boolean own = principal.organizationId() != null
                         && principal.organizationId().value().equals(source.id());
-                if (!own && !principal.networkAdministrator()) {
+                if (!own && !authorizer.actionsHeldBy(principal).contains(Actions.TRUST_MANAGE)) {
                     throw new DomainException(ErrorCategory.AUTHORIZATION_ERROR, "TRUST_SOURCE_NOT_MANAGED",
                             "Only members of the organization can manage its trust");
                 }

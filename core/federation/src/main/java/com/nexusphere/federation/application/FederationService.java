@@ -1,5 +1,8 @@
 package com.nexusphere.federation.application;
 
+import com.nexusphere.authorization.contract.Actions;
+import com.nexusphere.authorization.contract.AuthorizationRequest;
+import com.nexusphere.authorization.contract.Authorizer;
 import com.nexusphere.federation.contract.FederationDirectory;
 import com.nexusphere.federation.contract.FederationSnapshot;
 import com.nexusphere.federation.domain.model.Federation;
@@ -11,11 +14,10 @@ import com.nexusphere.network.contract.NetworkDirectory;
 import com.nexusphere.network.contract.NetworkSnapshot;
 import com.nexusphere.shared.context.ExecutionContext;
 import com.nexusphere.shared.error.ConflictException;
-import com.nexusphere.shared.error.DomainException;
-import com.nexusphere.shared.error.ErrorCategory;
 import com.nexusphere.shared.error.NotFoundException;
 import com.nexusphere.shared.event.DomainEventPublisher;
 import com.nexusphere.shared.id.NetworkId;
+import com.nexusphere.shared.reference.ResourceReference;
 import com.nexusphere.shared.time.TimeProvider;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -44,20 +46,23 @@ public class FederationService implements FederationDirectory {
     }
 
     private final FederationRepository federations;
+    private final Authorizer authorizer;
     private final NetworkDirectory networks;
     private final DomainEventPublisher events;
     private final TimeProvider time;
 
-    FederationService(FederationRepository federations, NetworkDirectory networks, DomainEventPublisher events,
-                      TimeProvider time) {
+    FederationService(FederationRepository federations, Authorizer authorizer, NetworkDirectory networks,
+                      DomainEventPublisher events, TimeProvider time) {
         this.federations = federations;
+        this.authorizer = authorizer;
         this.networks = networks;
         this.events = events;
         this.time = time;
     }
 
     public Federation propose(PrincipalContext principal, Proposal proposal, ExecutionContext context) {
-        requireAdministrator(principal);
+        authorizer.require(AuthorizationRequest.of(principal, Actions.FEDERATION_MANAGE,
+                new ResourceReference("federation", "new", principal.networkId())), context);
         NetworkId proposer = principal.networkId();
         NetworkId partner = NetworkId.of(proposal.partnerNetworkId());
         requireActive(proposer);
@@ -75,8 +80,9 @@ public class FederationService implements FederationDirectory {
 
     public Federation apply(PrincipalContext principal, UUID id, Action action, Long expectedVersion,
                             ExecutionContext context) {
-        requireAdministrator(principal);
         Federation federation = get(principal, id);
+        authorizer.require(AuthorizationRequest.of(principal, Actions.FEDERATION_MANAGE,
+                new ResourceReference("federation", id.toString(), principal.networkId())), context);
         if (expectedVersion != null && !expectedVersion.equals(federation.version())) {
             throw new ConflictException("FEDERATION_VERSION_MISMATCH", "Federation " + id + " is at version "
                     + federation.version() + ", not " + expectedVersion);
@@ -117,13 +123,6 @@ public class FederationService implements FederationDirectory {
                         federation.partnerNetworkId(),
                         federation.scopes().stream().map(Enum::name).collect(Collectors.toUnmodifiableSet()),
                         FederationStatus.ACTIVE.name(), federation.effectiveUntil().orElse(null)));
-    }
-
-    private static void requireAdministrator(PrincipalContext principal) {
-        if (!principal.networkAdministrator()) {
-            throw new DomainException(ErrorCategory.AUTHORIZATION_ERROR, "NETWORK_ADMINISTRATOR_REQUIRED",
-                    "Only a network administrator can manage federations");
-        }
     }
 
     private void requireActive(NetworkId networkId) {

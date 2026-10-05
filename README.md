@@ -197,19 +197,20 @@ Maven module with the package `com.nexusphere.<module>`. A module is reached by 
 
 ### Modules
 
-| Module                                                                         | Responsibility                                                                        |
-|--------------------------------------------------------------------------------|---------------------------------------------------------------------------------------|
-| `core/shared`                                                                  | Identifiers, execution context, correlation ID, domain event envelope, error model    |
-| `core/network`                                                                 | Network lifecycle: PENDING, ACTIVE, SUSPENDED, ARCHIVED                               |
-| `core/organization`                                                            | Organizations registered inside a network                                             |
-| `core/identity`                                                                | Human, service, application, agent and machine identities and credentials             |
-| `core/membership`                                                              | Memberships, principal context and member listing                                     |
-| `core/capability`                                                              | Capability types with versioned schemas, capabilities, visibility and withdrawal      |
-| `core/trust`                                                                   | Scoped, directional, revocable trust between networks, organizations and identities   |
-| `core/federation`                                                              | Federation lifecycle between two sovereign networks with scope and optimistic locking |
-| `core/authorization`, `core/delegation`, `core/discovery` … `core/integration` | Bounded contexts of the next phases                                                   |
-| `core/bootstrap`                                                               | Application, persistence wiring, error handling, architecture tests                   |
-| `core/e2e-tests`                                                               | End-to-end tests against the application and PostgreSQL                               |
+| Module                                                   | Responsibility                                                                        |
+|----------------------------------------------------------|---------------------------------------------------------------------------------------|
+| `core/shared`                                            | Identifiers, execution context, correlation ID, domain event envelope, error model    |
+| `core/network`                                           | Network lifecycle: PENDING, ACTIVE, SUSPENDED, ARCHIVED                               |
+| `core/organization`                                      | Organizations registered inside a network                                             |
+| `core/identity`                                          | Human, service, application, agent and machine identities and credentials             |
+| `core/membership`                                        | Memberships, principal context and member listing                                     |
+| `core/capability`                                        | Capability types with versioned schemas, capabilities, visibility and withdrawal      |
+| `core/trust`                                             | Scoped, directional, revocable trust between networks, organizations and identities   |
+| `core/federation`                                        | Federation lifecycle between two sovereign networks with scope and optimistic locking |
+| `core/authorization`                                     | Roles, role assignments, central ALLOW/DENY decisions recorded as evidence            |
+| `core/delegation`, `core/discovery` … `core/integration` | Bounded contexts of the next phases                                                   |
+| `core/bootstrap`                                         | Application, persistence wiring, error handling, architecture tests                   |
+| `core/e2e-tests`                                         | End-to-end tests against the application and PostgreSQL                               |
 
 ### Profiles
 
@@ -284,8 +285,15 @@ APP_TOKEN_TTL: 15m
 | GET    | `/api/v1/networks/{networkId}/federations`                               | List federations of the network (bearer token)                                   |
 | GET    | `/api/v1/networks/{networkId}/federations/{federationId}`                | Get a federation (bearer token)                                                  |
 | POST   | `/api/v1/networks/{networkId}/federations/{federationId}/{action}`       | `submit`, `accept`, `reject`, `suspend`, `resume` or `terminate` (administrator) |
+| GET    | `/api/v1/authorization/roles`                                            | Role catalog with the actions of each role                                       |
+| POST   | `/api/v1/authorization/evaluate`                                         | Evaluate an action and record the decision (bearer token)                        |
+| GET    | `/api/v1/authorization/decisions/{decisionId}`                           | Read a recorded decision (bearer token)                                          |
+| POST   | `/api/v1/networks/{networkId}/role-assignments`                          | Assign a role to a principal (`role:assign`)                                     |
+| GET    | `/api/v1/networks/{networkId}/role-assignments`                          | List role assignments, optionally by `principalId` (bearer token)                |
+| POST   | `/api/v1/networks/{networkId}/role-assignments/{assignmentId}/revoke`    | Revoke a role assignment (`role:assign`)                                         |
 
-Requests marked with bearer token need `Authorization: Bearer <token>` and a network context, taken from the path
+Every active member holds the MEMBER role; an `ADMINISTRATOR` membership holds NETWORK_ADMINISTRATOR. Requests that name an
+action in parentheses are checked by the central authorizer, which records an ALLOW or DENY decision. Requests marked with bearer token need `Authorization: Bearer <token>` and a network context, taken from the path
 or the `X-Network-Id` header. The identity must be active and hold an active membership in that network.
 
 ```shell
