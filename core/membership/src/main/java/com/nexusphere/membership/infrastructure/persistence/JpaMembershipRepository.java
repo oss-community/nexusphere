@@ -54,6 +54,12 @@ class JpaMembershipRepository implements MembershipRepository {
     }
 
     @Override
+    public List<Membership> findActive(IdentityId identityId) {
+        return jpa.findByIdentityIdAndStatus(identityId.value(), MembershipStatus.ACTIVE).stream()
+                .map(JpaMembershipRepository::toDomain).toList();
+    }
+
+    @Override
     public List<Membership> findActive(NetworkId networkId) {
         return jpa.findByNetworkIdAndStatusOrderByJoinedAtAscIdAsc(networkId.value(), MembershipStatus.ACTIVE).stream()
                 .map(JpaMembershipRepository::toDomain).toList();

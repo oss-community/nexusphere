@@ -224,8 +224,9 @@ public final class Agreement extends AggregateRoot<UUID> {
     }
 
     private void record(String change, Actor actor, Instant now) {
-        registerEvent(new AgreementChanged(now, id, proposer.networkId(), change, status.name(), current().number(),
-                actor.principalId(), actor.networkId()));
+        registerEvent(new AgreementChanged(now, id, proposer.networkId(), counterparty.networkId(), change,
+                status.name(), current().number(), actor.principalId(), actor.networkId(), actor.organizationId(),
+                actor.decisionId(), actor.delegationId(), actor.federationId()));
     }
 
     private static AgreementVersion version(int number, Map<String, Object> terms, List<String> changes,

@@ -189,8 +189,15 @@ public final class Transaction extends AggregateRoot<UUID> {
     }
 
     private void record(String change, Participant participant, Instant now) {
-        registerEvent(new TransactionChanged(now, id, requester.networkId(), provider.networkId(), agreementId, change,
-                status.name(), reason, participant.principalId(), participant.networkId()));
+        boolean requesting = status == TransactionStatus.REQUESTED || status == TransactionStatus.AUTHORIZED
+                || status == TransactionStatus.REJECTED;
+        boolean executing = status == TransactionStatus.EXECUTING || status == TransactionStatus.COMPLETED
+                || status == TransactionStatus.FAILED && executionDecisionId != null;
+        UUID decision = requesting ? authority.decisionId() : executing ? executionDecisionId : null;
+        registerEvent(new TransactionChanged(now, id, requester.networkId(), provider.networkId(), agreementId,
+                capabilityId, change, status.name(), reason, participant.principalId(), participant.networkId(),
+                participant.organizationId(), decision, requesting ? authority.delegationId() : null,
+                requesting ? authority.federationId() : null));
     }
 
     @Override

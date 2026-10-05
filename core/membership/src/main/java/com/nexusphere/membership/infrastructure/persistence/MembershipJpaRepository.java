@@ -11,6 +11,8 @@ interface MembershipJpaRepository extends JpaRepository<MembershipEntity, UUID> 
 
     Optional<MembershipEntity> findByIdAndNetworkId(UUID id, UUID networkId);
 
+    List<MembershipEntity> findByIdentityIdAndStatus(UUID identityId, MembershipStatus status);
+
     Optional<MembershipEntity> findByIdentityIdAndNetworkIdAndStatus(UUID identityId, UUID networkId,
                                                                      MembershipStatus status);
 

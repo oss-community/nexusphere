@@ -56,20 +56,22 @@ repository and architecture tests live in their own modules and are not listed h
 
 ## Test Classes
 
-| Class                              | Package                            | Covers                                                         |
-|------------------------------------|------------------------------------|----------------------------------------------------------------|
-| `PlatformBootstrapE2ETest`         | `com.nexusphere.e2e.platform`      | E2E-PLT-01..07                                                 |
-| `SovereignNetworkBootstrapE2ETest` | `com.nexusphere.e2e.sovereignty`   | E2E-SC06-01..08                                                |
-| `NetworkIsolationE2ETest`          | `com.nexusphere.e2e.sovereignty`   | E2E-SC15-02                                                    |
-| `IdentityMembershipE2ETest`        | `com.nexusphere.e2e.identity`      | E2E-SC07-01..06                                                |
-| `IdentityIsolationE2ETest`         | `com.nexusphere.e2e.identity`      | E2E-SC15-01, E2E-SC15-10                                       |
-| `CapabilityRegistrationE2ETest`    | `com.nexusphere.e2e.capability`    | E2E-SC08-01..04                                                |
-| `TrustFederationE2ETest`           | `com.nexusphere.e2e.federation`    | E2E-SC09-01..06                                                |
-| `AuthorizationE2ETest`             | `com.nexusphere.e2e.authorization` | E2E-SC10-01..05                                                |
-| `DelegationE2ETest`                | `com.nexusphere.e2e.delegation`    | E2E-SC11-01..05, E2E-SC05-01, 03, E2E-SC15-05                  |
-| `DiscoveryE2ETest`                 | `com.nexusphere.e2e.discovery`     | E2E-SC12-01..03, E2E-SC04-01..03, E2E-SC08-03, 04, E2E-SC09-04 |
-| `AgreementE2ETest`                 | `com.nexusphere.e2e.agreement`     | E2E-SC13-01..06, E2E-SC05-01, 03, E2E-SC08-04, E2E-SC11-03     |
-| `TransactionE2ETest`               | `com.nexusphere.e2e.transaction`   | E2E-SC14-01..04, E2E-SC03-01, E2E-SC09-04                      |
+| Class                              | Package                            | Covers                                                                  |
+|------------------------------------|------------------------------------|-------------------------------------------------------------------------|
+| `PlatformBootstrapE2ETest`         | `com.nexusphere.e2e.platform`      | E2E-PLT-01..07                                                          |
+| `SovereignNetworkBootstrapE2ETest` | `com.nexusphere.e2e.sovereignty`   | E2E-SC06-01..08                                                         |
+| `NetworkIsolationE2ETest`          | `com.nexusphere.e2e.sovereignty`   | E2E-SC15-02                                                             |
+| `IdentityMembershipE2ETest`        | `com.nexusphere.e2e.identity`      | E2E-SC07-01..06                                                         |
+| `IdentityIsolationE2ETest`         | `com.nexusphere.e2e.identity`      | E2E-SC15-01, E2E-SC15-10                                                |
+| `CapabilityRegistrationE2ETest`    | `com.nexusphere.e2e.capability`    | E2E-SC08-01..04                                                         |
+| `TrustFederationE2ETest`           | `com.nexusphere.e2e.federation`    | E2E-SC09-01..06                                                         |
+| `AuthorizationE2ETest`             | `com.nexusphere.e2e.authorization` | E2E-SC10-01..05                                                         |
+| `DelegationE2ETest`                | `com.nexusphere.e2e.delegation`    | E2E-SC11-01..05, E2E-SC05-01, 03, E2E-SC15-05                           |
+| `DiscoveryE2ETest`                 | `com.nexusphere.e2e.discovery`     | E2E-SC12-01..03, E2E-SC04-01..03, E2E-SC08-03, 04, E2E-SC09-04          |
+| `AgreementE2ETest`                 | `com.nexusphere.e2e.agreement`     | E2E-SC13-01..06, E2E-SC05-01, 03, E2E-SC08-04, E2E-SC11-03              |
+| `TransactionE2ETest`               | `com.nexusphere.e2e.transaction`   | E2E-SC14-01..04, E2E-SC03-01, E2E-SC09-04                               |
+| `PrimaryTrustedInteractionE2ETest` | `com.nexusphere.e2e.primary`       | E2E-SC01-01..05                                                         |
+| `AuditE2ETest`                     | `com.nexusphere.e2e.audit`         | E2E-SC16-01..03, E2E-SC03-02, E2E-SC05-02, E2E-SC14-01, E2E-SC15-02, 10 |
 
 ## Scenario Catalog
 
@@ -92,11 +94,11 @@ Status: ✓ implemented, ◐ partly implemented, ○ planned. The scenarios are 
 
 | ID          | Test                                                                                                                       | Status |
 |-------------|----------------------------------------------------------------------------------------------------------------------------|--------|
-| E2E-SC01-01 | The sixteen main-flow steps succeed through the API: federation ACTIVE, agreement version 1 ACTIVE, transaction COMPLETED  | ○      |
-| E2E-SC01-02 | The agreement and the transaction show Agent A as acting principal and Organization A as accountable party                 | ○      |
-| E2E-SC01-03 | Every audit event of steps 11 to 15 references an ALLOW decision with the created delegation and federation                | ○      |
-| E2E-SC01-04 | The accountability trail returns Human A, delegation, Agent A, federation, capability, agreement version 1 and transaction | ○      |
-| E2E-SC01-05 | Network B's members do not include Human A or Agent A, and Network A's members do not include Human B                      | ○      |
+| E2E-SC01-01 | The sixteen main-flow steps succeed through the API: federation ACTIVE, agreement version 1 ACTIVE, transaction COMPLETED  | ✓      |
+| E2E-SC01-02 | The agreement and the transaction show Agent A as acting principal and Organization A as accountable party                 | ✓      |
+| E2E-SC01-03 | Every audit event of steps 11 to 15 references an ALLOW decision with the created delegation and federation                | ✓      |
+| E2E-SC01-04 | The accountability trail returns Human A, delegation, Agent A, federation, capability, agreement version 1 and transaction | ✓      |
+| E2E-SC01-05 | Network B's members do not include Human A or Agent A, and Network A's members do not include Human B                      | ✓      |
 
 ### SC-02 Machine Actor
 
@@ -112,7 +114,7 @@ Status: ✓ implemented, ◐ partly implemented, ○ planned. The scenarios are 
 | ID          | Test                                                                                                 | Status |
 |-------------|------------------------------------------------------------------------------------------------------|--------|
 | E2E-SC03-01 | An agent delegated only `agreement:propose` requests a transaction: 403 `DELEGATION_SCOPE_VIOLATION` | ✓      |
-| E2E-SC03-02 | The audit trail has a DENIED event linked to the decision and the checked delegation                 | ○      |
+| E2E-SC03-02 | The audit trail has a DENIED event linked to the decision and the checked delegation                 | ✓      |
 
 ### SC-04 Discovery Without Federation
 
@@ -127,7 +129,7 @@ Status: ✓ implemented, ◐ partly implemented, ○ planned. The scenarios are 
 | ID          | Test                                                                | Status |
 |-------------|---------------------------------------------------------------------|--------|
 | E2E-SC05-01 | After revocation the next proposal returns 403 `DELEGATION_REVOKED` | ✓      |
-| E2E-SC05-02 | Audit events written before the revocation are unchanged            | ○      |
+| E2E-SC05-02 | Audit events written before the revocation are unchanged            | ✓      |
 | E2E-SC05-03 | After the validity ends the action returns 403 `DELEGATION_EXPIRED` | ✓      |
 
 ### SC-06 Sovereign Network Bootstrap
@@ -215,35 +217,35 @@ Status: ✓ implemented, ◐ partly implemented, ○ planned. The scenarios are 
 
 ### SC-14 Transaction Lifecycle
 
-| ID          | Test                                                                                          | Status |
-|-------------|-----------------------------------------------------------------------------------------------|--------|
-| E2E-SC14-01 | REQUESTED, AUTHORIZED, EXECUTING, COMPLETED; the audit of each transition follows in Phase 11 | ◐      |
-| E2E-SC14-02 | A transaction under an agreement that is not ACTIVE is REJECTED                               | ✓      |
-| E2E-SC14-03 | A transaction for a capability outside the agreement is REJECTED                              | ✓      |
-| E2E-SC14-04 | Cancelling before execution gives CANCELLED; completion by the requesting side returns 403    | ✓      |
+| ID          | Test                                                                                       | Status |
+|-------------|--------------------------------------------------------------------------------------------|--------|
+| E2E-SC14-01 | REQUESTED, AUTHORIZED, EXECUTING, COMPLETED, each transition audited                       | ✓      |
+| E2E-SC14-02 | A transaction under an agreement that is not ACTIVE is REJECTED                            | ✓      |
+| E2E-SC14-03 | A transaction for a capability outside the agreement is REJECTED                           | ✓      |
+| E2E-SC14-04 | Cancelling before execution gives CANCELLED; completion by the requesting side returns 403 | ✓      |
 
 ### SC-15 Network Isolation
 
-| ID          | Test                                                                                                          | Status |
-|-------------|---------------------------------------------------------------------------------------------------------------|--------|
-| E2E-SC15-01 | Network A cannot read network B identities by list or by ID                                                   | ✓      |
-| E2E-SC15-02 | Organizations, capabilities, agreements and audit events of B are not found from A; audit follows in Phase 11 | ◐      |
-| E2E-SC15-03 | Unauthorized capability discovery, covered by E2E-SC04-01..03                                                 | ✓      |
-| E2E-SC15-04 | Citing a federation the caller's network is not part of returns 403                                           | ○      |
-| E2E-SC15-05 | Citing another principal's delegation returns 403                                                             | ✓      |
-| E2E-SC15-06 | Delegation privilege escalation, covered by E2E-SC11-01 and 02                                                | ✓      |
-| E2E-SC15-07 | Revoked and expired delegation usage, covered by E2E-SC05-01 and 03                                           | ✓      |
-| E2E-SC15-08 | Unauthorized agreement modification, covered by E2E-SC13-04                                                   | ✓      |
-| E2E-SC15-09 | Unauthorized transaction execution, covered by E2E-SC03-01                                                    | ✓      |
-| E2E-SC15-10 | A token of A with the network context of B returns 403; the audit event comes with the audit phase            | ◐      |
+| ID          | Test                                                                               | Status |
+|-------------|------------------------------------------------------------------------------------|--------|
+| E2E-SC15-01 | Network A cannot read network B identities by list or by ID                        | ✓      |
+| E2E-SC15-02 | Organizations, capabilities, agreements and audit events of B are not found from A | ✓      |
+| E2E-SC15-03 | Unauthorized capability discovery, covered by E2E-SC04-01..03                      | ✓      |
+| E2E-SC15-04 | Citing a federation the caller's network is not part of returns 403                | ○      |
+| E2E-SC15-05 | Citing another principal's delegation returns 403                                  | ✓      |
+| E2E-SC15-06 | Delegation privilege escalation, covered by E2E-SC11-01 and 02                     | ✓      |
+| E2E-SC15-07 | Revoked and expired delegation usage, covered by E2E-SC05-01 and 03                | ✓      |
+| E2E-SC15-08 | Unauthorized agreement modification, covered by E2E-SC13-04                        | ✓      |
+| E2E-SC15-09 | Unauthorized transaction execution, covered by E2E-SC03-01                         | ✓      |
+| E2E-SC15-10 | A token of A with the network context of B returns 403 and is audited in A         | ✓      |
 
 ### SC-16 Accountability Reconstruction
 
 | ID          | Test                                                                                                   | Status |
 |-------------|--------------------------------------------------------------------------------------------------------|--------|
-| E2E-SC16-01 | The trail of a completed transaction returns every element of the accountability chain in causal order | ○      |
-| E2E-SC16-02 | Denied attempts of the same correlation appear with their decisions                                    | ○      |
-| E2E-SC16-03 | Audit events cannot be changed or deleted through any endpoint                                         | ○      |
+| E2E-SC16-01 | The trail of a completed transaction returns every element of the accountability chain in causal order | ✓      |
+| E2E-SC16-02 | Denied attempts of the same correlation appear with their decisions                                    | ✓      |
+| E2E-SC16-03 | Audit events cannot be changed or deleted through any endpoint                                         | ✓      |
 
 ### SC-17 Agent Adapter
 
@@ -256,7 +258,7 @@ Status: ✓ implemented, ◐ partly implemented, ○ planned. The scenarios are 
 * Every response has an `X-Correlation-Id` header.
 * Errors use the error model and never leak stack traces or SQL.
 * No endpoint returns data of a network the caller has no membership in or federation with.
-* Every 4xx for an authorization reason will have a matching DENIED audit event once the audit phase is done.
+* Every 4xx for an authorization reason has a matching DENIED audit event.
 
 ##
 
