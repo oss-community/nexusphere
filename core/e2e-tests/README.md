@@ -65,6 +65,7 @@ repository and architecture tests live in their own modules and are not listed h
 | `IdentityIsolationE2ETest`         | `com.nexusphere.e2e.identity`      | E2E-SC15-01, E2E-SC15-10                                                |
 | `CapabilityRegistrationE2ETest`    | `com.nexusphere.e2e.capability`    | E2E-SC08-01..04                                                         |
 | `TrustFederationE2ETest`           | `com.nexusphere.e2e.federation`    | E2E-SC09-01..06                                                         |
+| `FederationContextE2ETest`         | `com.nexusphere.e2e.federation`    | E2E-SC15-04                                                             |
 | `AuthorizationE2ETest`             | `com.nexusphere.e2e.authorization` | E2E-SC10-01..05                                                         |
 | `DelegationE2ETest`                | `com.nexusphere.e2e.delegation`    | E2E-SC11-01..05, E2E-SC05-01, 03, E2E-SC15-05                           |
 | `DiscoveryE2ETest`                 | `com.nexusphere.e2e.discovery`     | E2E-SC12-01..03, E2E-SC04-01..03, E2E-SC08-03, 04, E2E-SC09-04          |
@@ -73,6 +74,7 @@ repository and architecture tests live in their own modules and are not listed h
 | `PrimaryTrustedInteractionE2ETest` | `com.nexusphere.e2e.primary`       | E2E-SC01-01..05                                                         |
 | `AuditE2ETest`                     | `com.nexusphere.e2e.audit`         | E2E-SC16-01..03, E2E-SC03-02, E2E-SC05-02, E2E-SC14-01, E2E-SC15-02, 10 |
 | `AgentAdapterE2ETest`              | `com.nexusphere.e2e.agent`         | E2E-SC17-01..03                                                         |
+| `MachineAdapterE2ETest`            | `com.nexusphere.e2e.machine`       | E2E-SC02-01..04                                                         |
 
 ## Scenario Catalog
 
@@ -105,9 +107,9 @@ Status: ✓ implemented, ◐ partly implemented, ○ planned. The scenarios are 
 
 | ID          | Test                                                                                                            | Status |
 |-------------|-----------------------------------------------------------------------------------------------------------------|--------|
-| E2E-SC02-01 | A transaction for a machine-owned capability completes and the audit names requester, owner, machine and result | ○      |
-| E2E-SC02-02 | The simulator reports FAILED; the transaction is FAILED with a reason and the failure is audited                | ○      |
-| E2E-SC02-03 | A rejected transaction never reaches the simulator                                                              | ○      |
+| E2E-SC02-01 | A transaction for a machine-owned capability completes and the audit names requester, owner, machine and result | ✓      |
+| E2E-SC02-02 | The simulator reports FAILED; the transaction is FAILED with a reason and the failure is audited                | ✓      |
+| E2E-SC02-03 | A rejected transaction never reaches the simulator                                                              | ✓      |
 | E2E-SC02-04 | A machine identity without an owning organization cannot be created                                             | ✓      |
 
 ### SC-03 Out-of-Scope Agent Action
@@ -227,18 +229,18 @@ Status: ✓ implemented, ◐ partly implemented, ○ planned. The scenarios are 
 
 ### SC-15 Network Isolation
 
-| ID          | Test                                                                               | Status |
-|-------------|------------------------------------------------------------------------------------|--------|
-| E2E-SC15-01 | Network A cannot read network B identities by list or by ID                        | ✓      |
-| E2E-SC15-02 | Organizations, capabilities, agreements and audit events of B are not found from A | ✓      |
-| E2E-SC15-03 | Unauthorized capability discovery, covered by E2E-SC04-01..03                      | ✓      |
-| E2E-SC15-04 | Citing a federation the caller's network is not part of returns 403                | ○      |
-| E2E-SC15-05 | Citing another principal's delegation returns 403                                  | ✓      |
-| E2E-SC15-06 | Delegation privilege escalation, covered by E2E-SC11-01 and 02                     | ✓      |
-| E2E-SC15-07 | Revoked and expired delegation usage, covered by E2E-SC05-01 and 03                | ✓      |
-| E2E-SC15-08 | Unauthorized agreement modification, covered by E2E-SC13-04                        | ✓      |
-| E2E-SC15-09 | Unauthorized transaction execution, covered by E2E-SC03-01                         | ✓      |
-| E2E-SC15-10 | A token of A with the network context of B returns 403 and is audited in A         | ✓      |
+| ID          | Test                                                                                                                  | Status |
+|-------------|-----------------------------------------------------------------------------------------------------------------------|--------|
+| E2E-SC15-01 | Network A cannot read network B identities by list or by ID                                                           | ✓      |
+| E2E-SC15-02 | Organizations, capabilities, agreements and audit events of B are not found from A                                    | ✓      |
+| E2E-SC15-03 | Unauthorized capability discovery, covered by E2E-SC04-01..03                                                         | ✓      |
+| E2E-SC15-04 | A foreign federation is 404 from the own network and 403 through a spoofed network context; it never widens discovery | ✓      |
+| E2E-SC15-05 | Citing another principal's delegation returns 403                                                                     | ✓      |
+| E2E-SC15-06 | Delegation privilege escalation, covered by E2E-SC11-01 and 02                                                        | ✓      |
+| E2E-SC15-07 | Revoked and expired delegation usage, covered by E2E-SC05-01 and 03                                                   | ✓      |
+| E2E-SC15-08 | Unauthorized agreement modification, covered by E2E-SC13-04                                                           | ✓      |
+| E2E-SC15-09 | Unauthorized transaction execution, covered by E2E-SC03-01                                                            | ✓      |
+| E2E-SC15-10 | A token of A with the network context of B returns 403 and is audited in A                                            | ✓      |
 
 ### SC-16 Accountability Reconstruction
 

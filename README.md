@@ -197,25 +197,25 @@ Maven module with the package `com.nexusphere.<module>`. A module is reached by 
 
 ### Modules
 
-| Module               | Responsibility                                                                                                       |
-|----------------------|----------------------------------------------------------------------------------------------------------------------|
-| `core/shared`        | Identifiers, execution context, correlation ID, domain event envelope, error model                                   |
-| `core/network`       | Network lifecycle: PENDING, ACTIVE, SUSPENDED, ARCHIVED                                                              |
-| `core/organization`  | Organizations registered inside a network                                                                            |
-| `core/identity`      | Human, service, application, agent and machine identities and credentials                                            |
-| `core/membership`    | Memberships, principal context and member listing                                                                    |
-| `core/capability`    | Capability types with versioned schemas, capabilities, visibility and withdrawal                                     |
-| `core/trust`         | Scoped, directional, revocable trust between networks, organizations and identities                                  |
-| `core/federation`    | Federation lifecycle between two sovereign networks with scope and optimistic locking                                |
-| `core/authorization` | Roles, role assignments, central ALLOW/DENY decisions recorded as evidence                                           |
-| `core/delegation`    | Constrained, time-bounded, revocable delegations between principals of one network                                   |
-| `core/discovery`     | Governed local and federated capability discovery behind a port                                                      |
-| `core/agreement`     | Versioned agreements between accountable parties, with acting principal and delegation                               |
-| `core/transaction`   | Transactions under agreements: request, authorize or reject, execute, complete, fail, cancel                         |
-| `core/audit`         | Append-only audit events, search and the accountability trail of a transaction                                       |
-| `core/integration`   | Agent gateway: JSON-RPC 2.0 adapter that maps external agent calls to discovery, agreement and transaction use cases |
-| `core/bootstrap`     | Application, persistence wiring, error handling, architecture tests                                                  |
-| `core/e2e-tests`     | End-to-end tests against the application and PostgreSQL                                                              |
+| Module               | Responsibility                                                                                           |
+|----------------------|----------------------------------------------------------------------------------------------------------|
+| `core/shared`        | Identifiers, execution context, correlation ID, domain event envelope, error model                       |
+| `core/network`       | Network lifecycle: PENDING, ACTIVE, SUSPENDED, ARCHIVED                                                  |
+| `core/organization`  | Organizations registered inside a network                                                                |
+| `core/identity`      | Human, service, application, agent and machine identities and credentials                                |
+| `core/membership`    | Memberships, principal context and member listing                                                        |
+| `core/capability`    | Capability types with versioned schemas, capabilities, visibility and withdrawal                         |
+| `core/trust`         | Scoped, directional, revocable trust between networks, organizations and identities                      |
+| `core/federation`    | Federation lifecycle between two sovereign networks with scope and optimistic locking                    |
+| `core/authorization` | Roles, role assignments, central ALLOW/DENY decisions recorded as evidence                               |
+| `core/delegation`    | Constrained, time-bounded, revocable delegations between principals of one network                       |
+| `core/discovery`     | Governed local and federated capability discovery behind a port                                          |
+| `core/agreement`     | Versioned agreements between accountable parties, with acting principal and delegation                   |
+| `core/transaction`   | Transactions under agreements: request, authorize or reject, execute, complete, fail, cancel             |
+| `core/audit`         | Append-only audit events, search and the accountability trail of a transaction                           |
+| `core/integration`   | Adapters: a JSON-RPC 2.0 agent gateway and a task gateway for machines executing authorized transactions |
+| `core/bootstrap`     | Application, persistence wiring, error handling, architecture tests                                      |
+| `core/e2e-tests`     | End-to-end tests against the application and PostgreSQL                                                  |
 
 ### Profiles
 
@@ -320,6 +320,8 @@ APP_TOKEN_TTL: 15m
 | GET    | `/api/v1/audit-events/trail`                                             | Accountability chain and related events of a `transactionId` (`audit:read`)                                                                                                       |
 | GET    | `/api/v1/networks/{networkId}/agent/card`                                | Agent gateway card: protocol, endpoint, methods and the calling principal (bearer token)                                                                                          |
 | POST   | `/api/v1/networks/{networkId}/agent/rpc`                                 | JSON-RPC 2.0 agent gateway, single or batch (bearer token of the agent)                                                                                                           |
+| GET    | `/api/v1/networks/{networkId}/machine/tasks`                             | AUTHORIZED and EXECUTING transactions for capabilities the calling machine owns (machine token)                                                                                   |
+| POST   | `/api/v1/networks/{networkId}/machine/tasks/{taskId}/{action}`           | `start`, `complete` with a result, or `fail` with a reason (machine token, `transaction:execute`)                                                                                 |
 
 Every active member holds the MEMBER role; an `ADMINISTRATOR` membership holds NETWORK_ADMINISTRATOR. Requests that name an
 action in parentheses are checked by the central authorizer, which records an ALLOW or DENY decision. Requests marked with bearer token need `Authorization: Bearer <token>` and a network context, taken from the path
@@ -356,6 +358,15 @@ errors with the core code in `data.code`: -32602 validation, -32003 authorizatio
 ```shell
 curl -X POST http://localhost:8080/api/v1/networks/{networkA}/agent/rpc -H "Authorization: Bearer {agentToken}" -H "Content-Type: application/json" -d '{"jsonrpc":"2.0","id":1,"method":"capabilities/discover","params":{"typeCode":"manufacturing.cnc"}}'
 curl -X POST http://localhost:8080/api/v1/networks/{networkA}/agent/rpc -H "Authorization: Bearer {agentToken}" -H "Content-Type: application/json" -d '{"jsonrpc":"2.0","id":2,"method":"agreements/propose","params":{"capabilityId":"{capabilityId}","title":"CNC parts","terms":{"quantity":100}}}'
+```
+
+A machine that owns a capability uses its own token to pick up authorized transactions and report the outcome. It
+never sees a transaction that was rejected or that belongs to another owner.
+
+```shell
+curl -X GET http://localhost:8080/api/v1/networks/{networkB}/machine/tasks -H "Authorization: Bearer {machineToken}"
+curl -X POST http://localhost:8080/api/v1/networks/{networkB}/machine/tasks/{taskId}/start -H "Authorization: Bearer {machineToken}"
+curl -X POST http://localhost:8080/api/v1/networks/{networkB}/machine/tasks/{taskId}/complete -H "Authorization: Bearer {machineToken}" -H "Content-Type: application/json" -d '{"result":{"delivered":true}}'
 ```
 
 Every response carries an `X-Correlation-Id` header. Errors use one model:
