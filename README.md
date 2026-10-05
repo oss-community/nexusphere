@@ -221,24 +221,50 @@ APP_DATABASE_PORT: 5432
 APP_DATABASE_DB: nexusphere
 APP_DATABASE_USERNAME: nexusphere
 APP_DATABASE_PASSWORD: nexusphere
+APP_TOKEN_ISSUER: nexusphere
+APP_TOKEN_SECRET: nexusphere-development-token-secret-change-me
+APP_TOKEN_TTL: 15m
 ```
 
 ### API
 
-| Method | Path                                                                     | Description                |
-|--------|--------------------------------------------------------------------------|----------------------------|
-| GET    | `/api/v1/platform`                                                       | Platform information       |
-| POST   | `/api/v1/networks`                                                       | Create a network           |
-| GET    | `/api/v1/networks`                                                       | List networks              |
-| GET    | `/api/v1/networks/{networkId}`                                           | Get a network              |
-| POST   | `/api/v1/networks/{networkId}/activate`                                  | Activate a network         |
-| POST   | `/api/v1/networks/{networkId}/suspend`                                   | Suspend a network          |
-| POST   | `/api/v1/networks/{networkId}/archive`                                   | Archive a network          |
-| POST   | `/api/v1/networks/{networkId}/organizations`                             | Register an organization   |
-| GET    | `/api/v1/networks/{networkId}/organizations`                             | List organizations         |
-| GET    | `/api/v1/networks/{networkId}/organizations/{organizationId}`            | Get an organization        |
-| PUT    | `/api/v1/networks/{networkId}/organizations/{organizationId}`            | Rename an organization     |
-| POST   | `/api/v1/networks/{networkId}/organizations/{organizationId}/deactivate` | Deactivate an organization |
+| Method | Path                                                                     | Description                                         |
+|--------|--------------------------------------------------------------------------|-----------------------------------------------------|
+| GET    | `/api/v1/platform`                                                       | Platform information                                |
+| POST   | `/api/v1/networks`                                                       | Create a network                                    |
+| GET    | `/api/v1/networks`                                                       | List networks                                       |
+| GET    | `/api/v1/networks/{networkId}`                                           | Get a network                                       |
+| POST   | `/api/v1/networks/{networkId}/activate`                                  | Activate a network                                  |
+| POST   | `/api/v1/networks/{networkId}/suspend`                                   | Suspend a network                                   |
+| POST   | `/api/v1/networks/{networkId}/archive`                                   | Archive a network                                   |
+| POST   | `/api/v1/networks/{networkId}/organizations`                             | Register an organization                            |
+| GET    | `/api/v1/networks/{networkId}/organizations`                             | List organizations                                  |
+| GET    | `/api/v1/networks/{networkId}/organizations/{organizationId}`            | Get an organization                                 |
+| PUT    | `/api/v1/networks/{networkId}/organizations/{organizationId}`            | Rename an organization                              |
+| POST   | `/api/v1/networks/{networkId}/organizations/{organizationId}/deactivate` | Deactivate an organization                          |
+| POST   | `/api/v1/identities`                                                     | Create an identity                                  |
+| POST   | `/api/v1/identities/{identityId}/suspend`                                | Suspend an identity                                 |
+| POST   | `/api/v1/identities/{identityId}/activate`                               | Activate an identity                                |
+| POST   | `/api/v1/identities/{identityId}/credentials`                            | Issue a credential secret                           |
+| POST   | `/api/v1/auth/token`                                                     | Exchange a credential for a bearer token            |
+| POST   | `/api/v1/networks/{networkId}/memberships`                               | Activate a membership                               |
+| GET    | `/api/v1/networks/{networkId}/memberships`                               | List memberships                                    |
+| GET    | `/api/v1/networks/{networkId}/memberships/{membershipId}`                | Get a membership                                    |
+| POST   | `/api/v1/networks/{networkId}/memberships/{membershipId}/terminate`      | Terminate a membership                              |
+| GET    | `/api/v1/networks/{networkId}/identities`                                | List member identities (bearer token)               |
+| GET    | `/api/v1/networks/{networkId}/identities/{identityId}`                   | Get a member identity (bearer token)                |
+| GET    | `/api/v1/principal`                                                      | Principal context for `X-Network-Id` (bearer token) |
+
+Requests marked with bearer token need `Authorization: Bearer <token>` and a network context, taken from the path
+or the `X-Network-Id` header. The identity must be active and hold an active membership in that network.
+
+```shell
+curl -X POST http://localhost:8080/api/v1/identities -H "Content-Type: application/json" -d '{"type":"HUMAN","displayName":"Alice"}'
+curl -X POST http://localhost:8080/api/v1/networks/{networkId}/memberships -H "Content-Type: application/json" -d '{"identityId":"{identityId}"}'
+curl -X POST http://localhost:8080/api/v1/identities/{identityId}/credentials
+curl -X POST http://localhost:8080/api/v1/auth/token -H "Content-Type: application/json" -d '{"identityId":"{identityId}","secret":"{secret}"}'
+curl -X GET http://localhost:8080/api/v1/principal -H "Authorization: Bearer {accessToken}" -H "X-Network-Id: {networkId}"
+```
 
 Every response carries an `X-Correlation-Id` header. Errors use one model:
 

@@ -16,6 +16,9 @@ ENV APP_DATABASE_PORT=5432
 ENV APP_DATABASE_DB=nexusphere
 ENV APP_DATABASE_USERNAME=nexusphere
 ENV APP_DATABASE_PASSWORD=nexusphere
+ENV APP_TOKEN_ISSUER=nexusphere
+ENV APP_TOKEN_SECRET=nexusphere-development-token-secret-change-me
+ENV APP_TOKEN_TTL=15m
 
 ADD ${JAR_PATH}/${JAR_NAME}-${JAR_VERSION}-exec.jar ${TARGET_PATH}/application.jar
 
