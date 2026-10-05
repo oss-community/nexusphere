@@ -2,6 +2,7 @@ package com.nexusphere.organization.api.rest;
 
 import com.nexusphere.organization.application.OrganizationService;
 import com.nexusphere.organization.domain.model.Organization;
+import com.nexusphere.shared.context.Caller;
 import com.nexusphere.shared.context.ExecutionContext;
 import com.nexusphere.shared.id.NetworkId;
 import com.nexusphere.shared.id.OrganizationId;
@@ -47,32 +48,38 @@ class OrganizationController {
     @PostMapping
     ResponseEntity<OrganizationResponse> register(@PathVariable String networkId,
                                                   @Valid @RequestBody OrganizationRequest request,
-                                                  ExecutionContext context) {
+                                                  Caller caller, ExecutionContext context) {
+        caller.requireAdministratorOf(NetworkId.of(networkId));
         Organization organization = organizations.register(NetworkId.of(networkId), request.name(), context);
         return ResponseEntity.created(URI.create("/api/v1/networks/" + networkId + "/organizations/" + organization.id()))
                 .body(OrganizationResponse.of(organization));
     }
 
     @GetMapping
-    List<OrganizationResponse> list(@PathVariable String networkId) {
+    List<OrganizationResponse> list(@PathVariable String networkId, Caller caller) {
+        caller.requireMemberOf(NetworkId.of(networkId));
         return organizations.list(NetworkId.of(networkId)).stream().map(OrganizationResponse::of).toList();
     }
 
     @GetMapping("/{organizationId}")
-    OrganizationResponse get(@PathVariable String networkId, @PathVariable String organizationId) {
+    OrganizationResponse get(@PathVariable String networkId, @PathVariable String organizationId, Caller caller) {
+        caller.requireMemberOf(NetworkId.of(networkId));
         return OrganizationResponse.of(organizations.get(NetworkId.of(networkId), OrganizationId.of(organizationId)));
     }
 
     @PutMapping("/{organizationId}")
     OrganizationResponse rename(@PathVariable String networkId, @PathVariable String organizationId,
-                                @Valid @RequestBody OrganizationRequest request, ExecutionContext context) {
+                                @Valid @RequestBody OrganizationRequest request, Caller caller,
+                                ExecutionContext context) {
+        caller.requireAdministratorOf(NetworkId.of(networkId));
         return OrganizationResponse.of(organizations.rename(NetworkId.of(networkId), OrganizationId.of(organizationId),
                 request.name(), context));
     }
 
     @PostMapping("/{organizationId}/deactivate")
     OrganizationResponse deactivate(@PathVariable String networkId, @PathVariable String organizationId,
-                                    ExecutionContext context) {
+                                    Caller caller, ExecutionContext context) {
+        caller.requireAdministratorOf(NetworkId.of(networkId));
         return OrganizationResponse.of(organizations.deactivate(NetworkId.of(networkId),
                 OrganizationId.of(organizationId), context));
     }

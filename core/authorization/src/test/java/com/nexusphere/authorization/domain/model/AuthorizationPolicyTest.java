@@ -20,7 +20,7 @@ class AuthorizationPolicyTest {
 
     private AuthorizationPolicy.Outcome evaluate(String action, Set<Role> roles, NetworkId target,
                                                  FederationContext federation, UUID trust) {
-        return AuthorizationPolicy.evaluate(new AuthorizationPolicy.Facts(action, roles, false, home, target, true,
+        return AuthorizationPolicy.evaluate(new AuthorizationPolicy.Facts(action, roles, Ownership.NONE, home, target, true,
                 federation, trust));
     }
 
@@ -59,11 +59,18 @@ class AuthorizationPolicyTest {
     @Test
     void ownersManageTheirOwnResourcesOnlyAtHome() {
         assertThat(AuthorizationPolicy.evaluate(new AuthorizationPolicy.Facts(Actions.CAPABILITY_PUBLISH,
-                EnumSet.of(Role.MEMBER), true, home, home, true, null, null)).reason()).isEqualTo("OWNERSHIP");
+                EnumSet.of(Role.MEMBER), Ownership.ORGANIZATION, home, home, true, null, null)).reason())
+                .isEqualTo("OWNERSHIP");
         assertThat(AuthorizationPolicy.evaluate(new AuthorizationPolicy.Facts(Actions.AGREEMENT_MANAGE,
-                EnumSet.of(Role.MEMBER), true, home, home, true, null, null)).allowed()).isFalse();
+                EnumSet.of(Role.MEMBER), Ownership.IDENTITY, home, home, true, null, null)).allowed()).isFalse();
+        assertThat(AuthorizationPolicy.evaluate(new AuthorizationPolicy.Facts(Actions.TRANSACTION_EXECUTE,
+                EnumSet.of(Role.MEMBER), Ownership.IDENTITY, home, home, true, null, null)).reason())
+                .isEqualTo("OWNERSHIP");
+        assertThat(AuthorizationPolicy.evaluate(new AuthorizationPolicy.Facts(Actions.TRANSACTION_EXECUTE,
+                EnumSet.of(Role.MEMBER), Ownership.ORGANIZATION, home, home, true, null, null)).reason())
+                .isEqualTo("NO_AUTHORITY");
         assertThat(AuthorizationPolicy.evaluate(new AuthorizationPolicy.Facts(Actions.CAPABILITY_DISCOVER,
-                EnumSet.of(Role.MEMBER), false, home, other, false, agreements, UUID.randomUUID())).reason())
+                EnumSet.of(Role.MEMBER), Ownership.NONE, home, other, false, agreements, UUID.randomUUID())).reason())
                 .isEqualTo("TARGET_NETWORK_NOT_ACTIVE");
     }
 }

@@ -166,7 +166,7 @@ class MachineAdapterE2ETest extends E2ETestBase {
     @Test
     @DisplayName("E2E-SC02-04 a MACHINE identity without an owning organization cannot be created")
     void machinesNeedAnOwningOrganization() {
-        ApiClient.Response unowned = api().post("/api/v1/identities",
+        ApiClient.Response unowned = api().asOperator().post("/api/v1/identities",
                 "{\"type\":\"MACHINE\",\"displayName\":\"Stray robot\"}");
 
         assertThat(unowned.status()).isEqualTo(400);

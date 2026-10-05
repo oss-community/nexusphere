@@ -5,6 +5,7 @@ import com.nexusphere.identity.application.IdentityService;
 import com.nexusphere.identity.domain.model.Identity;
 import com.nexusphere.identity.domain.model.IdentityType;
 import com.nexusphere.identity.domain.model.Ownership;
+import com.nexusphere.shared.context.Caller;
 import com.nexusphere.shared.context.ExecutionContext;
 import com.nexusphere.shared.error.ValidationException;
 import com.nexusphere.shared.id.IdentityId;
@@ -75,26 +76,47 @@ class IdentityController {
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
-    IdentityResponse create(@Valid @RequestBody CreateIdentityRequest request, ExecutionContext context) {
+    IdentityResponse create(@Valid @RequestBody CreateIdentityRequest request, Caller caller,
+                            ExecutionContext context) {
+        Ownership ownership = request.ownership();
+        if (ownership == null) {
+            caller.requireOperator();
+        } else {
+            caller.requireAdministratorOf(ownership.networkId());
+        }
         Identity identity = identities.create(new IdentityService.CreateIdentity(request.type(), request.displayName(),
-                request.ownership(), request.agentProvider(), request.agentModel()), context);
+                ownership, request.agentProvider(), request.agentModel()), context);
         return IdentityResponse.of(identity);
     }
 
     @PostMapping("/{identityId}/suspend")
-    IdentityResponse suspend(@PathVariable String identityId, ExecutionContext context) {
-        return IdentityResponse.of(identities.suspend(IdentityId.of(identityId), context));
+    IdentityResponse suspend(@PathVariable String identityId, Caller caller, ExecutionContext context) {
+        return IdentityResponse.of(identities.suspend(managed(identityId, caller), context));
     }
 
     @PostMapping("/{identityId}/activate")
-    IdentityResponse activate(@PathVariable String identityId, ExecutionContext context) {
-        return IdentityResponse.of(identities.activate(IdentityId.of(identityId), context));
+    IdentityResponse activate(@PathVariable String identityId, Caller caller, ExecutionContext context) {
+        return IdentityResponse.of(identities.activate(managed(identityId, caller), context));
     }
 
     @PostMapping("/{identityId}/credentials")
-    ResponseEntity<CredentialResponse> issueCredential(@PathVariable String identityId, ExecutionContext context) {
-        CredentialService.IssuedCredential issued = credentials.issue(IdentityId.of(identityId), context);
+    ResponseEntity<CredentialResponse> issueCredential(@PathVariable String identityId, Caller caller,
+                                                       ExecutionContext context) {
+        IdentityId id = IdentityId.of(identityId);
+        CredentialService.IssuedCredential issued = credentials.issue(caller.is(id) ? id : managed(identityId, caller),
+                context);
         return ResponseEntity.status(HttpStatus.CREATED).body(new CredentialResponse(
                 issued.credentialId().toString(), issued.identityId().toString(), issued.secret()));
+    }
+
+    private IdentityId managed(String identityId, Caller caller) {
+        IdentityId id = IdentityId.of(identityId);
+        Ownership ownership = identities.get(id).ownership().orElse(null);
+        if (ownership == null) {
+            caller.requireOperator();
+        } else {
+            caller.requireAdministratorOf(ownership.networkId());
+        }
+        return id;
     }
 }

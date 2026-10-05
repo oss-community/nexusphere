@@ -18,6 +18,8 @@ nexusphere:
       issuer: ${APP_TOKEN_ISSUER:nexusphere}
       secret: ${APP_TOKEN_SECRET:nexusphere-development-token-secret-change-me}
       ttl: ${APP_TOKEN_TTL:15m}
+    operator:
+      secret: ${APP_OPERATOR_SECRET:nexusphere-development-operator-secret-change-me}
   persistence:
     modules:
       - network

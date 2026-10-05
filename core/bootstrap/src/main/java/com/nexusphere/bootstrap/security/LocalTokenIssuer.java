@@ -12,6 +12,9 @@ import java.time.Instant;
 
 public class LocalTokenIssuer {
 
+    public static final String OPERATOR_SUBJECT = "platform-operator";
+    public static final String OPERATOR_CLAIM = "operator";
+
     public record IssuedToken(String accessToken, String tokenType, long expiresIn) {
     }
 
@@ -26,13 +29,23 @@ public class LocalTokenIssuer {
     }
 
     public IssuedToken issue(IdentityId identityId) {
+        return issue(claims(identityId.toString()).build());
+    }
+
+    public IssuedToken issueOperator() {
+        return issue(claims(OPERATOR_SUBJECT).claim(OPERATOR_CLAIM, true).build());
+    }
+
+    private JwtClaimsSet.Builder claims(String subject) {
         Instant now = time.now();
-        JwtClaimsSet claims = JwtClaimsSet.builder()
+        return JwtClaimsSet.builder()
                 .issuer(properties.issuer())
-                .subject(identityId.toString())
+                .subject(subject)
                 .issuedAt(now)
-                .expiresAt(now.plus(properties.ttl()))
-                .build();
+                .expiresAt(now.plus(properties.ttl()));
+    }
+
+    private IssuedToken issue(JwtClaimsSet claims) {
         String token = encoder.encode(JwtEncoderParameters.from(JwsHeader.with(MacAlgorithm.HS256).build(), claims))
                 .getTokenValue();
         return new IssuedToken(token, "Bearer", properties.ttl().toSeconds());

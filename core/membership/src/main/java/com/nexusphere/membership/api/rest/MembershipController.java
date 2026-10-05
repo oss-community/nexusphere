@@ -3,6 +3,7 @@ package com.nexusphere.membership.api.rest;
 import com.nexusphere.membership.application.MembershipService;
 import com.nexusphere.membership.domain.model.Membership;
 import com.nexusphere.membership.domain.model.MembershipRole;
+import com.nexusphere.shared.context.Caller;
 import com.nexusphere.shared.context.ExecutionContext;
 import com.nexusphere.shared.error.ValidationException;
 import com.nexusphere.shared.id.IdentityId;
@@ -50,7 +51,8 @@ class MembershipController {
     @PostMapping
     ResponseEntity<MembershipResponse> activate(@PathVariable String networkId,
                                                 @Valid @RequestBody ActivateMembershipRequest request,
-                                                ExecutionContext context) {
+                                                Caller caller, ExecutionContext context) {
+        caller.requireAdministratorOf(NetworkId.of(networkId));
         OrganizationId organization = request.organizationId() == null ? null : OrganizationId.of(request.organizationId());
         Membership membership = memberships.activate(NetworkId.of(networkId), IdentityId.of(request.identityId()),
                 organization, MembershipRole.parse(request.role()), context);
@@ -59,18 +61,21 @@ class MembershipController {
     }
 
     @GetMapping
-    List<MembershipResponse> list(@PathVariable String networkId) {
+    List<MembershipResponse> list(@PathVariable String networkId, Caller caller) {
+        caller.requireMemberOf(NetworkId.of(networkId));
         return memberships.list(NetworkId.of(networkId)).stream().map(MembershipResponse::of).toList();
     }
 
     @GetMapping("/{membershipId}")
-    MembershipResponse get(@PathVariable String networkId, @PathVariable String membershipId) {
+    MembershipResponse get(@PathVariable String networkId, @PathVariable String membershipId, Caller caller) {
+        caller.requireMemberOf(NetworkId.of(networkId));
         return MembershipResponse.of(memberships.get(NetworkId.of(networkId), membershipId(membershipId)));
     }
 
     @PostMapping("/{membershipId}/terminate")
     MembershipResponse terminate(@PathVariable String networkId, @PathVariable String membershipId,
-                                 ExecutionContext context) {
+                                 Caller caller, ExecutionContext context) {
+        caller.requireAdministratorOf(NetworkId.of(networkId));
         return MembershipResponse.of(memberships.terminate(NetworkId.of(networkId), membershipId(membershipId), context));
     }
 

@@ -12,7 +12,7 @@ import java.util.UUID;
 
 public final class AuthorizationPolicy {
 
-    public record Facts(String action, Set<Role> roles, boolean owner, NetworkId homeNetwork, NetworkId targetNetwork,
+    public record Facts(String action, Set<Role> roles, Ownership owner, NetworkId homeNetwork, NetworkId targetNetwork,
                         boolean targetNetworkActive, FederationContext federation, UUID trustRelationshipId) {
     }
 
@@ -36,7 +36,14 @@ public final class AuthorizationPolicy {
     private static final Set<String> OWNER_ACTIONS = Set.of(Actions.CAPABILITY_REGISTER, Actions.CAPABILITY_PUBLISH,
             Actions.TRANSACTION_EXECUTE);
 
+    private static final Set<String> IDENTITY_OWNER_ACTIONS = Set.of(Actions.TRANSACTION_EXECUTE);
+
     private AuthorizationPolicy() {
+    }
+
+    private static boolean owns(Facts facts) {
+        return facts.owner() == Ownership.IDENTITY
+                || facts.owner() == Ownership.ORGANIZATION && !IDENTITY_OWNER_ACTIONS.contains(facts.action());
     }
 
     public static Optional<String> federationScopeFor(String action) {
@@ -61,7 +68,7 @@ public final class AuthorizationPolicy {
         if (role.isPresent()) {
             return new Outcome(true, "ROLE_GRANTED", role.get());
         }
-        if (facts.owner() && !isCrossNetwork(facts) && OWNER_ACTIONS.contains(facts.action())) {
+        if (owns(facts) && !isCrossNetwork(facts) && OWNER_ACTIONS.contains(facts.action())) {
             return new Outcome(true, "OWNERSHIP", null);
         }
         return Outcome.deny("NO_AUTHORITY");

@@ -1,5 +1,6 @@
 package com.nexusphere.capability.api.rest;
 
+import com.nexusphere.shared.context.Caller;
 import com.nexusphere.capability.application.CapabilityTypeService;
 import com.nexusphere.capability.domain.model.CapabilityType;
 import com.nexusphere.shared.error.ValidationException;
@@ -47,7 +48,9 @@ class CapabilityTypeController {
     }
 
     @PostMapping
-    ResponseEntity<CapabilityTypeResponse> register(@Valid @RequestBody CapabilityTypeRequest request) {
+    ResponseEntity<CapabilityTypeResponse> register(@Valid @RequestBody CapabilityTypeRequest request,
+                                                    Caller caller) {
+        caller.requireOperator();
         CapabilityType type = types.register(request.code(), request.name(), request.description(), request.schema());
         return ResponseEntity.created(URI.create("/api/v1/capability-types/" + type.id()))
                 .body(CapabilityTypeResponse.of(type));

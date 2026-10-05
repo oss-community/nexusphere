@@ -29,7 +29,8 @@ class IdentityMembershipE2ETest extends E2ETestBase {
         String acme = sovereignty.organization(network, "Acme");
 
         JsonNode human = identities.create("HUMAN", "Alice", null, null).json();
-        ApiClient.Response agent = api().post("/api/v1/identities", "{\"type\":\"AGENT\",\"displayName\":\"Buyer Agent\","
+        ApiClient.Response agent = api().asOperator().post("/api/v1/identities",
+                "{\"type\":\"AGENT\",\"displayName\":\"Buyer Agent\","
                 + "\"owningNetworkId\":\"" + network + "\",\"owningOrganizationId\":\"" + acme + "\","
                 + "\"agentProvider\":\"Anthropic\",\"agentModel\":\"local\"}");
         JsonNode machine = identities.create("MACHINE", "CNC-7", network, acme).json();
@@ -75,7 +76,8 @@ class IdentityMembershipE2ETest extends E2ETestBase {
         assertThat(inB.path("networkId").asString()).isEqualTo(networkB);
         assertThat(inA.path("principalId").asString()).isNotEqualTo(inB.path("principalId").asString());
 
-        api().post("/api/v1/networks/" + networkA + "/memberships/" + membershipA + "/terminate", "");
+        api().asOperator().post("/api/v1/networks/" + networkA + "/memberships/" + membershipA + "/terminate",
+                "");
 
         assertThat(identities.as(actor, networkA).get("/api/v1/principal").status()).isEqualTo(403);
         assertThat(identities.as(actor, networkB).get("/api/v1/principal").status()).isEqualTo(200);
@@ -108,7 +110,7 @@ class IdentityMembershipE2ETest extends E2ETestBase {
         IdentityApi.Actor actor = new IdentityApi.Actor(alice,
                 identities.token(alice, secret).json().path("accessToken").asString());
 
-        api().post("/api/v1/identities/" + alice + "/suspend", "");
+        api().asOperator().post("/api/v1/identities/" + alice + "/suspend", "");
 
         for (ApiClient.Response response : new ApiClient.Response[]{
                 identities.as(actor, network).get("/api/v1/principal"),
@@ -119,7 +121,7 @@ class IdentityMembershipE2ETest extends E2ETestBase {
         }
         assertThat(identities.token(alice, secret).status()).isEqualTo(401);
 
-        api().post("/api/v1/identities/" + alice + "/activate", "");
+        api().asOperator().post("/api/v1/identities/" + alice + "/activate", "");
         assertThat(identities.as(actor, network).get("/api/v1/principal").status()).isEqualTo(200);
     }
 

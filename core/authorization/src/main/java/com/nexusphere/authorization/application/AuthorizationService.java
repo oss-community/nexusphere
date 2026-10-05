@@ -10,6 +10,7 @@ import com.nexusphere.authorization.contract.FederationContextPort;
 import com.nexusphere.authorization.contract.ResourceOwner;
 import com.nexusphere.authorization.contract.TrustEvidencePort;
 import com.nexusphere.authorization.domain.model.AuthorizationPolicy;
+import com.nexusphere.authorization.domain.model.Ownership;
 import com.nexusphere.authorization.domain.model.DelegationPolicy;
 import com.nexusphere.authorization.domain.model.Role;
 import com.nexusphere.authorization.domain.model.RoleAssignment;
@@ -176,12 +177,16 @@ public class AuthorizationService implements Authorizer {
         return new Delegated(DelegationPolicy.evaluate(delegation, facts, delegatorRoles), delegation.id());
     }
 
-    private static boolean owns(PrincipalContext principal, ResourceOwner owner) {
+    private static Ownership owns(PrincipalContext principal, ResourceOwner owner) {
         if (owner == null) {
-            return false;
+            return Ownership.NONE;
         }
-        boolean identity = owner.identityId() != null && owner.identityId().equals(principal.identityId());
-        boolean organization = owner.organizationId() != null && owner.organizationId().equals(principal.organizationId());
-        return identity || organization;
+        if (owner.identityId() != null && owner.identityId().equals(principal.identityId())) {
+            return Ownership.IDENTITY;
+        }
+        if (owner.organizationId() != null && owner.organizationId().equals(principal.organizationId())) {
+            return Ownership.ORGANIZATION;
+        }
+        return Ownership.NONE;
     }
 }

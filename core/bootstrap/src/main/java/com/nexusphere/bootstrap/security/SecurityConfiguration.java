@@ -26,7 +26,7 @@ import javax.crypto.spec.SecretKeySpec;
 import java.nio.charset.StandardCharsets;
 
 @Configuration(proxyBeanMethods = false)
-@EnableConfigurationProperties(TokenProperties.class)
+@EnableConfigurationProperties({TokenProperties.class, OperatorProperties.class})
 class SecurityConfiguration {
 
     @Bean
