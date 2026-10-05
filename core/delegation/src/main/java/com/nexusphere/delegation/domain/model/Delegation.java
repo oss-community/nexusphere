@@ -24,6 +24,9 @@ import java.util.UUID;
 
 public final class Delegation extends AggregateRoot<UUID> {
 
+    private static final Set<String> NON_DELEGABLE = Set.of(Actions.ROLE_ASSIGN, Actions.TRUST_MANAGE,
+            Actions.FEDERATION_MANAGE);
+
     private final UUID id;
     private final NetworkId networkId;
     private final PrincipalId delegatorPrincipalId;
@@ -144,6 +147,10 @@ public final class Delegation extends AggregateRoot<UUID> {
         if (normalized.contains(Actions.DELEGATION_GRANT)) {
             throw new DomainException(ErrorCategory.BUSINESS_RULE_VIOLATION, "DELEGATION_DEPTH_EXCEEDED",
                     "The authority to grant delegations cannot itself be delegated");
+        }
+        if (normalized.stream().anyMatch(NON_DELEGABLE::contains)) {
+            throw new DomainException(ErrorCategory.BUSINESS_RULE_VIOLATION, "ACTION_NOT_DELEGABLE",
+                    "Role assignment, trust and federation management cannot be delegated");
         }
         return normalized;
     }

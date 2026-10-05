@@ -4,6 +4,7 @@ import com.nexusphere.NexusphereApplication;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.test.context.ActiveProfiles;
 import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Import;
@@ -17,6 +18,7 @@ import java.util.List;
 import static org.assertj.core.api.Assertions.assertThat;
 
 @SpringBootTest(classes = NexusphereApplication.class)
+@ActiveProfiles({"postgresql", "dev"})
 @Import(ApplicationIT.Containers.class)
 class ApplicationIT {
 

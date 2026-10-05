@@ -24,6 +24,10 @@
         </dependency>
         <dependency>
             <groupId>com.nexusphere</groupId>
+            <artifactId>identity</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.nexusphere</groupId>
             <artifactId>membership</artifactId>
         </dependency>
         <dependency>

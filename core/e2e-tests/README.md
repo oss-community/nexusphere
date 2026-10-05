@@ -76,6 +76,7 @@ repository and architecture tests live in their own modules and are not listed h
 | `AgentAdapterE2ETest`              | `com.nexusphere.e2e.agent`         | E2E-SC17-01..03                                                         |
 | `MachineAdapterE2ETest`            | `com.nexusphere.e2e.machine`       | E2E-SC02-01..04                                                         |
 | `ManagementAccessE2ETest`          | `com.nexusphere.e2e.security`      | E2E-SC18-01..04, E2E-SC15-11                                            |
+| `HardeningE2ETest`                 | `com.nexusphere.e2e.security`      | E2E-SC19-01..08                                                         |
 
 ## Scenario Catalog
 
@@ -268,6 +269,19 @@ Status: ✓ implemented, ◐ partly implemented, ○ planned. The scenarios are 
 | E2E-SC18-02 | The platform operator authenticates with its own secret and has no principal in any network             | ✓      |
 | E2E-SC18-03 | A network administrator manages organizations, memberships and owned identities of its own network only | ✓      |
 | E2E-SC18-04 | An ordinary member cannot manage the network but can rotate its own credential                          | ✓      |
+
+### SC-19 Stability and Escalation Guards
+
+| ID          | Test                                                                                                       | Status |
+|-------------|------------------------------------------------------------------------------------------------------------|--------|
+| E2E-SC19-01 | `role:assign`, `trust:manage` and `federation:manage` cannot be delegated (422 `ACTION_NOT_DELEGABLE`)     | ✓      |
+| E2E-SC19-02 | A principal cannot assign a role to itself (403 `ROLE_SELF_ASSIGNMENT`)                                    | ✓      |
+| E2E-SC19-03 | A suspended network blocks every authorized change with 409 `NETWORK_NOT_ACTIVE` but keeps reads and audit | ✓      |
+| E2E-SC19-04 | Credentials expire, can be revoked, and rotation invalidates old secrets and tokens                        | ✓      |
+| E2E-SC19-05 | Identity, credential and role changes are audited in the platform stream and the member networks           | ✓      |
+| E2E-SC19-06 | Every endpoint except sign-in, health, platform information and API docs needs a token                     | ✓      |
+| E2E-SC19-07 | A 128-character correlation id is kept in the audit trail                                                  | ✓      |
+| E2E-SC19-08 | More concurrent authorized requests than request threads never exhaust the connection pool                 | ✓      |
 
 ## Cross-Cutting Checks
 

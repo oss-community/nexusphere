@@ -46,6 +46,10 @@ class DelegationTest {
                 .isInstanceOf(DomainException.class).hasFieldOrPropertyWithValue("code", "DELEGATION_TO_SELF");
         assertThatThrownBy(() -> grant(List.of(Actions.DELEGATION_GRANT), null))
                 .isInstanceOf(DomainException.class).hasFieldOrPropertyWithValue("code", "DELEGATION_DEPTH_EXCEEDED");
+        for (String action : List.of(Actions.ROLE_ASSIGN, Actions.TRUST_MANAGE, Actions.FEDERATION_MANAGE)) {
+            assertThatThrownBy(() -> grant(List.of(Actions.AGREEMENT_PROPOSE, action), null))
+                    .isInstanceOf(DomainException.class).hasFieldOrPropertyWithValue("code", "ACTION_NOT_DELEGABLE");
+        }
         assertThatThrownBy(() -> grant(List.of("payment:send"), null)).isInstanceOf(ValidationException.class);
         assertThatThrownBy(() -> grant(List.of(Actions.AGREEMENT_PROPOSE), now.minusSeconds(1)))
                 .isInstanceOf(ValidationException.class);

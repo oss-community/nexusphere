@@ -10,7 +10,7 @@ public record OperatorProperties(String secret) {
 
     public OperatorProperties {
         if (secret == null || secret.getBytes(StandardCharsets.UTF_8).length < 32) {
-            throw new IllegalStateException("nexusphere.security.operator.secret must have at least 32 bytes");
+            throw new IllegalStateException("nexusphere.security.operator.secret must have at least 32 bytes; set APP_OPERATOR_SECRET");
         }
     }
 

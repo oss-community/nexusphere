@@ -21,6 +21,7 @@ import com.nexusphere.membership.contract.PrincipalResolver;
 import com.nexusphere.network.contract.NetworkDirectory;
 import com.nexusphere.network.contract.NetworkSnapshot;
 import com.nexusphere.shared.context.ExecutionContext;
+import com.nexusphere.shared.error.ConflictException;
 import com.nexusphere.shared.error.DomainException;
 import com.nexusphere.shared.error.ErrorCategory;
 import com.nexusphere.shared.error.NotFoundException;
@@ -76,14 +77,16 @@ public class AuthorizationService implements Authorizer {
         NetworkId target = request.targetNetworkId();
         FederationContext federation = null;
         UUID trustRelationship = null;
-        boolean targetActive = true;
+        boolean homeActive = networks.find(home).map(NetworkSnapshot::active).orElse(false);
+        boolean targetActive = homeActive;
         if (!home.equals(target)) {
             targetActive = networks.find(target).map(NetworkSnapshot::active).orElse(false);
             federation = federations.findActive(home, target).orElse(null);
             trustRelationship = trust.findEffective(target, home, request.action()).orElse(null);
         }
         AuthorizationPolicy.Outcome outcome = AuthorizationPolicy.evaluate(new AuthorizationPolicy.Facts(
-                request.action(), roles(principal), owns(principal, request.owner()), home, target, targetActive,
+                request.action(), roles(principal), owns(principal, request.owner()), home, homeActive, target,
+                targetActive,
                 federation, trustRelationship));
         UUID delegationId = null;
         if ("NO_AUTHORITY".equals(outcome.reason()) || (request.delegationId() != null && outcome.allowed())) {
@@ -104,6 +107,9 @@ public class AuthorizationService implements Authorizer {
     @Override
     public AuthorizationDecision require(AuthorizationRequest request, ExecutionContext context) {
         AuthorizationDecision decision = authorize(request, context);
+        if (AuthorizationPolicy.NETWORK_NOT_ACTIVE.equals(decision.reason())) {
+            throw new ConflictException(decision.reason(), "Network " + decision.networkId() + " is not active");
+        }
         if (!decision.allowed()) {
             throw new DomainException(ErrorCategory.AUTHORIZATION_ERROR, decision.reason(),
                     "The principal is not authorized to " + decision.action(),

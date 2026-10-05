@@ -8,10 +8,11 @@ import java.time.Instant;
 import java.util.Optional;
 import java.util.UUID;
 
-public record CredentialIssued(UUID eventId, Instant occurredAt, IdentityId identity, UUID credentialId) implements DomainEvent {
+public record CredentialIssued(UUID eventId, Instant occurredAt, IdentityId identity, UUID credentialId,
+                               Instant expiresAt) implements DomainEvent {
 
-    public CredentialIssued(Instant occurredAt, IdentityId identity, UUID credentialId) {
-        this(UUID.randomUUID(), occurredAt, identity, credentialId);
+    public CredentialIssued(Instant occurredAt, IdentityId identity, UUID credentialId, Instant expiresAt) {
+        this(UUID.randomUUID(), occurredAt, identity, credentialId, expiresAt);
     }
 
     @Override

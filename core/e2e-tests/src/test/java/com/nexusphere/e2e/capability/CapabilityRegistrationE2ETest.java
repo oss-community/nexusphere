@@ -93,7 +93,7 @@ class CapabilityRegistrationE2ETest extends E2ETestBase {
 
         assertThat(second.status()).isEqualTo(201);
         assertThat(second.json().path("version").asInt()).isEqualTo(2);
-        assertThat(api().get("/api/v1/capability-types?code=" + cnc).json().valueStream()
+        assertThat(api().asOperator().get("/api/v1/capability-types?code=" + cnc).json().valueStream()
                 .map(type -> type.path("version").asInt())).containsExactly(1, 2);
         String latest = registered(supplierAdmin, network, """
                 {"name":"Any material","typeCode":"%s","specification":{"material":"wood"}}""".formatted(cnc));

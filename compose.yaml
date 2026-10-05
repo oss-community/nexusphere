@@ -47,7 +47,7 @@ services:
     environment:
       APP_HOST: "0.0.0.0"
       APP_PORT: "8080"
-      APP_PROFILES: postgresql
+      APP_PROFILES: postgresql,dev
       APP_DATABASE_HOST: postgresql
       APP_DATABASE_PORT: "5432"
       APP_DATABASE_DB: nexusphere

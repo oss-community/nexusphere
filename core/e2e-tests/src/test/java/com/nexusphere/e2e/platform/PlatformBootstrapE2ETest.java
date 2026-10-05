@@ -56,7 +56,8 @@ class PlatformBootstrapE2ETest extends E2ETestBase {
     @Test
     @DisplayName("E2E-PLT-05 an unknown path answers with the error model and no internals")
     void unknownPathUsesErrorModel() {
-        ApiClient.Response response = api().withHeader(CORRELATION, "e2e-plt-05").get("/api/v1/does-not-exist");
+        ApiClient.Response response = api().asOperator().withHeader(CORRELATION, "e2e-plt-05")
+                .get("/api/v1/does-not-exist");
 
         assertThat(response.status()).isEqualTo(404);
         JsonNode error = response.json();

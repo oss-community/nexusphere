@@ -9,11 +9,13 @@ import org.springframework.security.oauth2.jwt.JwtEncoder;
 import org.springframework.security.oauth2.jwt.JwtEncoderParameters;
 
 import java.time.Instant;
+import java.util.UUID;
 
 public class LocalTokenIssuer {
 
     public static final String OPERATOR_SUBJECT = "platform-operator";
     public static final String OPERATOR_CLAIM = "operator";
+    public static final String CREDENTIAL_CLAIM = "credential";
 
     public record IssuedToken(String accessToken, String tokenType, long expiresIn) {
     }
@@ -28,8 +30,8 @@ public class LocalTokenIssuer {
         this.time = time;
     }
 
-    public IssuedToken issue(IdentityId identityId) {
-        return issue(claims(identityId.toString()).build());
+    public IssuedToken issue(IdentityId identityId, UUID credentialId) {
+        return issue(claims(identityId.toString()).claim(CREDENTIAL_CLAIM, credentialId.toString()).build());
     }
 
     public IssuedToken issueOperator() {
