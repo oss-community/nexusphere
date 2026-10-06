@@ -1,2 +1,5 @@
 /mvnw text eol=lf
 *.cmd text eol=crlf
+*.sh text eol=lf
+mvn-devops/** text eol=lf
+mvn-devops/*.bat text eol=crlf
