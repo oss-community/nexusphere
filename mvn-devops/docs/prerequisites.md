@@ -4,7 +4,7 @@
 |---|---|
 | Bash 4+, curl, jq, git, ssh-keygen | always |
 | Docker with the compose plugin | tools that run in Docker |
-| Java 17 and Maven 3.9 | the `maven` orchestrator and `release` (Jenkins and Concourse bring their own) |
+| Java 21 and Maven 3.9 | the `maven` orchestrator and `release` (Jenkins and Concourse bring their own) |
 
 `devops.sh doctor` (or `mvn-devops doctor`) checks all of them.
 
@@ -12,7 +12,7 @@
 
 ```bash
 sudo apt-get update
-sudo apt-get install -y bash curl jq git openssh-client openjdk-17-jdk maven
+sudo apt-get install -y bash curl jq git openssh-client openjdk-21-jdk maven
 # Docker Engine with the compose plugin: https://docs.docker.com/engine/install/ubuntu/
 curl -fsSL https://get.docker.com | sudo sh
 sudo usermod -aG docker "$USER"     # log out and in again
@@ -21,7 +21,7 @@ sudo usermod -aG docker "$USER"     # log out and in again
 ## Fedora, RHEL, Rocky
 
 ```bash
-sudo dnf install -y bash curl jq git openssh-clients java-17-openjdk-devel maven
+sudo dnf install -y bash curl jq git openssh-clients java-21-openjdk-devel maven
 # Docker Engine: https://docs.docker.com/engine/install/fedora/ (or /rhel/)
 sudo dnf -y install dnf-plugins-core
 sudo dnf config-manager --add-repo https://download.docker.com/linux/fedora/docker-ce.repo
@@ -29,13 +29,13 @@ sudo dnf install -y docker-ce docker-ce-cli containerd.io docker-compose-plugin
 sudo systemctl enable --now docker && sudo usermod -aG docker "$USER"
 ```
 
-The Maven package of older RHEL releases can be older than 3.9; then install
-Maven by hand as described for macOS/Linux below.
+The Maven packages of Debian, Ubuntu and RHEL are often older than 3.9; check
+with `mvn -version` and install Maven by hand as described below if needed.
 
 ## macOS
 
 ```bash
-brew install bash jq git openjdk@17 maven
+brew install bash jq git openjdk@21 maven
 brew install --cask docker          # Docker Desktop, start it once
 ```
 
@@ -50,7 +50,7 @@ when `/opt/homebrew/bin` (or `/usr/local/bin`) comes first in `PATH`.
    [jqlang.github.io/jq](https://jqlang.github.io/jq/download/), rename it to
    `jq.exe` and put it in a folder on `PATH`.
 3. [Docker Desktop](https://docs.docker.com/desktop/setup/install/windows-install/) with the WSL 2 backend.
-4. Java 17: `winget install EclipseAdoptium.Temurin.17.JDK`.
+4. Java 21: `winget install EclipseAdoptium.Temurin.21.JDK`.
 5. Maven: download the binary zip from [maven.apache.org](https://maven.apache.org/download.cgi),
    unpack it to e.g. `C:\sdk\maven`, then in a console run as administrator:
    ```bat

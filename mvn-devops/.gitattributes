@@ -1,0 +1,7 @@
+# Keep line endings fixed on every system. Bash fails on CRLF scripts, and
+# git on Windows (core.autocrlf=true) would otherwise convert them on checkout.
+# This file also ships inside the zip, so it protects mvn-devops/ when it is
+# committed into a project.
+* text=auto eol=lf
+*.bat text eol=crlf
+*.cmd text eol=crlf

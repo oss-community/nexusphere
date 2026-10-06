@@ -117,6 +117,18 @@ Notes:
 - On Linux and macOS keep the executable bit when committing (`unzip` and git
   keep it). If `devops.sh` lost it, run
   `git update-index --chmod=+x mvn-devops/devops.sh`.
+- Line endings: Bash cannot run scripts with Windows (CRLF) line endings, and
+  git on Windows (`core.autocrlf=true`) converts files to CRLF on checkout.
+  The zip contains `mvn-devops/.gitattributes`, which keeps every file LF (and
+  `devops.bat` CRLF) whatever `core.autocrlf` is, so commit it together with
+  the folder. `devops.sh doctor` reports files that are already CRLF and prints
+  the command that fixes them. A project that committed mvn-devops before this
+  file existed adds it from the new zip, then fixes its checkout once with:
+
+  ```bash
+  git add --renormalize mvn-devops && git commit -m "Normalize mvn-devops line endings"
+  rm -rf mvn-devops && git checkout -- mvn-devops
+  ```
 
 ## Quick start
 
@@ -318,8 +330,8 @@ Jenkins or Concourse in Docker, which share its network. See
 variables exported only for that process. `render` also writes
 `.devops/generated/pipeline.sh` for IDE run configurations.
 
-**jenkins** builds an image from `jenkins/jenkins:lts-jdk17` with Maven and the
-needed plugins, skips the setup wizard and configures everything with
+**jenkins** builds an image from `jenkins/jenkins:lts-jdk21` with Maven 3.9
+(copied from the official Maven image) and the needed plugins, skips the setup wizard and configures everything with
 Configuration as Code: the admin user, one secret-text credential per secret and
 a pipeline job generated from the stages. `run` triggers the job and streams its
 console. There is no login to the UI and no API token to create by hand:
@@ -335,7 +347,34 @@ after the first build, which records the repository.
 **concourse** runs `concourse quickstart` (web and worker in one container).
 The pipeline has a `ci` job, triggered by every push, and a `cd` job that runs
 all stages and is started by hand after `ci` passed. Tasks run in
-`maven:3.9-eclipse-temurin-17`. `fly` is downloaded from the server.
+`maven:3.9-eclipse-temurin-21`. `fly` is downloaded from the server.
+
+All orchestrators use the same Java and Maven, set with `JAVA_VERSION` (21)
+and `MAVEN_VERSION` (3.9) in `secrets`. Java 21 also builds projects whose pom
+targets an older release such as 17.
+
+## Docker images
+
+Every tool runs from its official image, unchanged:
+
+| Tool | Image |
+|---|---|
+| SonarQube | `sonarqube` (with `postgres:16`) |
+| Nexus | `sonatype/nexus3` |
+| Artifactory OSS | `releases-docker.jfrog.io/jfrog/artifactory-oss` (with `postgres:16`) |
+| Concourse | `concourse/concourse` (with `postgres:16`) |
+| Concourse build tasks | `maven:<MAVEN_VERSION>-eclipse-temurin-<JAVA_VERSION>` |
+
+Jenkins is the one exception. The official `jenkins/jenkins` image has Java but
+no Maven, and the pipeline stages are `mvn` commands run inside Jenkins. So
+[`modules/orchestrator/jenkins/docker/Dockerfile`](modules/orchestrator/jenkins/docker/Dockerfile)
+adds a thin layer built only from official images: it starts from
+`jenkins/jenkins:lts-jdk<JAVA_VERSION>`, copies Maven from
+`maven:<MAVEN_VERSION>-eclipse-temurin-<JAVA_VERSION>`, and adds git, ssh, curl,
+jq and the plugins in `plugins.txt`. `up` builds it locally; no image is
+published by mvn-devops. Java and Maven versions come from `JAVA_VERSION`
+(default 21) and `MAVEN_VERSION` (default 3.9), asked by the `maven` build
+module, so Jenkins, Concourse and your machine use the same versions.
 
 ## The compose file of your tools
 
@@ -382,7 +421,7 @@ For an existing server, `configure` only checks the credentials and the
 repositories; it does not change passwords or create anything there. For
 Jenkins, `publish` creates or updates the job and its credentials through the
 REST API (credential ids get the prefix `<project>-`, because the server is
-shared). The agents need git, ssh, Java 17 and Maven, and the server the
+shared). The agents need git, ssh, Java 21 and Maven 3.9, and the server the
 plugins workflow-aggregator, git, credentials-binding, plain-credentials and
 timestamper. For Concourse, `publish` downloads `fly` from the server and sets
 the pipeline in your team.

@@ -2,7 +2,10 @@ services:
   jenkins:
     build:
       context: ${DEVOPS_HOME}/modules/orchestrator/jenkins/docker
-    image: mvn-devops/jenkins:local
+      args:
+        JAVA_VERSION: ${JAVA_VERSION:-21}
+        MAVEN_VERSION: ${MAVEN_VERSION:-3.9}
+    image: mvn-devops/jenkins:maven${MAVEN_VERSION:-3.9}-jdk${JAVA_VERSION:-21}
     restart: unless-stopped
     env_file:
       - ${DEVOPS_STATE}/env/pipeline.env
