@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
 # mvn-devops: pick your DevOps tools, then set up and run a Maven pipeline.
+# On Windows (Git Bash, Cygwin) ignore CR in case the files got CRLF endings.
+(set -o igncr) 2>/dev/null && set -o igncr #
 set -euo pipefail
 
 # Follow symlinks, e.g. /usr/bin/mvn-devops -> /usr/share/mvn-devops/devops.sh.

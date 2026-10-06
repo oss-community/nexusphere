@@ -19,7 +19,7 @@ module_secrets() {
     ask CONCOURSE_TEAM "Concourse team" main
     ask CONCOURSE_USER "Concourse user (local user of the team)" admin
     ask_secret CONCOURSE_PASSWORD "Password of $(value CONCOURSE_USER)"
-    ask MAVEN_IMAGE "Docker image for build tasks" "maven:3.9-eclipse-temurin-17"
+    ask MAVEN_IMAGE "Docker image for build tasks" "$(build_image)"
     return
   fi
   ask CONCOURSE_HOST_PORT "Concourse port on the Docker machine" 8083
@@ -28,8 +28,10 @@ module_secrets() {
   ask_secret CONCOURSE_DB_PASSWORD "Concourse database password" "$(random_password)"
   ask_secret CONCOURSE_CLIENT_SECRET "Concourse web client secret" "$(random_password)"
   ask_secret CONCOURSE_TSA_CLIENT_SECRET "Concourse TSA client secret" "$(random_password)"
-  ask MAVEN_IMAGE "Docker image for build tasks" "maven:3.9-eclipse-temurin-17"
+  ask MAVEN_IMAGE "Docker image for build tasks" "$(build_image)"
 }
+
+build_image() { printf 'maven:%s-eclipse-temurin-%s' "$(value MAVEN_VERSION 3.9)" "$(value JAVA_VERSION 21)"; }
 
 yaml_quote() { local v=${1//\'/\'\'}; printf "'%s'" "$v"; }
 
@@ -37,7 +39,7 @@ yaml_quote() { local v=${1//\'/\'\'}; printf "'%s'" "$v"; }
 render_job() {
   local job=$1 flags phase name args key image
   flags="$(maven_flags "" "$CI_SETTINGS") -Dmaven.repo.local=../.m2/repository"
-  image=$(value MAVEN_IMAGE maven:3.9-eclipse-temurin-17)
+  image=$(value MAVEN_IMAGE "$(build_image)")
 
   printf '  - name: %s\n    plan:\n      - get: source\n' "$job"
   if [[ $job == ci ]]; then

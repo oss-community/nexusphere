@@ -3,6 +3,10 @@
 # so the project's pom.xml needs no profiles for them.
 
 module_secrets() {
+  # One Java and Maven version for every orchestrator: the Jenkins image, the
+  # Concourse task image, and what doctor expects on this machine.
+  ask JAVA_VERSION "Java version for builds (21 also builds projects that target 17)" 21
+  ask MAVEN_VERSION "Maven version for builds" 3.9
   ask MAVEN_SETTINGS "Extra settings file of the project, relative to it (empty: none)" ""
   ask MAVEN_PROFILES "Extra project profiles for every stage (empty: none)" ""
   ask MAVEN_ATTACH_SOURCES "Attach sources and javadoc jars when deploying? yes/no" yes
