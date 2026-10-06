@@ -46,9 +46,6 @@ module_env() {
   pipeline_var GITHUB_EMAIL "$(value GITHUB_EMAIL)"
   pipeline_secret GITHUB_TOKEN "$token"
   pipeline_secret GITHUB_PACKAGE_TOKEN "$package_token"
-  # Names used by existing pom.xml/settings.xml files (pine-core-java).
-  pipeline_secret GITHUB_REPOSITORY_ACCESS_TOKEN "$token"
-  pipeline_var GITHUB_ARTIFACTORY_URL "$(value GITHUB_REPOSITORY)"
 }
 
 module_urls() {
