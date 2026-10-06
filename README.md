@@ -6,6 +6,7 @@
 
 * [Project Description](docs/README.md)
 * [End-to-End Tests](core/e2e-tests/README.md)
+* [Local Environment Setup](docs/local-setup.md)
 * [Getting Started](#getting-started)
 * [Dockerized](#dockerized)
 * [Kubernetes](#kubernetes)
@@ -21,6 +22,8 @@
 * [Maven 3](https://maven.apache.org/index.html)
 * [Docker](https://www.docker.com)
 * [Kubernetes](https://kubernetes.io)
+
+Windows, shell and IDE settings are in [Local Environment Setup](docs/local-setup.md).
 
 ### Build
 
@@ -163,7 +166,8 @@ docker volume prune -f
 The project ships [mvn-devops](https://github.com/oss-community/mvn-devops) 1.0.0 in the `mvn-devops` folder. It
 starts the chosen tools in Docker (SonarQube, Nexus, Artifactory, Jenkins or Concourse), configures them and runs the
 pipeline stages against this Maven project. Its own guide is [mvn-devops/README.md](mvn-devops/README.md). Values and
-tokens are kept in `.devops/`, which is never committed.
+tokens are kept in `.devops/`, which is never committed. Shell, IntelliJ IDEA terminal and line-ending settings are in
+[Local Environment Setup](docs/local-setup.md).
 
 ```shell
 mvn-devops/devops.sh doctor
