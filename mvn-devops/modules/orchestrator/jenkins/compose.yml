@@ -1,0 +1,19 @@
+services:
+  jenkins:
+    build:
+      context: ${DEVOPS_HOME}/modules/orchestrator/jenkins/docker
+    image: mvn-devops/jenkins:local
+    restart: unless-stopped
+    env_file:
+      - ${DEVOPS_STATE}/env/pipeline.env
+    environment:
+      JENKINS_ADMIN_USER: ${JENKINS_ADMIN_USER}
+      JENKINS_ADMIN_PASSWORD: ${JENKINS_ADMIN_PASSWORD}
+    ports:
+      - "${JENKINS_HOST_PORT}:8080"
+    volumes:
+      - jenkins-home:/var/jenkins_home
+      - ${DEVOPS_STATE}/generated/jenkins:/var/jenkins_home/casc_configs:ro
+
+volumes:
+  jenkins-home:

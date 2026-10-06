@@ -1,0 +1,40 @@
+services:
+  concourse-db:
+    image: postgres:16
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: concourse
+      POSTGRES_USER: concourse
+      POSTGRES_PASSWORD: ${CONCOURSE_DB_PASSWORD}
+    volumes:
+      - concourse-db:/var/lib/postgresql/data
+
+  concourse:
+    image: concourse/concourse:${CONCOURSE_IMAGE_TAG:-latest}
+    # quickstart runs web and worker in one container and generates its own keys.
+    command: quickstart
+    privileged: true
+    restart: unless-stopped
+    depends_on:
+      - concourse-db
+    ports:
+      - "${CONCOURSE_HOST_PORT}:8080"
+    environment:
+      CONCOURSE_POSTGRES_HOST: concourse-db
+      CONCOURSE_POSTGRES_DATABASE: concourse
+      CONCOURSE_POSTGRES_USER: concourse
+      CONCOURSE_POSTGRES_PASSWORD: ${CONCOURSE_DB_PASSWORD}
+      CONCOURSE_EXTERNAL_URL: http://${DEVOPS_HOST:-localhost}:${CONCOURSE_HOST_PORT}
+      CONCOURSE_ADD_LOCAL_USER: ${CONCOURSE_USER}:${CONCOURSE_PASSWORD}
+      CONCOURSE_MAIN_TEAM_LOCAL_USER: ${CONCOURSE_USER}
+      CONCOURSE_CLUSTER_NAME: ${PROJECT_NAME}
+      CONCOURSE_CLIENT_SECRET: ${CONCOURSE_CLIENT_SECRET}
+      CONCOURSE_TSA_CLIENT_SECRET: ${CONCOURSE_TSA_CLIENT_SECRET}
+      CONCOURSE_WORKER_BAGGAGECLAIM_DRIVER: overlay
+      CONCOURSE_WORKER_RUNTIME: containerd
+      # Task containers resolve compose service names (sonarqube, nexus, ...)
+      # through the worker's DNS.
+      CONCOURSE_WORKER_CONTAINERD_DNS_PROXY_ENABLE: "true"
+
+volumes:
+  concourse-db:

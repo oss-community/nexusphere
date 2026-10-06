@@ -1,0 +1,11 @@
+services:
+  nexus:
+    image: sonatype/nexus3:${NEXUS_IMAGE_TAG:-latest}
+    restart: unless-stopped
+    ports:
+      - "${NEXUS_HOST_PORT}:8081"
+    volumes:
+      - nexus-data:/nexus-data
+
+volumes:
+  nexus-data:
