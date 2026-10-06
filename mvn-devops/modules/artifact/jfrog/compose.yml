@@ -1,0 +1,30 @@
+services:
+  jfrog-db:
+    image: postgres:16
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${JFROG_DB}
+      POSTGRES_USER: ${JFROG_DB_USER}
+      POSTGRES_PASSWORD: ${JFROG_DB_PASSWORD}
+    volumes:
+      - jfrog-db:/var/lib/postgresql/data
+
+  jfrog:
+    image: releases-docker.jfrog.io/jfrog/artifactory-oss:${JFROG_IMAGE_TAG:-latest}
+    restart: unless-stopped
+    depends_on:
+      - jfrog-db
+    environment:
+      JF_SHARED_DATABASE_TYPE: postgresql
+      JF_SHARED_DATABASE_DRIVER: org.postgresql.Driver
+      JF_SHARED_DATABASE_URL: jdbc:postgresql://jfrog-db:5432/${JFROG_DB}
+      JF_SHARED_DATABASE_USERNAME: ${JFROG_DB_USER}
+      JF_SHARED_DATABASE_PASSWORD: ${JFROG_DB_PASSWORD}
+    ports:
+      - "${JFROG_HOST_PORT}:8082"
+    volumes:
+      - jfrog-data:/var/opt/jfrog/artifactory
+
+volumes:
+  jfrog-db:
+  jfrog-data:

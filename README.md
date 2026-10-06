@@ -9,6 +9,7 @@
 * [Getting Started](#getting-started)
 * [Dockerized](#dockerized)
 * [Kubernetes](#kubernetes)
+* [DevOps](#devops)
 * [UI](#ui)
 * [Nexusphere Core](#nexusphere-core)
 
@@ -156,6 +157,30 @@ kubectl delete persistentvolumeclaim pgadmin-pvc -n dev
 docker image rm samanalishiri/nexusphere:latest
 docker volume prune -f
 ```
+
+## DevOps
+
+The project ships [mvn-devops](https://github.com/oss-community/mvn-devops) 1.0.0 in the `mvn-devops` folder. It
+starts the chosen tools in Docker (SonarQube, Nexus, Artifactory, Jenkins or Concourse), configures them and runs the
+pipeline stages against this Maven project. Its own guide is [mvn-devops/README.md](mvn-devops/README.md). Values and
+tokens are kept in `.devops/`, which is never committed.
+
+```shell
+mvn-devops/devops.sh doctor
+mvn-devops/devops.sh setup
+mvn-devops/devops.sh stages
+mvn-devops/devops.sh run
+mvn-devops/devops.sh urls
+```
+
+Windows:
+
+```shell
+mvn-devops\devops.bat setup
+```
+
+Upgrade by deleting the `mvn-devops` folder, extracting the new release zip in its place and renaming the folder to
+`mvn-devops`.
 
 ## UI
 

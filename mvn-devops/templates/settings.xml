@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Global settings that mvn-devops passes to every stage with -gs.
+  Credentials come from environment variables exported by the selected modules;
+  the server ids match the repository ids the deploy stages use
+  (-DaltSnapshotDeploymentRepository=<id>::<url>).  The project needs no
+  distributionManagement, profiles or settings of its own.  A project settings
+  file can still be added with the MAVEN_SETTINGS value (-s).
+-->
+<settings xmlns="http://maven.apache.org/SETTINGS/1.2.0"
+          xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+          xsi:schemaLocation="http://maven.apache.org/SETTINGS/1.2.0 https://maven.apache.org/xsd/settings-1.2.0.xsd">
+    <servers>
+        <server>
+            <id>github</id>
+            <username>${env.GITHUB_USERNAME}</username>
+            <password>${env.GITHUB_PACKAGE_TOKEN}</password>
+        </server>
+        <server>
+            <id>nexus-snapshots</id>
+            <username>${env.NEXUS_ARTIFACTORY_USERNAME}</username>
+            <password>${env.NEXUS_ARTIFACTORY_PASSWORD}</password>
+        </server>
+        <server>
+            <id>nexus-releases</id>
+            <username>${env.NEXUS_ARTIFACTORY_USERNAME}</username>
+            <password>${env.NEXUS_ARTIFACTORY_PASSWORD}</password>
+        </server>
+        <server>
+            <id>jfrog-snapshots</id>
+            <username>${env.JFROG_ARTIFACTORY_USERNAME}</username>
+            <password>${env.JFROG_ARTIFACTORY_ENCRYPTED_PASSWORD}</password>
+        </server>
+        <server>
+            <id>jfrog-releases</id>
+            <username>${env.JFROG_ARTIFACTORY_USERNAME}</username>
+            <password>${env.JFROG_ARTIFACTORY_ENCRYPTED_PASSWORD}</password>
+        </server>
+    </servers>
+</settings>
