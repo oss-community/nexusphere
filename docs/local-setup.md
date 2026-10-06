@@ -70,6 +70,10 @@ echo 'export PATH="/usr/local/bin:/usr/bin:$PATH"' >> ~/.bashrc
 
 Open a new terminal and run `command -v bash` again.
 
+mvn-devops 1.0.0 passes Cygwin paths such as `/cygdrive/c/...` to `docker.exe`, which reads them as `C:\cygdrive\c\...`, so
+`setup` fails with `couldn't find env file`. Run `setup`, `up` and the other Docker commands from Git Bash until the
+framework converts these paths.
+
 ## IntelliJ IDEA Terminal
 
 Settings > Tools > Terminal > Shell path:
