@@ -12,7 +12,7 @@
 * [Evidence Format](#evidence-format)
 * [Verification](#verification)
 * [API](#api)
-* [End-to-End Tests](e2e-tests/README.md)
+* [End-to-End Tests](ledger-e2e-tests/README.md)
 
 ## Purpose
 
@@ -40,11 +40,11 @@ interval. Anyone holding the published public key can check the chain and the ch
 
 ## Modules
 
-| Module              | Responsibility                                                                         |
-|---------------------|----------------------------------------------------------------------------------------|
-| `ledger/chain`      | Canonical JSON, evidence entry, hash chain verifier, Ed25519 keys and checkpoints. No framework dependencies |
-| `ledger/server`     | Spring Boot service: evidence API, PostgreSQL storage, checkpoint scheduler, verification |
-| `ledger/e2e-tests`  | End-to-end tests against the server and PostgreSQL                                     |
+| Module                    | Responsibility                                                                                               |
+|---------------------------|--------------------------------------------------------------------------------------------------------------|
+| `ledger/chain`            | Canonical JSON, evidence entry, hash chain verifier, Ed25519 keys and checkpoints. No framework dependencies |
+| `ledger/server`           | Spring Boot service: evidence API, PostgreSQL storage, checkpoint scheduler, verification                    |
+| `ledger/ledger-e2e-tests` | End-to-end tests against the server and PostgreSQL                                                           |
 
 ## Getting Started
 
@@ -65,7 +65,7 @@ mvn -pl ledger/server spring-boot:stop
 ```
 
 ```shell
-mvn -pl ledger/e2e-tests -am verify
+mvn -pl ledger/ledger-e2e-tests -am verify
 ```
 
 ## Environment Variables

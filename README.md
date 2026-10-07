@@ -5,7 +5,7 @@
 ## <p align="center">Table of Content</p>
 
 * [Project Description](docs/README.md)
-* [End-to-End Tests](core/e2e-tests/README.md)
+* [End-to-End Tests](core/core-e2e-tests/README.md)
 * [Local Environment Setup](docs/local-setup.md)
 * [Getting Started](#getting-started)
 * [Dockerized](#dockerized)
@@ -214,7 +214,7 @@ Password: nexusphere
 
 The vision, concepts, invariants, architecture, use cases, scenarios and roadmap are described in the
 [Project Description](docs/README.md). The end-to-end test scenarios are listed in
-[End-to-End Tests](core/e2e-tests/README.md).
+[End-to-End Tests](core/core-e2e-tests/README.md).
 
 
 <p style="text-align: justify;">
@@ -228,25 +228,25 @@ Maven module with the package `com.nexusphere.<module>`. A module is reached by 
 
 ### Modules
 
-| Module               | Responsibility                                                                                           |
-|----------------------|----------------------------------------------------------------------------------------------------------|
-| `core/shared`        | Identifiers, execution context, correlation ID, domain event envelope, error model                       |
-| `core/network`       | Network lifecycle: PENDING, ACTIVE, SUSPENDED, ARCHIVED                                                  |
-| `core/organization`  | Organizations registered inside a network                                                                |
-| `core/identity`      | Human, service, application, agent and machine identities and credentials                                |
-| `core/membership`    | Memberships, principal context and member listing                                                        |
-| `core/capability`    | Capability types with versioned schemas, capabilities, visibility and withdrawal                         |
-| `core/trust`         | Scoped, directional, revocable trust between networks, organizations and identities                      |
-| `core/federation`    | Federation lifecycle between two sovereign networks with scope and optimistic locking                    |
-| `core/authorization` | Roles, role assignments, central ALLOW/DENY decisions recorded as evidence                               |
-| `core/delegation`    | Constrained, time-bounded, revocable delegations between principals of one network                       |
-| `core/discovery`     | Governed local and federated capability discovery behind a port                                          |
-| `core/agreement`     | Versioned agreements between accountable parties, with acting principal and delegation                   |
-| `core/transaction`   | Transactions under agreements: request, authorize or reject, execute, complete, fail, cancel             |
-| `core/audit`         | Append-only audit events, search and the accountability trail of a transaction                           |
-| `core/integration`   | Adapters: a JSON-RPC 2.0 agent gateway and a task gateway for machines executing authorized transactions |
-| `core/bootstrap`     | Application, persistence wiring, error handling, architecture tests                                      |
-| `core/e2e-tests`     | End-to-end tests against the application and PostgreSQL                                                  |
+| Module                | Responsibility                                                                                           |
+|-----------------------|----------------------------------------------------------------------------------------------------------|
+| `core/shared`         | Identifiers, execution context, correlation ID, domain event envelope, error model                       |
+| `core/network`        | Network lifecycle: PENDING, ACTIVE, SUSPENDED, ARCHIVED                                                  |
+| `core/organization`   | Organizations registered inside a network                                                                |
+| `core/identity`       | Human, service, application, agent and machine identities and credentials                                |
+| `core/membership`     | Memberships, principal context and member listing                                                        |
+| `core/capability`     | Capability types with versioned schemas, capabilities, visibility and withdrawal                         |
+| `core/trust`          | Scoped, directional, revocable trust between networks, organizations and identities                      |
+| `core/federation`     | Federation lifecycle between two sovereign networks with scope and optimistic locking                    |
+| `core/authorization`  | Roles, role assignments, central ALLOW/DENY decisions recorded as evidence                               |
+| `core/delegation`     | Constrained, time-bounded, revocable delegations between principals of one network                       |
+| `core/discovery`      | Governed local and federated capability discovery behind a port                                          |
+| `core/agreement`      | Versioned agreements between accountable parties, with acting principal and delegation                   |
+| `core/transaction`    | Transactions under agreements: request, authorize or reject, execute, complete, fail, cancel             |
+| `core/audit`          | Append-only audit events, search and the accountability trail of a transaction                           |
+| `core/integration`    | Adapters: a JSON-RPC 2.0 agent gateway and a task gateway for machines executing authorized transactions |
+| `core/bootstrap`      | Application, persistence wiring, error handling, architecture tests                                      |
+| `core/core-e2e-tests` | End-to-end tests against the application and PostgreSQL                                                  |
 
 ### Profiles
 

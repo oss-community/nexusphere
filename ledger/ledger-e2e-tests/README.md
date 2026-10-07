@@ -17,13 +17,13 @@
 ### Run Only This Module
 
 ```shell
-mvn -pl ledger/e2e-tests -am verify
+mvn -pl ledger/ledger-e2e-tests -am verify
 ```
 
 ### Run One Test Class
 
 ```shell
-mvn -pl ledger/e2e-tests -am verify -Dit.test=VerificationE2ETest -Dfailsafe.failIfNoSpecifiedTests=false -Dsurefire.failIfNoSpecifiedTests=false
+mvn -pl ledger/ledger-e2e-tests -am verify -Dit.test=VerificationE2ETest -Dfailsafe.failIfNoSpecifiedTests=false -Dsurefire.failIfNoSpecifiedTests=false
 ```
 
 ## Test Harness

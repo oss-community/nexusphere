@@ -30,7 +30,7 @@
         <module>audit</module>
         <module>integration</module>
         <module>bootstrap</module>
-        <module>e2e-tests</module>
+        <module>core-e2e-tests</module>
     </modules>
 
     <properties>
