@@ -51,6 +51,10 @@ answers `initialize`, `tools/list` and `tools/call`, and streams the answer of t
 | `VerificationE2ETest` | The ledger verifies its own chain and checkpoints                            |
 |                       | A checkpoint is verified offline with the published key                      |
 |                       | An outsider rebuilds and verifies the whole chain from the API               |
+| `PackageE2ETest`      | A package discloses only the requested evidence and verifies offline         |
+|                       | A package starts at the last checkpoint before the evidence                  |
+|                       | Any change to a package is detected                                          |
+|                       | Packages are for the operator and need matching evidence                     |
 | `ApiKeyE2ETest`       | The API requires the ledger key                                              |
 |                       | Health is open for probes                                                    |
 | `AgentE2ETest`        | A registered agent gets its own key once                                     |

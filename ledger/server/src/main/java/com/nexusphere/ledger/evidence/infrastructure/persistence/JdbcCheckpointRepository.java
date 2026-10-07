@@ -63,6 +63,18 @@ class JdbcCheckpointRepository implements CheckpointRepository {
                 Map.of("after", afterSequence, "upTo", upToSequence), JdbcCheckpointRepository::row);
     }
 
+    @Override
+    public Optional<SignedCheckpoint> firstAtOrAfter(long sequence) {
+        return jdbc.query(SELECT + " where sequence >= :sequence order by sequence limit 1",
+                Map.of("sequence", sequence), JdbcCheckpointRepository::row).stream().findFirst();
+    }
+
+    @Override
+    public Optional<SignedCheckpoint> lastBefore(long sequence) {
+        return jdbc.query(SELECT + " where sequence < :sequence order by sequence desc limit 1",
+                Map.of("sequence", sequence), JdbcCheckpointRepository::row).stream().findFirst();
+    }
+
     private static SignedCheckpoint row(ResultSet rs, int row) throws SQLException {
         Checkpoint checkpoint = new Checkpoint(rs.getLong("sequence"), rs.getString("head_hash"),
                 rs.getTimestamp("created_at").toInstant(), rs.getString("key_id"));

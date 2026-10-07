@@ -17,6 +17,7 @@
     <modules>
         <module>chain</module>
         <module>server</module>
+        <module>verifier</module>
         <module>ledger-e2e-tests</module>
     </modules>
 
@@ -36,6 +37,7 @@
 
             <dependency><groupId>com.nexusphere.ledger</groupId><artifactId>chain</artifactId><version>${project.version}</version></dependency>
             <dependency><groupId>com.nexusphere.ledger</groupId><artifactId>server</artifactId><version>${project.version}</version></dependency>
+            <dependency><groupId>com.nexusphere.ledger</groupId><artifactId>verifier</artifactId><version>${project.version}</version></dependency>
         </dependencies>
     </dependencyManagement>
 

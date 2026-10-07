@@ -17,18 +17,22 @@ public final class ChainVerifier {
     }
 
     public boolean accept(EvidenceEntry entry) {
+        return accept(entry.link());
+    }
+
+    public boolean accept(EvidenceLink link) {
         if (failure != null) {
             return false;
         }
-        if (entry.sequence() != expectedSequence) {
-            return fail(entry, "expected sequence " + expectedSequence + " but found " + entry.sequence());
+        if (link.sequence() != expectedSequence) {
+            return fail(link, "expected sequence " + expectedSequence + " but found " + link.sequence());
         }
-        if (!expectedPreviousHash.equals(entry.previousHash())) {
-            return fail(entry, "previous hash does not match the hash of sequence " + (expectedSequence - 1));
+        if (!expectedPreviousHash.equals(link.previousHash())) {
+            return fail(link, "previous hash does not match the hash of sequence " + (expectedSequence - 1));
         }
-        String recomputed = entry.computeHash();
-        if (!recomputed.equals(entry.hash())) {
-            return fail(entry, "content does not match its hash");
+        String recomputed = link.computeHash();
+        if (!recomputed.equals(link.hash())) {
+            return fail(link, "content does not match its hash");
         }
         checked++;
         expectedSequence++;
@@ -53,8 +57,8 @@ public final class ChainVerifier {
         return verifier.result();
     }
 
-    private boolean fail(EvidenceEntry entry, String reason) {
-        failure = ChainVerification.broken(checked, expectedSequence - 1, expectedPreviousHash, entry.sequence(),
+    private boolean fail(EvidenceLink link, String reason) {
+        failure = ChainVerification.broken(checked, expectedSequence - 1, expectedPreviousHash, link.sequence(),
                 reason);
         return false;
     }
