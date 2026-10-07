@@ -442,6 +442,13 @@ is a standalone service and does not depend on the core. Its roadmap, configurat
 
 </p>
 
+```shell
+mvn -pl ledger/server,ledger/verifier,ledger/demo-mcp -am package -DskipTests=true
+docker compose --file ledger/compose.yaml --project-name ledger up -d --build
+ledger/demo-mcp/demo.sh
+docker compose --file ledger/compose.yaml --project-name ledger down
+```
+
 ##
 
 **<p align="center">[Top](#nexusphere)</p>**
