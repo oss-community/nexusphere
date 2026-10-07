@@ -39,7 +39,7 @@ interval. Anyone holding the published public key can check the chain and the ch
 | L4    | Evidence package           | Exported evidence package and an offline verifier CLI                          | ✓      |
 | L5    | Release                    | Compose file, demo and release                                                 | ✓      |
 | M1    | Mandate format             | Signed cross-organization mandates with a status list                          | ✓      |
-| M2    | Verifier SDK               | Mandate verification library                                                   |        |
+| M2    | Verifier SDK               | Mandate verification library                                                   | ✓      |
 | M3    | A2A and two-sided evidence | Mandates over A2A with evidence on both sides                                  |        |
 
 ## Modules
@@ -48,8 +48,8 @@ interval. Anyone holding the published public key can check the chain and the ch
 |---------------------------|--------------------------------------------------------------------------------------------------------------|
 | `ledger/chain`            | Canonical JSON, evidence entry, hash chain verifier, Ed25519 keys and checkpoints. No framework dependencies |
 | `ledger/server`           | Spring Boot service: evidence API, PostgreSQL storage, checkpoint scheduler, verification                    |
-| `ledger/mandate`          | Mandate tokens, status lists and JWK keys, shared by the server and by verifiers                             |
-| `ledger/verifier`         | Offline verifier for evidence packages, a command-line tool with no server dependency                        |
+| `ledger/mandate`          | Mandate tokens, status lists, JWK keys and the mandate verifier SDK for other organizations                  |
+| `ledger/verifier`         | Command-line verifier for evidence packages and mandates, with no server dependency                          |
 | `ledger/demo-mcp`         | Demo MCP server with file and mail tools, and the demo script                                                |
 | `ledger/ledger-e2e-tests` | End-to-end tests against the server and PostgreSQL                                                           |
 
@@ -373,6 +373,46 @@ delegation ID and the mandate ID as the target.
 curl -X POST http://localhost:8090/api/v1/mandates -H "Authorization: Bearer {agentApiKey}" -H "Content-Type: application/json" -d '{"grantId":"{grantId}","audience":"https://supplier.example"}'
 curl http://localhost:8090/public/v1/keys
 curl http://localhost:8090/public/v1/mandates/status
+```
+
+### Verifying a Mandate
+
+<p style="text-align: justify;">
+
+An organization that receives a mandate checks it with `MandateVerifier` from `ledger/mandate`, a plain Java library
+with no Spring dependency. It trusts only the issuers it is told to trust, reads their keys from
+`{issuer}/public/v1/keys`, checks the signature, `nbf` and `exp` with a clock skew (60 seconds by default), the
+audience, and, when an action and target are given, that the mandate covers them. It then reads the status list named
+in the mandate, which must be served by the issuer, checks its signature, issuer, address and expiry, and looks up the
+mandate's bit. Keys and status lists are cached (5 minutes by default, and never past the status list's `exp`). When
+the keys or the status list cannot be read the mandate is not valid, so a verifier fails closed. Each problem has a
+code: `MALFORMED`, `WRONG_TYPE`, `UNTRUSTED_ISSUER`, `UNKNOWN_KEY`, `BAD_SIGNATURE`, `NOT_YET_VALID`, `EXPIRED`,
+`WRONG_AUDIENCE`, `NOT_COVERED`, `REVOKED` and `STATUS_UNAVAILABLE`.
+
+</p>
+
+```java
+MandateVerifier verifier = MandateVerifier.builder()
+        .trustIssuer("https://ledger.acme.example")
+        .audience("https://supplier.example")
+        .build();
+MandateCheck check = verifier.verify(token, "a2a/send", "supplier/orders");
+if (!check.valid()) {
+    throw new AccessDeniedException(check.problems().toString());
+}
+String principal = check.claims().principalId();
+```
+
+<p style="text-align: justify;">
+
+The verifier jar checks a mandate from the command line. `--public-key` pins the issuer's key instead of reading it
+from the issuer, and `--skip-status` leaves out the revocation check for offline use. The exit codes are the same as
+for packages.
+
+</p>
+
+```shell
+java -jar ledger/verifier/target/verifier-1.0.0-SNAPSHOT-exec.jar mandate --issuer http://localhost:8090 --audience https://supplier.example --action a2a/send --target supplier/orders mandate.jwt
 ```
 
 ## API

@@ -9,6 +9,7 @@ import java.io.IOException;
 import java.io.PrintStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Arrays;
 
 public final class VerifierCli {
 
@@ -18,7 +19,10 @@ public final class VerifierCli {
 
     private static final String USAGE_TEXT = """
             Usage: nexusphere-ledger-verify [--public-key <base64 X.509 Ed25519 key> | --public-key-file <file>] \
-            [--json] <package.json>""";
+            [--json] <package.json>
+                   nexusphere-ledger-verify mandate --issuer <url> [--issuer <url>] [--audience <aud>] \
+            [--action <action> --target <target>] [--public-key <key> | --public-key-file <file>] [--skip-status] \
+            [--json] <token | token file | ->""";
 
     private static final JsonMapper JSON = JsonMapper.builder().enable(SerializationFeature.INDENT_OUTPUT).build();
 
@@ -30,6 +34,9 @@ public final class VerifierCli {
     }
 
     public static int run(String[] args, PrintStream out, PrintStream err) {
+        if (args.length > 0 && "mandate".equals(args[0])) {
+            return MandateCli.run(Arrays.copyOfRange(args, 1, args.length), out, err, USAGE_TEXT);
+        }
         String publicKey = null;
         boolean json = false;
         Path file = null;

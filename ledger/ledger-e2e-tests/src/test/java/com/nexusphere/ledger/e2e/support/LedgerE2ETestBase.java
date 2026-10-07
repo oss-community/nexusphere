@@ -13,6 +13,9 @@ import org.springframework.test.context.DynamicPropertySource;
 import org.testcontainers.postgresql.PostgreSQLContainer;
 import org.testcontainers.utility.DockerImageName;
 
+import java.io.IOException;
+import java.io.UncheckedIOException;
+import java.net.ServerSocket;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.HashMap;
@@ -35,12 +38,24 @@ public abstract class LedgerE2ETestBase {
     }
 
     protected static final FakeMcpServer MCP = FakeMcpServer.start();
+    protected static final int PORT = freePort();
+    protected static final String ISSUER = "http://localhost:" + PORT;
 
     @DynamicPropertySource
     static void mcpServers(DynamicPropertyRegistry registry) {
         registry.add("ledger.mcp.servers.files.url", MCP::url);
         registry.add("ledger.mcp.servers.files.authorization", () -> FakeMcpServer.AUTHORIZATION);
         registry.add("ledger.mcp.servers.offline.url", () -> "http://localhost:1/mcp");
+        registry.add("server.port", () -> PORT);
+        registry.add("ledger.mandate.issuer", () -> ISSUER);
+    }
+
+    private static int freePort() {
+        try (ServerSocket socket = new ServerSocket(0)) {
+            return socket.getLocalPort();
+        } catch (IOException e) {
+            throw new UncheckedIOException(e);
+        }
     }
 
     @LocalServerPort
