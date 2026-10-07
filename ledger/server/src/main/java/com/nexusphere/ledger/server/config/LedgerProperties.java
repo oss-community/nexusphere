@@ -7,7 +7,8 @@ import java.time.Duration;
 import java.util.Map;
 
 @ConfigurationProperties("ledger")
-public record LedgerProperties(Security security, Signing signing, Checkpoint checkpoint, Mcp mcp) {
+public record LedgerProperties(Security security, Signing signing, Checkpoint checkpoint, Mcp mcp,
+                               Mandate mandate) {
 
     public record Security(String apiKey) {
     }
@@ -16,6 +17,9 @@ public record LedgerProperties(Security security, Signing signing, Checkpoint ch
     }
 
     public record Checkpoint(Duration interval) {
+    }
+
+    public record Mandate(String issuer, Duration statusListTtl) {
     }
 
     public record Mcp(Duration timeout, Map<String, Server> servers) {

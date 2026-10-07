@@ -21,6 +21,9 @@ ledger:
     interval: ${LEDGER_CHECKPOINT_INTERVAL:1m}
   mcp:
     timeout: ${LEDGER_MCP_TIMEOUT:60s}
+  mandate:
+    issuer: ${LEDGER_MANDATE_ISSUER:http://localhost:${LEDGER_PORT:8090}}
+    status-list-ttl: ${LEDGER_MANDATE_STATUS_LIST_TTL:5m}
 management:
   endpoints:
     web:

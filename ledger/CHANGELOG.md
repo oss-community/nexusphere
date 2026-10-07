@@ -1,5 +1,10 @@
 # <p align="center">Nexusphere Ledger Changelog</p>
 
+## Unreleased
+
+* Signed mandates (EdDSA JWS) issued from grants, a signed revocation status list and the ledger keys as a JWK set
+  on public endpoints, with issue and revoke recorded as evidence (M1)
+
 ## 0.1.0
 
 First release of the Nexusphere Ledger, a self-hosted evidence ledger for AI agent actions.

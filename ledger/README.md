@@ -14,6 +14,7 @@
 * [Evidence Packages](#evidence-packages)
 * [Agents, Grants and Decisions](#agents-grants-and-decisions)
 * [MCP Gateway](#mcp-gateway)
+* [Mandates](#mandates)
 * [API](#api)
 * [End-to-End Tests](ledger-e2e-tests/README.md)
 
@@ -37,7 +38,7 @@ interval. Anyone holding the published public key can check the chain and the ch
 | L3    | MCP gateway                | A gateway in front of MCP servers that decides and records every tool call     | ✓      |
 | L4    | Evidence package           | Exported evidence package and an offline verifier CLI                          | ✓      |
 | L5    | Release                    | Compose file, demo and release                                                 | ✓      |
-| M1    | Mandate format             | Signed cross-organization mandates with a status list                          |        |
+| M1    | Mandate format             | Signed cross-organization mandates with a status list                          | ✓      |
 | M2    | Verifier SDK               | Mandate verification library                                                   |        |
 | M3    | A2A and two-sided evidence | Mandates over A2A with evidence on both sides                                  |        |
 
@@ -47,6 +48,7 @@ interval. Anyone holding the published public key can check the chain and the ch
 |---------------------------|--------------------------------------------------------------------------------------------------------------|
 | `ledger/chain`            | Canonical JSON, evidence entry, hash chain verifier, Ed25519 keys and checkpoints. No framework dependencies |
 | `ledger/server`           | Spring Boot service: evidence API, PostgreSQL storage, checkpoint scheduler, verification                    |
+| `ledger/mandate`          | Mandate tokens, status lists and JWK keys, shared by the server and by verifiers                             |
 | `ledger/verifier`         | Offline verifier for evidence packages, a command-line tool with no server dependency                        |
 | `ledger/demo-mcp`         | Demo MCP server with file and mail tools, and the demo script                                                |
 | `ledger/ledger-e2e-tests` | End-to-end tests against the server and PostgreSQL                                                           |
@@ -146,6 +148,8 @@ LEDGER_CHECKPOINT_INTERVAL: 1m
 LEDGER_MCP_TIMEOUT: 60s
 LEDGER_MCP_SERVERS_{NAME}_URL:
 LEDGER_MCP_SERVERS_{NAME}_AUTHORIZATION:
+LEDGER_MANDATE_ISSUER: http://localhost:8090
+LEDGER_MANDATE_STATUS_LIST_TTL: 5m
 ```
 
 <p style="text-align: justify;">
@@ -325,6 +329,52 @@ stream (`GET`) are not supported.
 curl -X POST http://localhost:8090/mcp/files -H "Authorization: Bearer {agentApiKey}" -H "X-Ledger-Principal: alice" -H "Content-Type: application/json" -d '{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"read_file","arguments":{"path":"/tmp/report.txt"}}}'
 ```
 
+## Mandates
+
+<p style="text-align: justify;">
+
+A grant lives inside one ledger. When an agent acts for its principal at another organization, it carries a mandate:
+a signed, self-contained copy of the grant that the other side can check without calling back. A mandate is a compact
+JWS signed with the ledger's Ed25519 key (`alg` `EdDSA`, `typ` `nexusphere-mandate+jwt`, `kid` the ledger key ID).
+The operator, or the agent the grant was given to, asks for one with `POST /api/v1/mandates` and the grant ID, an
+optional `audience` (the organization that will receive it) and an optional `expiresAt` that may not be later than the
+grant's own expiry. Only an active or not-yet-valid grant can be turned into a mandate.
+
+</p>
+
+| Claim                | Meaning                                                                     |
+|----------------------|-----------------------------------------------------------------------------|
+| `iss`                | The ledger, `LEDGER_MANDATE_ISSUER`                                         |
+| `sub`                | The agent ID                                                                |
+| `aud`                | The receiving organization, when given                                      |
+| `jti`                | The mandate ID                                                              |
+| `iat`, `nbf`, `exp`  | Issued, valid from and expiry, in epoch seconds                             |
+| `mandate.principal`  | The person or organization the agent acts for                               |
+| `mandate.actions`    | Allowed actions, exact or with a trailing `*`                               |
+| `mandate.targets`    | Allowed targets, exact or with a trailing `*`                               |
+| `mandate.maxUses`    | The grant's use limit, when it has one                                      |
+| `mandate.grant`      | The grant ID                                                                |
+| `mandate.termsHash`  | The SHA-256 of the grant terms, the same hash the evidence of the grant has |
+| `status.status_list` | `idx` and `uri` of the mandate's bit in the status list                     |
+
+<p style="text-align: justify;">
+
+Revocation follows the IETF Token Status List draft. `GET /public/v1/mandates/status` returns a signed
+`statuslist+jwt` with one bit per mandate (`1` is revoked), deflated with zlib and base64url encoded in
+`status_list.lst`, and an `exp` of `LEDGER_MANDATE_STATUS_LIST_TTL` after it was made. Revoking a mandate sets its bit,
+and revoking a grant revokes every mandate issued from it. The keys are published as a JWK set at
+`GET /public/v1/keys`. Both public endpoints need no API key. Issuing and revoking a mandate are recorded as evidence
+(`mandate/issue` with the SHA-256 of the token as the input hash, and `mandate/revoke`), with the grant as the
+delegation ID and the mandate ID as the target.
+
+</p>
+
+```shell
+curl -X POST http://localhost:8090/api/v1/mandates -H "Authorization: Bearer {agentApiKey}" -H "Content-Type: application/json" -d '{"grantId":"{grantId}","audience":"https://supplier.example"}'
+curl http://localhost:8090/public/v1/keys
+curl http://localhost:8090/public/v1/mandates/status
+```
+
 ## API
 
 All `/api/**` endpoints require `Authorization: Bearer {LEDGER_API_KEY}` or an agent API key. Operator-only endpoints
@@ -354,6 +404,12 @@ answer `403 FORBIDDEN` to agents.
 | POST   | `/api/v1/decisions`                | Decide an action for an agent and record it; returns `201`                                         |
 | GET    | `/api/v1/decisions/{id}`           | Get a decision and its outcome                                                                     |
 | POST   | `/api/v1/decisions/{id}/outcome`   | Report `SUCCEEDED` or `FAILED` once for an allowed decision                                        |
+| POST   | `/api/v1/mandates`                 | Issue a signed mandate from a grant; returns `201`                                                 |
+| GET    | `/api/v1/mandates`                 | List the mandates of a `grantId`                                                                   |
+| GET    | `/api/v1/mandates/{id}`            | Get a mandate, its token and status                                                                |
+| POST   | `/api/v1/mandates/{id}/revoke`     | Revoke a mandate with an optional `reason` (operator)                                              |
+| GET    | `/public/v1/keys`                  | Public signing keys as a JWK set, no API key                                                       |
+| GET    | `/public/v1/mandates/status`       | Signed mandate status list, no API key                                                             |
 | POST   | `/mcp/{server}`                    | MCP gateway: decide, forward and record a `tools/call`; forward other messages                     |
 | DELETE | `/mcp/{server}`                    | Close an MCP session on the server                                                                 |
 | GET    | `/actuator/health`                 | Health, open for probes                                                                            |
