@@ -37,12 +37,15 @@ public class GrantService {
     private final GrantRepository grants;
     private final AgentService agents;
     private final EvidenceService evidence;
+    private final MandateService mandates;
     private final Clock clock;
 
-    GrantService(GrantRepository grants, AgentService agents, EvidenceService evidence, Clock clock) {
+    GrantService(GrantRepository grants, AgentService agents, EvidenceService evidence, MandateService mandates,
+                 Clock clock) {
         this.grants = grants;
         this.agents = agents;
         this.evidence = evidence;
+        this.mandates = mandates;
         this.clock = clock;
     }
 
@@ -78,6 +81,7 @@ public class GrantService {
         }
         grants.revoke(id, clock.instant(), reason);
         record(grant.terms(), "grant/revoke", reason, Map.of());
+        mandates.revokeForGrant(id, reason == null ? "The grant was revoked." : reason);
         return get(id);
     }
 

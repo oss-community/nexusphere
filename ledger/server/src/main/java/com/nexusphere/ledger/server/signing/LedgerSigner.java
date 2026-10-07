@@ -3,6 +3,9 @@ package com.nexusphere.ledger.server.signing;
 import com.nexusphere.ledger.chain.Checkpoint;
 import com.nexusphere.ledger.chain.SignedCheckpoint;
 import com.nexusphere.ledger.chain.SigningKeys;
+import com.nexusphere.ledger.mandate.MandateClaims;
+import com.nexusphere.ledger.mandate.Mandates;
+import com.nexusphere.ledger.mandate.StatusList;
 import com.nexusphere.ledger.server.config.LedgerProperties;
 import org.springframework.stereotype.Component;
 
@@ -30,6 +33,14 @@ public class LedgerSigner {
     public SignedCheckpoint sign(long sequence, String headHash, Instant createdAt) {
         Checkpoint checkpoint = new Checkpoint(sequence, headHash, createdAt, publicKey.keyId());
         return new SignedCheckpoint(checkpoint, SigningKeys.sign(privateKey, checkpoint.signedBytes()));
+    }
+
+    public String signMandate(MandateClaims claims) {
+        return Mandates.issue(claims, publicKey.keyId(), privateKey);
+    }
+
+    public String signStatusList(StatusList statusList) {
+        return statusList.sign(publicKey.keyId(), privateKey);
     }
 
     public SigningKeys.PublicKeyInfo publicKey() {
