@@ -37,6 +37,10 @@ public record MandateClaims(
         return actions.stream().anyMatch(p -> matches(p, action)) && targets.stream().anyMatch(p -> matches(p, target));
     }
 
+    public boolean coversAction(String action) {
+        return actions.stream().anyMatch(p -> matches(p, action));
+    }
+
     static boolean matches(String pattern, String value) {
         if (value == null) {
             return "*".equals(pattern);

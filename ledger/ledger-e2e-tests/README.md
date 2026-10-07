@@ -35,60 +35,69 @@ and `dev` profiles against a PostgreSQL 18 container. `LedgerClient` talks to it
 outside caller, and rebuilds evidence entries from the JSON so they can be checked with `ledger/chain` without trusting
 the server. `FakeMcpServer` is a small MCP server on a random port, configured as the `files` server of the gateway; it
 answers `initialize`, `tools/list` and `tools/call`, and streams the answer of tools ending in `_sse`.
+`A2aE2ETest` starts a second ledger, `SupplierLedger`, with its own PostgreSQL container and signing key, which trusts
+the first one and forwards to `FakeA2aAgent`, so mandates, request proofs and receipts cross between two ledgers over
+HTTP.
 
 </p>
 
 ## Test Classes
 
-| Class                    | Scenario                                                                   |
-|--------------------------|----------------------------------------------------------------------------|
-| `EvidenceE2ETest`        | Recorded evidence is sealed and linked to the previous entry               |
-|                          | Evidence is read back exactly as recorded, with microsecond timestamps     |
-|                          | Evidence is listed per agent and per principal in pages                    |
-|                          | A denied action is recorded with its reason                                |
-|                          | Invalid evidence is rejected with field errors                             |
-|                          | Malformed requests, unknown evidence and bad paging are reported clearly   |
-| `VerificationE2ETest`    | The ledger verifies its own chain and checkpoints                          |
-|                          | A checkpoint is verified offline with the published key                    |
-|                          | An outsider rebuilds and verifies the whole chain from the API             |
-| `PackageE2ETest`         | A package discloses only the requested evidence and verifies offline       |
-|                          | A package starts at the last checkpoint before the evidence                |
-|                          | Any change to a package is detected                                        |
-|                          | Packages are for the operator and need matching evidence                   |
-| `ApiKeyE2ETest`          | The API requires the ledger key                                            |
-|                          | Health is open for probes                                                  |
-| `AgentE2ETest`           | A registered agent gets its own key once                                   |
-|                          | Registering the same agent twice is a conflict                             |
-|                          | A disabled agent or an old key is rejected                                 |
-|                          | Agent lifecycle is recorded as evidence                                    |
-|                          | An agent cannot do what only the operator may                              |
-|                          | An agent records and reads only its own evidence                           |
-| `GrantE2ETest`           | A grant is created and its terms can be recomputed from the evidence       |
-|                          | A revoked grant is recorded and shown as revoked                           |
-|                          | Invalid grants are rejected with field errors                              |
-|                          | Grants need an active agent                                                |
-|                          | An agent sees only its own grants                                          |
-| `DecisionE2ETest`        | A covered action is allowed and its outcome is recorded                    |
-|                          | Every denial is recorded with its reason                                   |
-|                          | The operator can ask for a decision on behalf of an agent                  |
-|                          | Outcomes are reported once by the deciding agent for allowed actions only  |
-|                          | An agent cannot ask for another agent's decision and the chain stays valid |
-| `McpGatewayE2ETest`      | An allowed tool call is forwarded and recorded with its outcome            |
-|                          | A denied tool call never reaches the server                                |
-|                          | Tool errors are recorded as failed outcomes                                |
-|                          | Streamed responses are returned as JSON                                    |
-|                          | Other messages pass through with the session                               |
-|                          | Bad requests are answered as JSON-RPC errors                               |
-|                          | An unreachable server is recorded as a failed call                         |
-| `MandateE2ETest`         | An agent obtains a mandate that anyone can verify with the published key   |
-|                          | Revoking a mandate sets its bit in the signed status list                  |
-|                          | Revoking the grant revokes every mandate issued from it                    |
-|                          | An agent cannot obtain or revoke mandates it does not own                  |
-|                          | A mandate cannot outlive its grant                                         |
-|                          | The keys and status list are public and signed                             |
-| `MandateVerifierE2ETest` | Another organization verifies a mandate from the public endpoints only     |
-|                          | The verifier sees a revocation as soon as the status list is refetched     |
-|                          | The verifier rejects what the mandate does not allow                       |
+| Class                    | Scenario                                                                      |
+|--------------------------|-------------------------------------------------------------------------------|
+| `EvidenceE2ETest`        | Recorded evidence is sealed and linked to the previous entry                  |
+|                          | Evidence is read back exactly as recorded, with microsecond timestamps        |
+|                          | Evidence is listed per agent and per principal in pages                       |
+|                          | A denied action is recorded with its reason                                   |
+|                          | Invalid evidence is rejected with field errors                                |
+|                          | Malformed requests, unknown evidence and bad paging are reported clearly      |
+| `VerificationE2ETest`    | The ledger verifies its own chain and checkpoints                             |
+|                          | A checkpoint is verified offline with the published key                       |
+|                          | An outsider rebuilds and verifies the whole chain from the API                |
+| `PackageE2ETest`         | A package discloses only the requested evidence and verifies offline          |
+|                          | A package starts at the last checkpoint before the evidence                   |
+|                          | Any change to a package is detected                                           |
+|                          | Packages are for the operator and need matching evidence                      |
+| `ApiKeyE2ETest`          | The API requires the ledger key                                               |
+|                          | Health is open for probes                                                     |
+| `AgentE2ETest`           | A registered agent gets its own key once                                      |
+|                          | Registering the same agent twice is a conflict                                |
+|                          | A disabled agent or an old key is rejected                                    |
+|                          | Agent lifecycle is recorded as evidence                                       |
+|                          | An agent cannot do what only the operator may                                 |
+|                          | An agent records and reads only its own evidence                              |
+| `GrantE2ETest`           | A grant is created and its terms can be recomputed from the evidence          |
+|                          | A revoked grant is recorded and shown as revoked                              |
+|                          | Invalid grants are rejected with field errors                                 |
+|                          | Grants need an active agent                                                   |
+|                          | An agent sees only its own grants                                             |
+| `DecisionE2ETest`        | A covered action is allowed and its outcome is recorded                       |
+|                          | Every denial is recorded with its reason                                      |
+|                          | The operator can ask for a decision on behalf of an agent                     |
+|                          | Outcomes are reported once by the deciding agent for allowed actions only     |
+|                          | An agent cannot ask for another agent's decision and the chain stays valid    |
+| `McpGatewayE2ETest`      | An allowed tool call is forwarded and recorded with its outcome               |
+|                          | A denied tool call never reaches the server                                   |
+|                          | Tool errors are recorded as failed outcomes                                   |
+|                          | Streamed responses are returned as JSON                                       |
+|                          | Other messages pass through with the session                                  |
+|                          | Bad requests are answered as JSON-RPC errors                                  |
+|                          | An unreachable server is recorded as a failed call                            |
+| `MandateE2ETest`         | An agent obtains a mandate that anyone can verify with the published key      |
+|                          | Revoking a mandate sets its bit in the signed status list                     |
+|                          | Revoking the grant revokes every mandate issued from it                       |
+|                          | An agent cannot obtain or revoke mandates it does not own                     |
+|                          | A mandate cannot outlive its grant                                            |
+|                          | The keys and status list are public and signed                                |
+| `MandateVerifierE2ETest` | Another organization verifies a mandate from the public endpoints only        |
+|                          | The verifier sees a revocation as soon as the status list is refetched        |
+|                          | The verifier rejects what the mandate does not allow                          |
+| `A2aE2ETest`             | An allowed message carries a mandate and both ledgers hold matching evidence  |
+|                          | A denied message never leaves the ledger                                      |
+|                          | A failed task is recorded as failed on both sides with a receipt              |
+|                          | The receiver rejects a revoked mandate and records the denial                 |
+|                          | Replayed, tampered or forged requests are rejected without reaching the agent |
+|                          | An unreachable peer or streaming is answered without delivery                 |
 
 ##
 

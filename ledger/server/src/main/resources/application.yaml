@@ -24,6 +24,11 @@ ledger:
   mandate:
     issuer: ${LEDGER_MANDATE_ISSUER:http://localhost:${LEDGER_PORT:8090}}
     status-list-ttl: ${LEDGER_MANDATE_STATUS_LIST_TTL:5m}
+  a2a:
+    timeout: ${LEDGER_A2A_TIMEOUT:60s}
+    request-max-age: ${LEDGER_A2A_REQUEST_MAX_AGE:5m}
+    status-list-cache: ${LEDGER_A2A_STATUS_LIST_CACHE:30s}
+    trusted-issuers: ${LEDGER_A2A_TRUSTED_ISSUERS:}
 management:
   endpoints:
     web:

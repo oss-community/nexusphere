@@ -6,6 +6,8 @@
   on public endpoints, with issue and revoke recorded as evidence (M1)
 * `MandateVerifier` SDK that checks a mandate's issuer, key, signature, time, audience, coverage and revocation, and
   the `mandate` command of the verifier jar (M2)
+* A2A gateway between two ledgers: outbound requests are decided and carry a mandate and a signed request proof,
+  inbound requests are verified, recorded and answered with a signed receipt, so both sides hold matching evidence (M3)
 
 ## 0.1.0
 

@@ -9,6 +9,7 @@ import java.nio.charset.StandardCharsets;
 import java.security.PrivateKey;
 import java.security.PublicKey;
 import java.util.Base64;
+import java.util.LinkedHashMap;
 import java.util.Map;
 
 public final class Jws {
@@ -58,6 +59,31 @@ public final class Jws {
         } catch (JacksonException e) {
             throw new IllegalArgumentException("The token is not valid JSON");
         }
+    }
+
+    public static Parsed verified(String token, String type, String issuer, KeyResolver keys) {
+        Parsed parsed = parse(token);
+        if (!type.equals(parsed.header().path("typ").asString(null))
+                || !ALGORITHM.equals(parsed.header().path("alg").asString(null))) {
+            throw new IllegalArgumentException("The token is not an EdDSA " + type);
+        }
+        if (!issuer.equals(parsed.payload().path("iss").asString(null))) {
+            throw new IllegalArgumentException("The token was not issued by " + issuer);
+        }
+        PublicKey key = keys.resolve(issuer, parsed.header().path("kid").asString(""))
+                .orElseThrow(() -> new IllegalArgumentException("The token is signed with an unknown key"));
+        if (!parsed.verify(key)) {
+            throw new IllegalArgumentException("The token signature does not match the issuer's key");
+        }
+        return parsed;
+    }
+
+    public static String sign(String type, String keyId, Map<String, ?> payload, PrivateKey key) {
+        Map<String, Object> header = new LinkedHashMap<>();
+        header.put("alg", ALGORITHM);
+        header.put("typ", type);
+        header.put("kid", keyId);
+        return sign(header, payload, key);
     }
 
     static String encode(byte[] bytes) {

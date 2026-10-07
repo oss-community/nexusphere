@@ -23,6 +23,8 @@ public interface MandateRepository {
 
     List<Mandate> findByGrant(UUID grantId);
 
+    Optional<Mandate> findUsable(UUID grantId, String audience, Instant validUntil);
+
     void revoke(UUID id, Instant revokedAt, String reason);
 
     BitSet revokedIndexes();
