@@ -19,6 +19,10 @@
             <artifactId>chain</artifactId>
         </dependency>
         <dependency>
+            <groupId>com.nexusphere.ledger</groupId>
+            <artifactId>mandate</artifactId>
+        </dependency>
+        <dependency>
             <groupId>tools.jackson.core</groupId>
             <artifactId>jackson-databind</artifactId>
         </dependency>
