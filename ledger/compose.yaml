@@ -1,0 +1,58 @@
+name: ledger
+services:
+  ledger-postgresql:
+    image: postgres:18-alpine
+    container_name: ledger-postgresql
+    hostname: ledger-postgresql
+    restart: always
+    ports:
+      - "5433:5432"
+    environment:
+      POSTGRES_USER: ledger
+      POSTGRES_PASSWORD: ledger
+      POSTGRES_DB: ledger
+    volumes:
+      - "ledger-postgresql-data:/var/lib/postgresql"
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U ledger -d ledger" ]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+  demo-mcp:
+    image: samanalishiri/nexusphere-ledger-demo-mcp:latest
+    build:
+      context: ./demo-mcp
+      dockerfile: Dockerfile
+    container_name: demo-mcp
+    hostname: demo-mcp
+    restart: always
+    ports:
+      - "8091:8091"
+  ledger:
+    image: samanalishiri/nexusphere-ledger:latest
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: ledger
+    hostname: ledger
+    restart: always
+    ports:
+      - "8090:8090"
+    environment:
+      LEDGER_HOST: "0.0.0.0"
+      LEDGER_PORT: "8090"
+      LEDGER_PROFILES: postgresql,dev
+      LEDGER_DATABASE_HOST: ledger-postgresql
+      LEDGER_DATABASE_PORT: "5432"
+      LEDGER_DATABASE_DB: ledger
+      LEDGER_DATABASE_USERNAME: ledger
+      LEDGER_DATABASE_PASSWORD: ledger
+      LEDGER_CHECKPOINT_INTERVAL: 30s
+      LEDGER_MCP_SERVERS_DEMO_URL: http://demo-mcp:8091/mcp
+    depends_on:
+      ledger-postgresql:
+        condition: service_healthy
+      demo-mcp:
+        condition: service_started
+volumes:
+  ledger-postgresql-data:

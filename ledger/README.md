@@ -36,7 +36,7 @@ interval. Anyone holding the published public key can check the chain and the ch
 | L2    | Grants and decisions       | Grants from a principal to an agent, ALLOW/DENY decisions recorded as evidence | ✓      |
 | L3    | MCP gateway                | A gateway in front of MCP servers that decides and records every tool call     | ✓      |
 | L4    | Evidence package           | Exported evidence package and an offline verifier CLI                          | ✓      |
-| L5    | Release                    | Compose file, demo and release                                                 |        |
+| L5    | Release                    | Compose file, demo and release                                                 | ✓      |
 | M1    | Mandate format             | Signed cross-organization mandates with a status list                          |        |
 | M2    | Verifier SDK               | Mandate verification library                                                   |        |
 | M3    | A2A and two-sided evidence | Mandates over A2A with evidence on both sides                                  |        |
@@ -48,9 +48,53 @@ interval. Anyone holding the published public key can check the chain and the ch
 | `ledger/chain`            | Canonical JSON, evidence entry, hash chain verifier, Ed25519 keys and checkpoints. No framework dependencies |
 | `ledger/server`           | Spring Boot service: evidence API, PostgreSQL storage, checkpoint scheduler, verification                    |
 | `ledger/verifier`         | Offline verifier for evidence packages, a command-line tool with no server dependency                        |
+| `ledger/demo-mcp`         | Demo MCP server with file and mail tools, and the demo script                                                |
 | `ledger/ledger-e2e-tests` | End-to-end tests against the server and PostgreSQL                                                           |
 
 ## Getting Started
+
+### Prerequisites
+
+* [Java 21](https://www.oracle.com/java/technologies/downloads)
+* [Maven 3](https://maven.apache.org/index.html)
+* [Docker](https://www.docker.com)
+* [jq](https://jqlang.org) for the demo script
+
+### Dockerized
+
+```shell
+mvn -pl ledger/server,ledger/verifier,ledger/demo-mcp -am package -DskipTests=true
+docker compose --file ledger/compose.yaml --project-name ledger up -d --build
+curl -X GET http://localhost:8090/actuator/health
+```
+
+| Service             | URL                       | Description                                      |
+|---------------------|---------------------------|--------------------------------------------------|
+| `ledger`            | http://localhost:8090     | The ledger with the `dev` profile                |
+| `demo-mcp`          | http://localhost:8091/mcp | Demo MCP server, reached through `/mcp/demo`     |
+| `ledger-postgresql` | localhost:5433            | PostgreSQL, user, password and database `ledger` |
+
+### Demo
+
+```shell
+ledger/demo-mcp/demo.sh
+```
+
+<p style="text-align: justify;">
+
+The script registers an agent, lets `alice` grant it `read_file` and `send_email` on the demo server, calls both
+through the gateway, has `delete_file` denied, lists the recorded evidence, exports an evidence package, verifies it
+offline with the ledger's published key and shows that a changed entry fails verification. `LEDGER_URL`,
+`LEDGER_API_KEY`, `VERIFIER_JAR` and `WORK_DIR` override its defaults.
+
+</p>
+
+```shell
+docker compose --file ledger/compose.yaml --project-name ledger down
+docker volume prune -f
+```
+
+### Run
 
 ```shell
 docker compose --file compose.yaml --project-name dev up -d postgresql
@@ -68,9 +112,21 @@ curl -X GET http://localhost:8090/api/v1/verification -H "Authorization: Bearer 
 mvn -pl ledger/server spring-boot:stop
 ```
 
+### Verify
+
 ```shell
 mvn -pl ledger/ledger-e2e-tests -am verify
 ```
+
+### Release
+
+<p style="text-align: justify;">
+
+Ledger releases are tagged `ledger-v{version}` and described in the [Changelog](CHANGELOG.md). The release artifacts
+are the server jar (`ledger/server/target/server-*-exec.jar`), the verifier jar
+(`ledger/verifier/target/verifier-*-exec.jar`) and the two Docker images built by the compose file.
+
+</p>
 
 ## Environment Variables
 

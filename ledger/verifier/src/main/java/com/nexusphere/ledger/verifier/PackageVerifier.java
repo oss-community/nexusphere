@@ -75,8 +75,8 @@ public final class PackageVerifier {
         ChainVerification result = chain.result();
         if (!result.valid()) {
             problems.add("sequence " + result.failedSequence() + ": " + result.failure());
-        } else if (result.lastSequence() != checkpoint.checkpoint().sequence()
-                || !result.lastHash().equals(checkpoint.checkpoint().headHash())) {
+        } else if (problems.isEmpty() && (result.lastSequence() != checkpoint.checkpoint().sequence()
+                || !result.lastHash().equals(checkpoint.checkpoint().headHash()))) {
             problems.add("the chain ends at sequence " + result.lastSequence()
                     + " and does not reach the signed head of checkpoint " + checkpoint.checkpoint().sequence());
         }
