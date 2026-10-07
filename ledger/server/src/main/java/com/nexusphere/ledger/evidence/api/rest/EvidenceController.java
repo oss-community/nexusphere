@@ -1,0 +1,117 @@
+package com.nexusphere.ledger.evidence.api.rest;
+
+import com.nexusphere.ledger.chain.EvidenceEntry;
+import com.nexusphere.ledger.evidence.application.EvidenceService;
+import com.nexusphere.ledger.evidence.domain.model.Decision;
+import com.nexusphere.ledger.evidence.domain.model.EvidenceQuery;
+import com.nexusphere.ledger.evidence.domain.model.EvidenceSubmission;
+import com.nexusphere.ledger.evidence.domain.model.LedgerHead;
+import com.nexusphere.ledger.evidence.domain.model.Outcome;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
+
+import java.net.URI;
+import java.time.Instant;
+import java.util.List;
+import java.util.Map;
+import java.util.UUID;
+
+@RestController
+@RequestMapping("/api/v1")
+class EvidenceController {
+
+    record EvidenceRequest(
+            Instant occurredAt,
+            String agentId,
+            String principalId,
+            String action,
+            String target,
+            Decision decision,
+            String reason,
+            String delegationId,
+            String inputHash,
+            String outputHash,
+            Outcome outcome,
+            String correlationId,
+            Map<String, String> attributes) {
+
+        EvidenceSubmission toSubmission() {
+            return new EvidenceSubmission(occurredAt, agentId, principalId, action, target, decision, reason,
+                    delegationId, inputHash, outputHash, outcome, correlationId, attributes);
+        }
+    }
+
+    record EvidenceResponse(
+            String format,
+            UUID id,
+            long sequence,
+            Instant occurredAt,
+            Instant recordedAt,
+            String agentId,
+            String principalId,
+            String action,
+            String target,
+            String decision,
+            String reason,
+            String delegationId,
+            String inputHash,
+            String outputHash,
+            String outcome,
+            String correlationId,
+            Map<String, String> attributes,
+            String previousHash,
+            String hash) {
+
+        static EvidenceResponse of(EvidenceEntry e) {
+            return new EvidenceResponse(EvidenceEntry.FORMAT, e.id(), e.sequence(), e.occurredAt(), e.recordedAt(),
+                    e.agentId(), e.principalId(), e.action(), e.target(), e.decision(), e.reason(), e.delegationId(),
+                    e.inputHash(), e.outputHash(), e.outcome(), e.correlationId(), e.attributes(), e.previousHash(),
+                    e.hash());
+        }
+    }
+
+    record EvidencePage(List<EvidenceResponse> items, Long nextAfter) {
+    }
+
+    record HeadResponse(long sequence, String hash) {
+    }
+
+    private final EvidenceService evidence;
+
+    EvidenceController(EvidenceService evidence) {
+        this.evidence = evidence;
+    }
+
+    @PostMapping("/evidence")
+    ResponseEntity<EvidenceResponse> record(@RequestBody EvidenceRequest request) {
+        EvidenceEntry entry = evidence.record(request.toSubmission());
+        return ResponseEntity.created(URI.create("/api/v1/evidence/" + entry.id())).body(EvidenceResponse.of(entry));
+    }
+
+    @GetMapping("/evidence/{id}")
+    EvidenceResponse get(@PathVariable UUID id) {
+        return EvidenceResponse.of(evidence.get(id));
+    }
+
+    @GetMapping("/evidence")
+    EvidencePage find(@RequestParam(required = false) String agentId,
+                      @RequestParam(required = false) String principalId,
+                      @RequestParam(defaultValue = "0") long after,
+                      @RequestParam(defaultValue = "100") int limit) {
+        List<EvidenceEntry> entries = evidence.find(new EvidenceQuery(agentId, principalId, after, limit));
+        Long nextAfter = entries.size() == limit ? entries.getLast().sequence() : null;
+        return new EvidencePage(entries.stream().map(EvidenceResponse::of).toList(), nextAfter);
+    }
+
+    @GetMapping("/ledger/head")
+    HeadResponse head() {
+        LedgerHead head = evidence.head();
+        return new HeadResponse(head.sequence(), head.hash());
+    }
+}

@@ -13,6 +13,7 @@
 * [DevOps](#devops)
 * [UI](#ui)
 * [Nexusphere Core](#nexusphere-core)
+* [Nexusphere Ledger](ledger/README.md)
 
 ## Getting Started
 
@@ -429,6 +430,17 @@ Every response carries an `X-Correlation-Id` header. Errors use one model:
   "correlationId": "4f0b…"
 }
 ```
+
+## Nexusphere Ledger
+
+<p style="text-align: justify;">
+
+`ledger/` is a separate product built on the same stack: a self-hosted, tamper-evident evidence ledger for the actions
+of AI agents, with a hash chain, append-only storage and Ed25519-signed checkpoints that anyone can verify offline. It
+is a standalone service and does not depend on the core. Its roadmap, configuration and API are in
+[Nexusphere Ledger](ledger/README.md).
+
+</p>
 
 ##
 

@@ -1,0 +1,12 @@
+spring:
+  datasource:
+    username: ${LEDGER_DATABASE_USERNAME:ledger}
+    password: ${LEDGER_DATABASE_PASSWORD:ledger}
+    url: jdbc:postgresql://${LEDGER_DATABASE_HOST:localhost}:${LEDGER_DATABASE_PORT:5432}/${LEDGER_DATABASE_DB:ledger}
+    driver-class-name: org.postgresql.Driver
+server:
+  address: ${LEDGER_HOST:0.0.0.0}
+  port: ${LEDGER_PORT:8090}
+  error:
+    whitelabel:
+      enabled: false

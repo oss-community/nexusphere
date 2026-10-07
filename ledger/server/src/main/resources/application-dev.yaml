@@ -1,0 +1,6 @@
+ledger:
+  security:
+    api-key: ${LEDGER_API_KEY:nexusphere-ledger-development-key-change-me}
+  signing:
+    private-key: ${LEDGER_SIGNING_PRIVATE_KEY:MC4CAQAwBQYDK2VwBCIEIDPXxsOX77t9k2XIr5aVh1AORIeW8w4rXooP+vMeOPKL}
+    public-key: ${LEDGER_SIGNING_PUBLIC_KEY:MCowBQYDK2VwAyEAZAywHYwDVyxoGB6wLRHPgAv1MUe4LTjMnb7uYOZii3o=}

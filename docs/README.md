@@ -291,6 +291,9 @@ capability discovery, an active federation, a limited delegation, authorization 
 authorized and a denied transaction, a delegation revocation and a complete audit reconstruction all work through the
 public API.
 
+After V1 the first product is the Nexusphere Ledger in `ledger/`, a standalone evidence ledger for agent actions,
+followed by signed cross-organization mandates. Its phases and status are in [Nexusphere Ledger](../ledger/README.md#roadmap).
+
 ## Out of Scope
 
 * Workflow engines, policy languages, templates and module toggles in the core
