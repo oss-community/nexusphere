@@ -37,7 +37,8 @@ class ApiKeyFilter extends OncePerRequestFilter {
 
     @Override
     protected boolean shouldNotFilter(HttpServletRequest request) {
-        return !request.getRequestURI().startsWith("/api/");
+        String uri = request.getRequestURI();
+        return !uri.startsWith("/api/") && !uri.startsWith("/mcp/");
     }
 
     @Override

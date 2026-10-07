@@ -33,7 +33,8 @@ mvn -pl ledger/ledger-e2e-tests -am verify -Dit.test=VerificationE2ETest -Dfails
 `LedgerE2ETestBase` starts the ledger on a random port with the `postgresql` and `dev` profiles against a PostgreSQL 18
 container. `LedgerClient` talks to it over HTTP with the development API key or a registered agent's key, like any
 outside caller, and rebuilds evidence entries from the JSON so they can be checked with `ledger/chain` without trusting
-the server.
+the server. `FakeMcpServer` is a small MCP server on a random port, configured as the `files` server of the gateway; it
+answers `initialize`, `tools/list` and `tools/call`, and streams the answer of tools ending in `_sse`.
 
 </p>
 
@@ -68,6 +69,13 @@ the server.
 |                       | The operator can ask for a decision on behalf of an agent                    |
 |                       | Outcomes are reported once by the deciding agent for allowed actions only    |
 |                       | An agent cannot ask for another agent's decision and the chain stays valid   |
+| `McpGatewayE2ETest`   | An allowed tool call is forwarded and recorded with its outcome              |
+|                       | A denied tool call never reaches the server                                  |
+|                       | Tool errors are recorded as failed outcomes                                  |
+|                       | Streamed responses are returned as JSON                                      |
+|                       | Other messages pass through with the session                                 |
+|                       | Bad requests are answered as JSON-RPC errors                                 |
+|                       | An unreachable server is recorded as a failed call                           |
 
 ##
 

@@ -12,6 +12,7 @@
 * [Evidence Format](#evidence-format)
 * [Verification](#verification)
 * [Agents, Grants and Decisions](#agents-grants-and-decisions)
+* [MCP Gateway](#mcp-gateway)
 * [API](#api)
 * [End-to-End Tests](ledger-e2e-tests/README.md)
 
@@ -32,7 +33,7 @@ interval. Anyone holding the published public key can check the chain and the ch
 |-------|----------------------------|--------------------------------------------------------------------------------|--------|
 | L1    | Evidence core              | Hash chain, append-only storage, signed checkpoints, verification API          | ✓      |
 | L2    | Grants and decisions       | Grants from a principal to an agent, ALLOW/DENY decisions recorded as evidence | ✓      |
-| L3    | MCP gateway                | A gateway in front of MCP servers that decides and records every tool call     |        |
+| L3    | MCP gateway                | A gateway in front of MCP servers that decides and records every tool call     | ✓      |
 | L4    | Evidence package           | Exported evidence package and an offline verifier CLI                          |        |
 | L5    | Release                    | Compose file, demo and release                                                 |        |
 | M1    | Mandate format             | Signed cross-organization mandates with a status list                          |        |
@@ -84,6 +85,9 @@ LEDGER_API_KEY:
 LEDGER_SIGNING_PRIVATE_KEY:
 LEDGER_SIGNING_PUBLIC_KEY:
 LEDGER_CHECKPOINT_INTERVAL: 1m
+LEDGER_MCP_TIMEOUT: 60s
+LEDGER_MCP_SERVERS_{NAME}_URL:
+LEDGER_MCP_SERVERS_{NAME}_AUTHORIZATION:
 ```
 
 <p style="text-align: justify;">
@@ -193,6 +197,35 @@ curl -X POST http://localhost:8090/api/v1/decisions -H "Authorization: Bearer {a
 curl -X POST http://localhost:8090/api/v1/decisions/{decisionId}/outcome -H "Authorization: Bearer {agentApiKey}" -H "Content-Type: application/json" -d '{"outcome":"SUCCEEDED"}'
 ```
 
+## MCP Gateway
+
+<p style="text-align: justify;">
+
+The ledger can stand in front of MCP servers that speak Streamable HTTP. Each server gets a name and a URL, for example
+`LEDGER_MCP_SERVERS_FILES_URL=http://files-mcp:3000/mcp`, and an optional `Authorization` header the ledger sends to
+it. The agent points its MCP client at `/mcp/{name}` with its own API key and names the principal it works for in the
+`X-Ledger-Principal` header.
+
+</p>
+
+<p style="text-align: justify;">
+
+Every `tools/call` is decided first, with action `tools/call` and target `{name}/{tool}`, so a grant on `files/*` or
+`files/read_file` covers it. A denied call never reaches the server and is answered with JSON-RPC error `-32003` and
+the decision ID and reason code in `error.data`. An allowed call is forwarded, and its outcome is reported from the
+answer: a JSON-RPC error, `isError: true`, a non-2xx status or an unreachable server (`-32002`, HTTP 502) count as
+`FAILED`. The input hash is the SHA-256 of the request body, the output hash is the SHA-256 of the answer, the MCP
+session ID is the correlation ID, and every answer to a decided call carries the `X-Ledger-Decision` header. Other
+messages, such as `initialize`, `tools/list` and notifications, pass through unchanged with the `Mcp-Session-Id`
+header. Answers streamed as server-sent events are returned as one JSON response; batches and the server-to-client
+stream (`GET`) are not supported.
+
+</p>
+
+```shell
+curl -X POST http://localhost:8090/mcp/files -H "Authorization: Bearer {agentApiKey}" -H "X-Ledger-Principal: alice" -H "Content-Type: application/json" -d '{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"read_file","arguments":{"path":"/tmp/report.txt"}}}'
+```
+
 ## API
 
 All `/api/**` endpoints require `Authorization: Bearer {LEDGER_API_KEY}` or an agent API key. Operator-only endpoints
@@ -221,6 +254,8 @@ answer `403 FORBIDDEN` to agents.
 | POST   | `/api/v1/decisions`                | Decide an action for an agent and record it; returns `201`                        |
 | GET    | `/api/v1/decisions/{id}`           | Get a decision and its outcome                                                    |
 | POST   | `/api/v1/decisions/{id}/outcome`   | Report `SUCCEEDED` or `FAILED` once for an allowed decision                       |
+| POST   | `/mcp/{server}`                    | MCP gateway: decide, forward and record a `tools/call`; forward other messages    |
+| DELETE | `/mcp/{server}`                    | Close an MCP session on the server                                                |
 | GET    | `/actuator/health`                 | Health, open for probes                                                           |
 
 ```json

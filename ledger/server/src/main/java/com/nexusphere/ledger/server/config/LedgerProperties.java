@@ -2,10 +2,12 @@ package com.nexusphere.ledger.server.config;
 
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
+import java.net.URI;
 import java.time.Duration;
+import java.util.Map;
 
 @ConfigurationProperties("ledger")
-public record LedgerProperties(Security security, Signing signing, Checkpoint checkpoint) {
+public record LedgerProperties(Security security, Signing signing, Checkpoint checkpoint, Mcp mcp) {
 
     public record Security(String apiKey) {
     }
@@ -14,5 +16,11 @@ public record LedgerProperties(Security security, Signing signing, Checkpoint ch
     }
 
     public record Checkpoint(Duration interval) {
+    }
+
+    public record Mcp(Duration timeout, Map<String, Server> servers) {
+
+        public record Server(URI url, String authorization) {
+        }
     }
 }
