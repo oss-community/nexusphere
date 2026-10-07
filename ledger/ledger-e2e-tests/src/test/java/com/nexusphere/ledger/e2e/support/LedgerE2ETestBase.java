@@ -11,7 +11,10 @@ import org.springframework.test.context.ActiveProfiles;
 import org.testcontainers.postgresql.PostgreSQLContainer;
 import org.testcontainers.utility.DockerImageName;
 
+import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
@@ -38,6 +41,43 @@ public abstract class LedgerE2ETestBase {
 
     protected LedgerClient anonymous() {
         return new LedgerClient("http://localhost:" + port, null);
+    }
+
+    protected record RegisteredAgent(String agentId, String apiKey, LedgerClient client) {
+    }
+
+    protected RegisteredAgent registerAgent(String owner) {
+        String agentId = unique("agent");
+        LedgerClient.Response response = ledger().post("/api/v1/agents",
+                LedgerClient.json(Map.of("agentId", agentId, "name", "Agent " + agentId, "ownerId", owner)));
+        if (response.status() != 201) {
+            throw new IllegalStateException("Registering an agent failed: " + response.body());
+        }
+        String apiKey = response.json().path("apiKey").asString();
+        return new RegisteredAgent(agentId, apiKey, ledger().withApiKey(apiKey));
+    }
+
+    protected static Map<String, Object> grantBody(String principalId, String agentId, List<String> actions,
+                                                   List<String> targets) {
+        Map<String, Object> body = new HashMap<>();
+        body.put("principalId", principalId);
+        body.put("agentId", agentId);
+        body.put("actions", actions);
+        body.put("targets", targets);
+        body.put("expiresAt", Instant.now().plus(1, ChronoUnit.HOURS).toString());
+        return body;
+    }
+
+    protected String grant(Map<String, Object> body) {
+        LedgerClient.Response response = ledger().post("/api/v1/grants", LedgerClient.json(body));
+        if (response.status() != 201) {
+            throw new IllegalStateException("Creating a grant failed: " + response.body());
+        }
+        return response.json().path("id").asString();
+    }
+
+    protected static String decision(String principalId, String action, String target) {
+        return LedgerClient.json(Map.of("principalId", principalId, "action", action, "target", target));
     }
 
     protected static String unique(String prefix) {

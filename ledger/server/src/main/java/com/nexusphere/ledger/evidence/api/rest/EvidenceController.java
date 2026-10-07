@@ -7,6 +7,8 @@ import com.nexusphere.ledger.evidence.domain.model.EvidenceQuery;
 import com.nexusphere.ledger.evidence.domain.model.EvidenceSubmission;
 import com.nexusphere.ledger.evidence.domain.model.LedgerHead;
 import com.nexusphere.ledger.evidence.domain.model.Outcome;
+import com.nexusphere.ledger.server.security.Caller;
+import com.nexusphere.ledger.server.web.LedgerException;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -89,21 +91,35 @@ class EvidenceController {
     }
 
     @PostMapping("/evidence")
-    ResponseEntity<EvidenceResponse> record(@RequestBody EvidenceRequest request) {
+    ResponseEntity<EvidenceResponse> record(Caller caller, @RequestBody EvidenceRequest request) {
+        if (request.agentId() != null && !caller.canActAs(request.agentId())) {
+            throw LedgerException.forbidden("An agent may only record evidence for itself.");
+        }
         EvidenceEntry entry = evidence.record(request.toSubmission());
         return ResponseEntity.created(URI.create("/api/v1/evidence/" + entry.id())).body(EvidenceResponse.of(entry));
     }
 
     @GetMapping("/evidence/{id}")
-    EvidenceResponse get(@PathVariable UUID id) {
-        return EvidenceResponse.of(evidence.get(id));
+    EvidenceResponse get(Caller caller, @PathVariable UUID id) {
+        EvidenceEntry entry = evidence.get(id);
+        if (!caller.canActAs(entry.agentId())) {
+            throw LedgerException.notFound("Evidence " + id);
+        }
+        return EvidenceResponse.of(entry);
     }
 
     @GetMapping("/evidence")
-    EvidencePage find(@RequestParam(required = false) String agentId,
+    EvidencePage find(Caller caller,
+                      @RequestParam(required = false) String agentId,
                       @RequestParam(required = false) String principalId,
                       @RequestParam(defaultValue = "0") long after,
                       @RequestParam(defaultValue = "100") int limit) {
+        if (!caller.isOperator()) {
+            if (agentId != null && !caller.canActAs(agentId)) {
+                throw LedgerException.forbidden("An agent may only read its own evidence.");
+            }
+            agentId = caller.agentId();
+        }
         List<EvidenceEntry> entries = evidence.find(new EvidenceQuery(agentId, principalId, after, limit));
         Long nextAfter = entries.size() == limit ? entries.getLast().sequence() : null;
         return new EvidencePage(entries.stream().map(EvidenceResponse::of).toList(), nextAfter);

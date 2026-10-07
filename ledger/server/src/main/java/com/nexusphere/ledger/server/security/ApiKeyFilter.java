@@ -1,5 +1,6 @@
 package com.nexusphere.ledger.server.security;
 
+import com.nexusphere.ledger.chain.Hashes;
 import com.nexusphere.ledger.server.config.LedgerProperties;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
@@ -13,6 +14,7 @@ import org.springframework.web.filter.OncePerRequestFilter;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
+import java.util.Optional;
 
 @Component
 class ApiKeyFilter extends OncePerRequestFilter {
@@ -21,14 +23,16 @@ class ApiKeyFilter extends OncePerRequestFilter {
     private static final String UNAUTHORIZED_BODY =
             "{\"code\":\"UNAUTHORIZED\",\"message\":\"A valid ledger API key is required.\"}";
 
-    private final byte[] apiKey;
+    private final byte[] operatorKey;
+    private final AgentCredentials agents;
 
-    ApiKeyFilter(LedgerProperties properties) {
+    ApiKeyFilter(LedgerProperties properties, AgentCredentials agents) {
         String key = properties.security() == null ? null : properties.security().apiKey();
         if (key == null || key.isBlank()) {
             throw new IllegalStateException("ledger.security.api-key must be set");
         }
-        this.apiKey = key.getBytes(StandardCharsets.UTF_8);
+        this.operatorKey = key.getBytes(StandardCharsets.UTF_8);
+        this.agents = agents;
     }
 
     @Override
@@ -39,9 +43,9 @@ class ApiKeyFilter extends OncePerRequestFilter {
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain chain)
             throws ServletException, IOException {
-        String header = request.getHeader(HttpHeaders.AUTHORIZATION);
-        if (header != null && header.startsWith(BEARER)
-                && MessageDigest.isEqual(apiKey, header.substring(BEARER.length()).getBytes(StandardCharsets.UTF_8))) {
+        Optional<Caller> caller = authenticate(request.getHeader(HttpHeaders.AUTHORIZATION));
+        if (caller.isPresent()) {
+            request.setAttribute(Caller.ATTRIBUTE, caller.get());
             chain.doFilter(request, response);
             return;
         }
@@ -49,5 +53,16 @@ class ApiKeyFilter extends OncePerRequestFilter {
         response.setContentType(MediaType.APPLICATION_JSON_VALUE);
         response.setHeader(HttpHeaders.WWW_AUTHENTICATE, "Bearer");
         response.getWriter().write(UNAUTHORIZED_BODY);
+    }
+
+    private Optional<Caller> authenticate(String header) {
+        if (header == null || !header.startsWith(BEARER)) {
+            return Optional.empty();
+        }
+        byte[] presented = header.substring(BEARER.length()).getBytes(StandardCharsets.UTF_8);
+        if (MessageDigest.isEqual(operatorKey, presented)) {
+            return Optional.of(Caller.operator());
+        }
+        return agents.activeAgentByKeyHash(Hashes.sha256(presented)).map(Caller::agent);
     }
 }

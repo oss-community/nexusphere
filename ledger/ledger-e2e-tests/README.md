@@ -31,8 +31,9 @@ mvn -pl ledger/ledger-e2e-tests -am verify -Dit.test=VerificationE2ETest -Dfails
 <p style="text-align: justify;">
 
 `LedgerE2ETestBase` starts the ledger on a random port with the `postgresql` and `dev` profiles against a PostgreSQL 18
-container. `LedgerClient` talks to it over HTTP with the development API key, like any outside caller, and rebuilds
-evidence entries from the JSON so they can be checked with `ledger/chain` without trusting the server.
+container. `LedgerClient` talks to it over HTTP with the development API key or a registered agent's key, like any
+outside caller, and rebuilds evidence entries from the JSON so they can be checked with `ledger/chain` without trusting
+the server.
 
 </p>
 
@@ -51,6 +52,22 @@ evidence entries from the JSON so they can be checked with `ledger/chain` withou
 |                       | An outsider rebuilds and verifies the whole chain from the API               |
 | `ApiKeyE2ETest`       | The API requires the ledger key                                              |
 |                       | Health is open for probes                                                    |
+| `AgentE2ETest`        | A registered agent gets its own key once                                     |
+|                       | Registering the same agent twice is a conflict                               |
+|                       | A disabled agent or an old key is rejected                                   |
+|                       | Agent lifecycle is recorded as evidence                                      |
+|                       | An agent cannot do what only the operator may                                |
+|                       | An agent records and reads only its own evidence                             |
+| `GrantE2ETest`        | A grant is created and its terms can be recomputed from the evidence         |
+|                       | A revoked grant is recorded and shown as revoked                             |
+|                       | Invalid grants are rejected with field errors                                |
+|                       | Grants need an active agent                                                  |
+|                       | An agent sees only its own grants                                            |
+| `DecisionE2ETest`     | A covered action is allowed and its outcome is recorded                      |
+|                       | Every denial is recorded with its reason                                     |
+|                       | The operator can ask for a decision on behalf of an agent                    |
+|                       | Outcomes are reported once by the deciding agent for allowed actions only    |
+|                       | An agent cannot ask for another agent's decision and the chain stays valid   |
 
 ##
 

@@ -29,6 +29,10 @@ public class EvidenceService {
         this.clock = clock;
     }
 
+    public void check(EvidenceSubmission submission) {
+        EvidenceValidator.validate(submission, clock.instant());
+    }
+
     @Transactional
     public EvidenceEntry record(EvidenceSubmission submission) {
         Instant now = clock.instant();

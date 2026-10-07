@@ -25,6 +25,14 @@ public class LedgerException extends RuntimeException {
         return new LedgerException(HttpStatus.NOT_FOUND, "NOT_FOUND", what + " was not found.", Map.of());
     }
 
+    public static LedgerException forbidden(String message) {
+        return new LedgerException(HttpStatus.FORBIDDEN, "FORBIDDEN", message, Map.of());
+    }
+
+    public static LedgerException conflict(String code, String message) {
+        return new LedgerException(HttpStatus.CONFLICT, code, message, Map.of());
+    }
+
     public HttpStatus status() {
         return status;
     }

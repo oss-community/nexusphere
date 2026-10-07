@@ -35,13 +35,16 @@ final class EvidenceValidator {
         v.hash("inputHash", s.inputHash());
         v.hash("outputHash", s.outputHash());
         if (s.outcome() == null) {
-            v.errors.put("outcome", "must be one of SUCCEEDED, FAILED, DENIED");
+            v.errors.put("outcome", "must be one of SUCCEEDED, FAILED, DENIED, PENDING");
         }
         if (s.decision() == Decision.DENY && s.outcome() != null && s.outcome() != Outcome.DENIED) {
             v.errors.put("outcome", "must be DENIED when the decision is DENY");
         }
         if (s.outcome() == Outcome.DENIED && s.decision() == Decision.ALLOW) {
             v.errors.put("decision", "must not be ALLOW when the outcome is DENIED");
+        }
+        if (s.outcome() == Outcome.PENDING && s.decision() != Decision.ALLOW) {
+            v.errors.put("decision", "must be ALLOW when the outcome is PENDING");
         }
         if (s.occurredAt() != null && s.occurredAt().isAfter(now.plus(MAX_CLOCK_SKEW))) {
             v.errors.put("occurredAt", "must not be in the future");
