@@ -15,6 +15,7 @@
 * [Agents, Grants and Decisions](#agents-grants-and-decisions)
 * [MCP Gateway](#mcp-gateway)
 * [Mandates](#mandates)
+* [A2A Gateway](#a2a-gateway)
 * [API](#api)
 * [End-to-End Tests](ledger-e2e-tests/README.md)
 
@@ -40,7 +41,7 @@ interval. Anyone holding the published public key can check the chain and the ch
 | L5    | Release                    | Compose file, demo and release                                                 | ✓      |
 | M1    | Mandate format             | Signed cross-organization mandates with a status list                          | ✓      |
 | M2    | Verifier SDK               | Mandate verification library                                                   | ✓      |
-| M3    | A2A and two-sided evidence | Mandates over A2A with evidence on both sides                                  |        |
+| M3    | A2A and two-sided evidence | Mandates over A2A with evidence on both sides                                  | ✓      |
 
 ## Modules
 
@@ -150,6 +151,14 @@ LEDGER_MCP_SERVERS_{NAME}_URL:
 LEDGER_MCP_SERVERS_{NAME}_AUTHORIZATION:
 LEDGER_MANDATE_ISSUER: http://localhost:8090
 LEDGER_MANDATE_STATUS_LIST_TTL: 5m
+LEDGER_A2A_TIMEOUT: 60s
+LEDGER_A2A_REQUEST_MAX_AGE: 5m
+LEDGER_A2A_STATUS_LIST_CACHE: 30s
+LEDGER_A2A_TRUSTED_ISSUERS:
+LEDGER_A2A_PEERS_{NAME}_URL:
+LEDGER_A2A_PEERS_{NAME}_ISSUER:
+LEDGER_A2A_AGENTS_{NAME}_URL:
+LEDGER_A2A_AGENTS_{NAME}_AUTHORIZATION:
 ```
 
 <p style="text-align: justify;">
@@ -415,44 +424,103 @@ for packages.
 java -jar ledger/verifier/target/verifier-1.0.0-SNAPSHOT-exec.jar mandate --issuer http://localhost:8090 --audience https://supplier.example --action a2a/send --target supplier/orders mandate.jwt
 ```
 
+## A2A Gateway
+
+<p style="text-align: justify;">
+
+Two organizations that each run a ledger can let their agents talk over A2A (JSON-RPC over HTTP) with evidence on
+both sides that matches entry for entry. The sending ledger names each peer with the URL of the peer's inbound
+endpoint and the peer ledger's issuer, for example
+`LEDGER_A2A_PEERS_SUPPLIER_URL=https://ledger.supplier.example/a2a/in/sales` and
+`LEDGER_A2A_PEERS_SUPPLIER_ISSUER=https://ledger.supplier.example`. The receiving ledger lists the issuers it trusts
+in `LEDGER_A2A_TRUSTED_ISSUERS` (comma separated) and names its own agents with their A2A URL and an optional
+`Authorization` header, for example `LEDGER_A2A_AGENTS_SALES_URL=http://sales-agent:9000/a2a`.
+
+</p>
+
+<p style="text-align: justify;">
+
+The agent sends its JSON-RPC request to `/a2a/out/{peer}` with its own API key and the `X-Ledger-Principal` header.
+The ledger decides action `a2a/send` on target `{peer}/{method}`, so a grant on `supplier/*` covers it. A denied
+request never leaves and is answered with JSON-RPC error `-32003`. An allowed request carries two headers:
+`X-Nexusphere-Mandate`, a mandate for the grant with the peer's issuer as audience (reused while it is valid for at
+least another minute), and `X-Nexusphere-Request`, a request proof signed by the sending ledger
+(`typ` `nexusphere-a2a-request+jwt`) that binds the mandate, the method, the SHA-256 of the body and the decision ID
+as the request ID.
+
+</p>
+
+<p style="text-align: justify;">
+
+The receiving ledger answers on `/a2a/in/{agent}` without an API key. It verifies the mandate with `MandateVerifier`
+(trusted issuer, key from the issuer's JWKS, signature, time, its own issuer as audience, the `a2a/send` action and the
+revocation status) and the request proof (same issuer, key, mandate and agent, its own issuer as audience, the method,
+the body hash and an `iat` within `LEDGER_A2A_REQUEST_MAX_AGE`). A request ID is accepted once. A mandate or proof
+that cannot be trusted is answered with HTTP 401 and is not recorded. A trusted mandate that is revoked, expired or for
+another audience is answered with HTTP 403 and recorded as an `a2a/receive` DENY entry. Otherwise the request goes to
+the local agent and one `a2a/receive` entry records it with the same input and output hashes as the sender, the
+mandate as delegation ID and the request ID as correlation ID. The answer carries `X-Nexusphere-Receipt`, a receipt
+signed by the receiving ledger (`typ` `nexusphere-a2a-receipt+jwt`) with the request and response hashes, the HTTP
+status, the outcome, and the sequence and hash of its evidence entry.
+
+</p>
+
+<p style="text-align: justify;">
+
+The sending ledger verifies the receipt with the peer's published key, records the outcome with
+`a2a.receipt` set to `VERIFIED`, `INVALID` or `MISSING` and the peer's evidence sequence and hash, and returns the
+answer with `X-Ledger-Decision`, `X-Ledger-Exchange`, `X-Ledger-Receipt` and the receipt. Both ledgers keep the
+mandate, the request proof and the receipt of every exchange at `GET /api/v1/a2a/exchanges/{id}`, so either side can
+later show what the other signed. Streaming methods (`message/stream`, `tasks/resubscribe`) are answered with
+`-32004`; the use limit of a grant is counted by the sender only.
+
+</p>
+
+```shell
+curl -X POST http://localhost:8090/a2a/out/supplier -H "Authorization: Bearer {agentApiKey}" -H "X-Ledger-Principal: alice" -H "Content-Type: application/json" -d '{"jsonrpc":"2.0","id":"1","method":"message/send","params":{"message":{"role":"user","messageId":"1","parts":[{"kind":"text","text":"Order 40 pallets"}]}}}'
+```
+
 ## API
 
-All `/api/**` endpoints require `Authorization: Bearer {LEDGER_API_KEY}` or an agent API key. Operator-only endpoints
-answer `403 FORBIDDEN` to agents.
+All `/api/**`, `/mcp/**` and `/a2a/out/**` endpoints require `Authorization: Bearer {LEDGER_API_KEY}` or an agent
+API key. Operator-only endpoints answer `403 FORBIDDEN` to agents.
 
-| Method | Path                               | Description                                                                                        |
-|--------|------------------------------------|----------------------------------------------------------------------------------------------------|
-| POST   | `/api/v1/evidence`                 | Record an evidence entry; returns `201` with `Location`                                            |
-| GET    | `/api/v1/evidence/{id}`            | Get an evidence entry                                                                              |
-| GET    | `/api/v1/evidence`                 | List entries by `agentId`, `principalId`, `after` and `limit` (max 500)                            |
-| GET    | `/api/v1/ledger/head`              | Current sequence and hash                                                                          |
-| POST   | `/api/v1/checkpoints`              | Sign the current head now; `409 LEDGER_EMPTY` when nothing is recorded (operator)                  |
-| GET    | `/api/v1/checkpoints/latest`       | Latest checkpoint                                                                                  |
-| GET    | `/api/v1/checkpoints`              | List checkpoints by `after` and `limit`                                                            |
-| GET    | `/api/v1/keys`                     | Public signing keys                                                                                |
-| POST   | `/api/v1/packages`                 | Export an evidence package by `agentId`, `principalId`, `fromSequence` and `toSequence` (operator) |
-| GET    | `/api/v1/verification`             | Full verification report (operator)                                                                |
-| POST   | `/api/v1/agents`                   | Register an agent and return its API key once (operator)                                           |
-| GET    | `/api/v1/agents`                   | List agents by `after` and `limit` (operator)                                                      |
-| GET    | `/api/v1/agents/{agentId}`         | Get an agent                                                                                       |
-| POST   | `/api/v1/agents/{agentId}/disable` | Disable an agent and its key (operator)                                                            |
-| POST   | `/api/v1/agents/{agentId}/key`     | Issue a new API key; the old one stops working (operator)                                          |
-| POST   | `/api/v1/grants`                   | Create a grant (operator)                                                                          |
-| GET    | `/api/v1/grants`                   | List grants by `agentId`, `principalId`, `after` and `limit`                                       |
-| GET    | `/api/v1/grants/{id}`              | Get a grant with its status and uses                                                               |
-| POST   | `/api/v1/grants/{id}/revoke`       | Revoke a grant with an optional `reason` (operator)                                                |
-| POST   | `/api/v1/decisions`                | Decide an action for an agent and record it; returns `201`                                         |
-| GET    | `/api/v1/decisions/{id}`           | Get a decision and its outcome                                                                     |
-| POST   | `/api/v1/decisions/{id}/outcome`   | Report `SUCCEEDED` or `FAILED` once for an allowed decision                                        |
-| POST   | `/api/v1/mandates`                 | Issue a signed mandate from a grant; returns `201`                                                 |
-| GET    | `/api/v1/mandates`                 | List the mandates of a `grantId`                                                                   |
-| GET    | `/api/v1/mandates/{id}`            | Get a mandate, its token and status                                                                |
-| POST   | `/api/v1/mandates/{id}/revoke`     | Revoke a mandate with an optional `reason` (operator)                                              |
-| GET    | `/public/v1/keys`                  | Public signing keys as a JWK set, no API key                                                       |
-| GET    | `/public/v1/mandates/status`       | Signed mandate status list, no API key                                                             |
-| POST   | `/mcp/{server}`                    | MCP gateway: decide, forward and record a `tools/call`; forward other messages                     |
-| DELETE | `/mcp/{server}`                    | Close an MCP session on the server                                                                 |
-| GET    | `/actuator/health`                 | Health, open for probes                                                                            |
+| Method | Path                               | Description                                                                                            |
+|--------|------------------------------------|--------------------------------------------------------------------------------------------------------|
+| POST   | `/api/v1/evidence`                 | Record an evidence entry; returns `201` with `Location`                                                |
+| GET    | `/api/v1/evidence/{id}`            | Get an evidence entry                                                                                  |
+| GET    | `/api/v1/evidence`                 | List entries by `agentId`, `principalId`, `after` and `limit` (max 500)                                |
+| GET    | `/api/v1/ledger/head`              | Current sequence and hash                                                                              |
+| POST   | `/api/v1/checkpoints`              | Sign the current head now; `409 LEDGER_EMPTY` when nothing is recorded (operator)                      |
+| GET    | `/api/v1/checkpoints/latest`       | Latest checkpoint                                                                                      |
+| GET    | `/api/v1/checkpoints`              | List checkpoints by `after` and `limit`                                                                |
+| GET    | `/api/v1/keys`                     | Public signing keys                                                                                    |
+| POST   | `/api/v1/packages`                 | Export an evidence package by `agentId`, `principalId`, `fromSequence` and `toSequence` (operator)     |
+| GET    | `/api/v1/verification`             | Full verification report (operator)                                                                    |
+| POST   | `/api/v1/agents`                   | Register an agent and return its API key once (operator)                                               |
+| GET    | `/api/v1/agents`                   | List agents by `after` and `limit` (operator)                                                          |
+| GET    | `/api/v1/agents/{agentId}`         | Get an agent                                                                                           |
+| POST   | `/api/v1/agents/{agentId}/disable` | Disable an agent and its key (operator)                                                                |
+| POST   | `/api/v1/agents/{agentId}/key`     | Issue a new API key; the old one stops working (operator)                                              |
+| POST   | `/api/v1/grants`                   | Create a grant (operator)                                                                              |
+| GET    | `/api/v1/grants`                   | List grants by `agentId`, `principalId`, `after` and `limit`                                           |
+| GET    | `/api/v1/grants/{id}`              | Get a grant with its status and uses                                                                   |
+| POST   | `/api/v1/grants/{id}/revoke`       | Revoke a grant with an optional `reason` (operator)                                                    |
+| POST   | `/api/v1/decisions`                | Decide an action for an agent and record it; returns `201`                                             |
+| GET    | `/api/v1/decisions/{id}`           | Get a decision and its outcome                                                                         |
+| POST   | `/api/v1/decisions/{id}/outcome`   | Report `SUCCEEDED` or `FAILED` once for an allowed decision                                            |
+| POST   | `/api/v1/mandates`                 | Issue a signed mandate from a grant; returns `201`                                                     |
+| GET    | `/api/v1/mandates`                 | List the mandates of a `grantId`                                                                       |
+| GET    | `/api/v1/mandates/{id}`            | Get a mandate, its token and status                                                                    |
+| POST   | `/api/v1/mandates/{id}/revoke`     | Revoke a mandate with an optional `reason` (operator)                                                  |
+| GET    | `/public/v1/keys`                  | Public signing keys as a JWK set, no API key                                                           |
+| GET    | `/public/v1/mandates/status`       | Signed mandate status list, no API key                                                                 |
+| POST   | `/mcp/{server}`                    | MCP gateway: decide, forward and record a `tools/call`; forward other messages                         |
+| DELETE | `/mcp/{server}`                    | Close an MCP session on the server                                                                     |
+| POST   | `/a2a/out/{peer}`                  | A2A gateway: decide, attach a mandate and request proof, forward and record with the peer's receipt    |
+| POST   | `/a2a/in/{agent}`                  | A2A inbound: verify the mandate and proof, forward to the agent, record and sign a receipt; no API key |
+| GET    | `/api/v1/a2a/exchanges/{id}`       | Get an A2A exchange with its mandate, request proof and receipt                                        |
+| GET    | `/actuator/health`                 | Health, open for probes                                                                                |
 
 ```json
 {

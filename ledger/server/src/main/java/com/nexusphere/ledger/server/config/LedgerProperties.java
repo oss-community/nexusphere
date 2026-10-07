@@ -4,11 +4,12 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 
 import java.net.URI;
 import java.time.Duration;
+import java.util.List;
 import java.util.Map;
 
 @ConfigurationProperties("ledger")
 public record LedgerProperties(Security security, Signing signing, Checkpoint checkpoint, Mcp mcp,
-                               Mandate mandate) {
+                               Mandate mandate, A2a a2a) {
 
     public record Security(String apiKey) {
     }
@@ -20,6 +21,16 @@ public record LedgerProperties(Security security, Signing signing, Checkpoint ch
     }
 
     public record Mandate(String issuer, Duration statusListTtl) {
+    }
+
+    public record A2a(Duration timeout, Duration requestMaxAge, Duration statusListCache, List<String> trustedIssuers,
+                      Map<String, Peer> peers, Map<String, Agent> agents) {
+
+        public record Peer(URI url, String issuer) {
+        }
+
+        public record Agent(URI url, String authorization) {
+        }
     }
 
     public record Mcp(Duration timeout, Map<String, Server> servers) {

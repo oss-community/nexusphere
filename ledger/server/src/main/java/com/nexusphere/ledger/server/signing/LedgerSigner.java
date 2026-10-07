@@ -3,6 +3,7 @@ package com.nexusphere.ledger.server.signing;
 import com.nexusphere.ledger.chain.Checkpoint;
 import com.nexusphere.ledger.chain.SignedCheckpoint;
 import com.nexusphere.ledger.chain.SigningKeys;
+import com.nexusphere.ledger.mandate.Jws;
 import com.nexusphere.ledger.mandate.MandateClaims;
 import com.nexusphere.ledger.mandate.Mandates;
 import com.nexusphere.ledger.mandate.StatusList;
@@ -11,6 +12,7 @@ import org.springframework.stereotype.Component;
 
 import java.security.PrivateKey;
 import java.time.Instant;
+import java.util.Map;
 
 @Component
 public class LedgerSigner {
@@ -41,6 +43,10 @@ public class LedgerSigner {
 
     public String signStatusList(StatusList statusList) {
         return statusList.sign(publicKey.keyId(), privateKey);
+    }
+
+    public String sign(String type, Map<String, ?> payload) {
+        return Jws.sign(type, publicKey.keyId(), payload, privateKey);
     }
 
     public SigningKeys.PublicKeyInfo publicKey() {

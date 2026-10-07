@@ -36,6 +36,8 @@ public class MandateService {
 
     public static final String STATUS_LIST_PATH = "/public/v1/mandates/status";
 
+    private static final Duration EXCHANGE_MIN_VALIDITY = Duration.ofMinutes(1);
+
     private final MandateRepository mandates;
     private final GrantRepository grants;
     private final EvidenceService evidence;
@@ -105,6 +107,12 @@ public class MandateService {
         record(terms, id, "mandate/issue", null, Hashes.sha256(token.getBytes(StandardCharsets.US_ASCII)),
                 attributes);
         return mandates.find(id).orElseThrow();
+    }
+
+    @Transactional
+    public Mandate forExchange(UUID grantId, String audience) {
+        return mandates.findUsable(grantId, audience, clock.instant().plus(EXCHANGE_MIN_VALIDITY))
+                .orElseGet(() -> issue(Caller.operator(), new MandateRequest(grantId, audience, null)));
     }
 
     @Transactional

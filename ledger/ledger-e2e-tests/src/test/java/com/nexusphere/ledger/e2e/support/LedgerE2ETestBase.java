@@ -40,6 +40,8 @@ public abstract class LedgerE2ETestBase {
     protected static final FakeMcpServer MCP = FakeMcpServer.start();
     protected static final int PORT = freePort();
     protected static final String ISSUER = "http://localhost:" + PORT;
+    protected static final int SUPPLIER_PORT = freePort();
+    protected static final String SUPPLIER_ISSUER = "http://localhost:" + SUPPLIER_PORT;
 
     @DynamicPropertySource
     static void mcpServers(DynamicPropertyRegistry registry) {
@@ -48,6 +50,10 @@ public abstract class LedgerE2ETestBase {
         registry.add("ledger.mcp.servers.offline.url", () -> "http://localhost:1/mcp");
         registry.add("server.port", () -> PORT);
         registry.add("ledger.mandate.issuer", () -> ISSUER);
+        registry.add("ledger.a2a.peers.supplier.url", () -> SUPPLIER_ISSUER + "/a2a/in/sales");
+        registry.add("ledger.a2a.peers.supplier.issuer", () -> SUPPLIER_ISSUER);
+        registry.add("ledger.a2a.peers.offline.url", () -> "http://localhost:1/a2a/in/sales");
+        registry.add("ledger.a2a.peers.offline.issuer", () -> "http://localhost:1");
     }
 
     private static int freePort() {

@@ -78,6 +78,17 @@ class JdbcMandateRepository implements MandateRepository {
     }
 
     @Override
+    public Optional<Mandate> findUsable(UUID grantId, String audience, Instant validUntil) {
+        return jdbc.query(SELECT + """
+                         where grant_id = :grantId and audience = :audience and revoked_at is null and token <> ''
+                           and expires_at > :validUntil
+                         order by expires_at desc limit 1
+                        """, new MapSqlParameterSource().addValue("grantId", grantId).addValue("audience", audience)
+                        .addValue("validUntil", Timestamp.from(validUntil)), JdbcMandateRepository::row)
+                .stream().findFirst();
+    }
+
+    @Override
     public void revoke(UUID id, Instant revokedAt, String reason) {
         jdbc.update("update ledger.mandate set revoked_at = :revokedAt, revoke_reason = :reason where id = :id",
                 new MapSqlParameterSource().addValue("id", id).addValue("revokedAt", Timestamp.from(revokedAt))
