@@ -3,6 +3,7 @@ package com.nexusphere.ledger.chain;
 import org.junit.jupiter.api.Test;
 
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -33,6 +34,12 @@ class CanonicalJsonTest {
     @Test
     void keepsNonAsciiCharactersAsTheyAre() {
         assertThat(CanonicalJson.write(Map.of("name", "سامان"))).isEqualTo("{\"name\":\"سامان\"}");
+    }
+
+    @Test
+    void keepsTheOrderOfArrays() {
+        assertThat(CanonicalJson.write(Map.of("list", List.of("b", "a", 3L, Map.of("y", true, "x", "1")))))
+                .isEqualTo("{\"list\":[\"b\",\"a\",3,{\"x\":\"1\",\"y\":true}]}");
     }
 
     @Test

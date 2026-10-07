@@ -1,6 +1,7 @@
 package com.nexusphere.ledger.chain;
 
 import java.nio.charset.StandardCharsets;
+import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
 
@@ -27,6 +28,7 @@ public final class CanonicalJson {
             case Integer number -> out.append(number);
             case Boolean flag -> out.append(flag);
             case Map<?, ?> map -> writeObject(out, map);
+            case List<?> list -> writeArray(out, list);
             default -> throw new IllegalArgumentException("Unsupported canonical JSON value: " + value.getClass());
         }
     }
@@ -51,6 +53,17 @@ public final class CanonicalJson {
             writeValue(out, entry.getValue());
         }
         out.append('}');
+    }
+
+    private static void writeArray(StringBuilder out, List<?> list) {
+        out.append('[');
+        for (int i = 0; i < list.size(); i++) {
+            if (i > 0) {
+                out.append(',');
+            }
+            writeValue(out, list.get(i));
+        }
+        out.append(']');
     }
 
     private static void writeString(StringBuilder out, String text) {

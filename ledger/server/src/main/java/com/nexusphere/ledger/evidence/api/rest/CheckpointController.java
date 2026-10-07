@@ -3,6 +3,7 @@ package com.nexusphere.ledger.evidence.api.rest;
 import com.nexusphere.ledger.chain.Checkpoint;
 import com.nexusphere.ledger.chain.SignedCheckpoint;
 import com.nexusphere.ledger.evidence.application.CheckpointService;
+import com.nexusphere.ledger.server.security.Caller;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -36,7 +37,8 @@ class CheckpointController {
     }
 
     @PostMapping
-    CheckpointResponse create() {
+    CheckpointResponse create(Caller caller) {
+        caller.requireOperator();
         return CheckpointResponse.of(checkpoints.create());
     }
 

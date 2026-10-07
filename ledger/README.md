@@ -11,6 +11,7 @@
 * [Environment Variables](#environment-variables)
 * [Evidence Format](#evidence-format)
 * [Verification](#verification)
+* [Agents, Grants and Decisions](#agents-grants-and-decisions)
 * [API](#api)
 * [End-to-End Tests](ledger-e2e-tests/README.md)
 
@@ -30,7 +31,7 @@ interval. Anyone holding the published public key can check the chain and the ch
 | Phase | Name                       | Delivers                                                                       | Status |
 |-------|----------------------------|--------------------------------------------------------------------------------|--------|
 | L1    | Evidence core              | Hash chain, append-only storage, signed checkpoints, verification API          | ✓      |
-| L2    | Grants and decisions       | Grants from a principal to an agent, ALLOW/DENY decisions recorded as evidence |        |
+| L2    | Grants and decisions       | Grants from a principal to an agent, ALLOW/DENY decisions recorded as evidence | ✓      |
 | L3    | MCP gateway                | A gateway in front of MCP servers that decides and records every tool call     |        |
 | L4    | Evidence package           | Exported evidence package and an offline verifier CLI                          |        |
 | L5    | Release                    | Compose file, demo and release                                                 |        |
@@ -102,27 +103,27 @@ export LEDGER_SIGNING_PUBLIC_KEY=$(openssl pkey -inform DER -in ledger-signing.d
 
 ## Evidence Format
 
-| Field           | Description                                                              |
-|-----------------|--------------------------------------------------------------------------|
-| `format`        | `nexusphere-ledger/evidence/v1`                                          |
-| `id`            | UUID assigned by the ledger                                              |
-| `sequence`      | Position in the chain, starting at 1 without gaps                        |
-| `occurredAt`    | When the action happened, at most five minutes in the future            |
-| `recordedAt`    | When the ledger recorded it                                              |
-| `agentId`       | The acting agent (required)                                              |
-| `principalId`   | The person or organization the agent acted for (required)               |
-| `action`        | What was done, for example `tools/call` (required)                      |
-| `target`        | The tool, resource or counterparty                                       |
-| `decision`      | `ALLOW` or `DENY`                                                        |
-| `reason`        | Why the decision was taken                                               |
-| `delegationId`  | The grant or mandate the agent acted under                               |
-| `inputHash`     | Lowercase SHA-256 of the input                                           |
-| `outputHash`    | Lowercase SHA-256 of the output                                          |
-| `outcome`       | `SUCCEEDED`, `FAILED` or `DENIED` (required); `DENY` requires `DENIED`   |
-| `correlationId` | Caller correlation, for example a conversation                           |
-| `attributes`    | Up to 32 string attributes                                               |
-| `previousHash`  | Hash of the previous entry; 64 zeros for the first entry                 |
-| `hash`          | SHA-256 of the canonical JSON of every field except `hash`               |
+| Field           | Description                                                                                                   |
+|-----------------|---------------------------------------------------------------------------------------------------------------|
+| `format`        | `nexusphere-ledger/evidence/v1`                                                                               |
+| `id`            | UUID assigned by the ledger                                                                                   |
+| `sequence`      | Position in the chain, starting at 1 without gaps                                                             |
+| `occurredAt`    | When the action happened, at most five minutes in the future                                                  |
+| `recordedAt`    | When the ledger recorded it                                                                                   |
+| `agentId`       | The acting agent (required)                                                                                   |
+| `principalId`   | The person or organization the agent acted for (required)                                                     |
+| `action`        | What was done, for example `tools/call` (required)                                                            |
+| `target`        | The tool, resource or counterparty                                                                            |
+| `decision`      | `ALLOW` or `DENY`                                                                                             |
+| `reason`        | Why the decision was taken                                                                                    |
+| `delegationId`  | The grant or mandate the agent acted under                                                                    |
+| `inputHash`     | Lowercase SHA-256 of the input                                                                                |
+| `outputHash`    | Lowercase SHA-256 of the output                                                                               |
+| `outcome`       | `SUCCEEDED`, `FAILED`, `DENIED` or `PENDING` (required); `DENY` requires `DENIED`, `PENDING` requires `ALLOW` |
+| `correlationId` | Caller correlation, for example a conversation                                                                |
+| `attributes`    | Up to 32 string attributes                                                                                    |
+| `previousHash`  | Hash of the previous entry; 64 zeros for the first entry                                                      |
+| `hash`          | SHA-256 of the canonical JSON of every field except `hash`                                                    |
 
 <p style="text-align: justify;">
 
@@ -144,22 +145,83 @@ key from `GET /api/v1/keys`.
 
 </p>
 
+## Agents, Grants and Decisions
+
+<p style="text-align: justify;">
+
+The operator holds `LEDGER_API_KEY`. Every agent is registered by the operator and gets its own API key, shown only
+once and stored as a SHA-256 hash. An agent can record and read only its own evidence, grants and decisions; registering
+agents, creating and revoking grants, creating checkpoints and running the full verification belong to the operator.
+
+</p>
+
+<p style="text-align: justify;">
+
+A grant lets one agent act for one principal: a list of actions and a list of targets, each exact or ending with `*`,
+valid until `expiresAt`, optionally from `notBefore` and for at most `maxUses` allowed decisions. Its terms are hashed as
+the canonical JSON of `nexusphere-ledger/grant/v1` (`GrantTerms` in `ledger/chain`), and the hash is the `inputHash` of
+the `grant/create` evidence, so anyone can check that a grant was not changed after it was recorded.
+
+</p>
+
+<p style="text-align: justify;">
+
+Before acting, an agent asks for a decision. The ledger picks the active grant that covers the action and target and
+expires first, counts one use, and records the decision as evidence with outcome `PENDING`, or `DENIED` with the reason.
+The agent then reports `SUCCEEDED` or `FAILED` once; this is a second evidence entry carrying the `decisionId` attribute,
+the grant as `delegationId` and the same `inputHash` and `correlationId`. Concurrent decisions never use a grant more
+than `maxUses` times.
+
+</p>
+
+| Reason code        | Decision | Meaning                                                    |
+|--------------------|----------|------------------------------------------------------------|
+| `ALLOWED_BY_GRANT` | ALLOW    | An active grant covers the action and the target           |
+| `AGENT_NOT_ACTIVE` | DENY     | The agent is unknown or disabled                           |
+| `NO_ACTIVE_GRANT`  | DENY     | The principal has no active grant for this agent           |
+| `NOT_COVERED`      | DENY     | Active grants exist, but none covers the action and target |
+| `NOT_YET_VALID`    | DENY     | The covering grant starts later                            |
+| `USES_EXHAUSTED`   | DENY     | The covering grant has used all its uses                   |
+
+Agent, grant and decision changes are evidence too: `agent/register`, `agent/disable`, `agent/rotate-key`,
+`grant/create` and `grant/revoke`, with the owner or the granting principal as `principalId`.
+
+```shell
+curl -X POST http://localhost:8090/api/v1/agents -H "Authorization: Bearer nexusphere-ledger-development-key-change-me" -H "Content-Type: application/json" -d '{"agentId":"invoice-agent","name":"Invoice agent","ownerId":"acme"}'
+curl -X POST http://localhost:8090/api/v1/grants -H "Authorization: Bearer nexusphere-ledger-development-key-change-me" -H "Content-Type: application/json" -d '{"principalId":"alice","agentId":"invoice-agent","actions":["tools/call"],"targets":["send_email","read_*"],"expiresAt":"2026-12-31T00:00:00Z","maxUses":100}'
+curl -X POST http://localhost:8090/api/v1/decisions -H "Authorization: Bearer {agentApiKey}" -H "Content-Type: application/json" -d '{"principalId":"alice","action":"tools/call","target":"send_email"}'
+curl -X POST http://localhost:8090/api/v1/decisions/{decisionId}/outcome -H "Authorization: Bearer {agentApiKey}" -H "Content-Type: application/json" -d '{"outcome":"SUCCEEDED"}'
+```
+
 ## API
 
-All `/api/**` endpoints require `Authorization: Bearer {LEDGER_API_KEY}`.
+All `/api/**` endpoints require `Authorization: Bearer {LEDGER_API_KEY}` or an agent API key. Operator-only endpoints
+answer `403 FORBIDDEN` to agents.
 
-| Method | Path                         | Description                                                              |
-|--------|------------------------------|--------------------------------------------------------------------------|
-| POST   | `/api/v1/evidence`           | Record an evidence entry; returns `201` with `Location`                  |
-| GET    | `/api/v1/evidence/{id}`      | Get an evidence entry                                                    |
-| GET    | `/api/v1/evidence`           | List entries by `agentId`, `principalId`, `after` and `limit` (max 500)  |
-| GET    | `/api/v1/ledger/head`        | Current sequence and hash                                                |
-| POST   | `/api/v1/checkpoints`        | Sign the current head now; `409 LEDGER_EMPTY` when nothing is recorded   |
-| GET    | `/api/v1/checkpoints/latest` | Latest checkpoint                                                        |
-| GET    | `/api/v1/checkpoints`        | List checkpoints by `after` and `limit`                                  |
-| GET    | `/api/v1/keys`               | Public signing keys                                                      |
-| GET    | `/api/v1/verification`       | Full verification report                                                 |
-| GET    | `/actuator/health`           | Health, open for probes                                                  |
+| Method | Path                               | Description                                                                       |
+|--------|------------------------------------|-----------------------------------------------------------------------------------|
+| POST   | `/api/v1/evidence`                 | Record an evidence entry; returns `201` with `Location`                           |
+| GET    | `/api/v1/evidence/{id}`            | Get an evidence entry                                                             |
+| GET    | `/api/v1/evidence`                 | List entries by `agentId`, `principalId`, `after` and `limit` (max 500)           |
+| GET    | `/api/v1/ledger/head`              | Current sequence and hash                                                         |
+| POST   | `/api/v1/checkpoints`              | Sign the current head now; `409 LEDGER_EMPTY` when nothing is recorded (operator) |
+| GET    | `/api/v1/checkpoints/latest`       | Latest checkpoint                                                                 |
+| GET    | `/api/v1/checkpoints`              | List checkpoints by `after` and `limit`                                           |
+| GET    | `/api/v1/keys`                     | Public signing keys                                                               |
+| GET    | `/api/v1/verification`             | Full verification report (operator)                                               |
+| POST   | `/api/v1/agents`                   | Register an agent and return its API key once (operator)                          |
+| GET    | `/api/v1/agents`                   | List agents by `after` and `limit` (operator)                                     |
+| GET    | `/api/v1/agents/{agentId}`         | Get an agent                                                                      |
+| POST   | `/api/v1/agents/{agentId}/disable` | Disable an agent and its key (operator)                                           |
+| POST   | `/api/v1/agents/{agentId}/key`     | Issue a new API key; the old one stops working (operator)                         |
+| POST   | `/api/v1/grants`                   | Create a grant (operator)                                                         |
+| GET    | `/api/v1/grants`                   | List grants by `agentId`, `principalId`, `after` and `limit`                      |
+| GET    | `/api/v1/grants/{id}`              | Get a grant with its status and uses                                              |
+| POST   | `/api/v1/grants/{id}/revoke`       | Revoke a grant with an optional `reason` (operator)                               |
+| POST   | `/api/v1/decisions`                | Decide an action for an agent and record it; returns `201`                        |
+| GET    | `/api/v1/decisions/{id}`           | Get a decision and its outcome                                                    |
+| POST   | `/api/v1/decisions/{id}/outcome`   | Report `SUCCEEDED` or `FAILED` once for an allowed decision                       |
+| GET    | `/actuator/health`                 | Health, open for probes                                                           |
 
 ```json
 {
