@@ -16,4 +16,8 @@ public interface CheckpointRepository {
     List<SignedCheckpoint> list(long afterSequence, int limit);
 
     List<SignedCheckpoint> between(long afterSequence, long upToSequence);
+
+    Optional<SignedCheckpoint> firstAtOrAfter(long sequence);
+
+    Optional<SignedCheckpoint> lastBefore(long sequence);
 }

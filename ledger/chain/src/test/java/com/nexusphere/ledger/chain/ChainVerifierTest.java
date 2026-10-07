@@ -100,4 +100,46 @@ class ChainVerifierTest {
         assertThat(entry.recordedAt().getNano() % 1000).isZero();
         assertThat(entry.computeHash()).isEqualTo(entry.hash());
     }
+
+    @Test
+    void redactedLinksKeepTheChainVerifiable() {
+        List<EvidenceEntry> entries = chain(5);
+        ChainVerifier verifier = new ChainVerifier();
+
+        verifier.accept(entries.get(0).link());
+        verifier.accept(entries.get(1));
+        verifier.accept(entries.get(2).link());
+        verifier.accept(entries.get(3).link());
+        verifier.accept(entries.get(4));
+
+        assertThat(verifier.result().valid()).isTrue();
+        assertThat(verifier.result().lastHash()).isEqualTo(entries.get(4).hash());
+    }
+
+    @Test
+    void aForgedRedactedLinkIsDetected() {
+        List<EvidenceEntry> entries = chain(3);
+        EvidenceLink genuine = entries.get(1).link();
+        EvidenceLink forged = new EvidenceLink(genuine.sequence(), genuine.previousHash(),
+                Hashes.sha256(new byte[]{9}), genuine.hash());
+        ChainVerifier verifier = new ChainVerifier();
+
+        verifier.accept(entries.get(0));
+        verifier.accept(forged);
+
+        assertThat(verifier.result().valid()).isFalse();
+        assertThat(verifier.result().failedSequence()).isEqualTo(2);
+    }
+
+    @Test
+    void verificationCanStartAfterAnAnchor() {
+        List<EvidenceEntry> entries = chain(4);
+        ChainVerifier verifier = new ChainVerifier(3, entries.get(1).hash());
+
+        verifier.accept(entries.get(2));
+        verifier.accept(entries.get(3));
+
+        assertThat(verifier.result().valid()).isTrue();
+        assertThat(verifier.result().checkedEntries()).isEqualTo(2);
+    }
 }

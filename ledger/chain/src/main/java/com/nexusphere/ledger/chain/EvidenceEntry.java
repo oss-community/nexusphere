@@ -48,14 +48,21 @@ public record EvidenceEntry(
     }
 
     public String computeHash() {
+        return EvidenceLink.hashOf(sequence, previousHash, contentHash());
+    }
+
+    public String contentHash() {
         return Hashes.sha256(CanonicalJson.bytes(canonicalContent()));
+    }
+
+    public EvidenceLink link() {
+        return new EvidenceLink(sequence, previousHash, contentHash(), hash);
     }
 
     public Map<String, Object> canonicalContent() {
         Map<String, Object> content = new LinkedHashMap<>();
         content.put("format", FORMAT);
         content.put("id", id.toString());
-        content.put("sequence", sequence);
         content.put("occurredAt", Timestamps.format(occurredAt));
         content.put("recordedAt", Timestamps.format(recordedAt));
         content.put("agentId", agentId);
@@ -70,7 +77,6 @@ public record EvidenceEntry(
         content.put("outcome", outcome);
         content.put("correlationId", correlationId);
         content.put("attributes", attributes);
-        content.put("previousHash", previousHash);
         return content;
     }
 }

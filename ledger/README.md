@@ -11,6 +11,7 @@
 * [Environment Variables](#environment-variables)
 * [Evidence Format](#evidence-format)
 * [Verification](#verification)
+* [Evidence Packages](#evidence-packages)
 * [Agents, Grants and Decisions](#agents-grants-and-decisions)
 * [MCP Gateway](#mcp-gateway)
 * [API](#api)
@@ -34,7 +35,7 @@ interval. Anyone holding the published public key can check the chain and the ch
 | L1    | Evidence core              | Hash chain, append-only storage, signed checkpoints, verification API          | ✓      |
 | L2    | Grants and decisions       | Grants from a principal to an agent, ALLOW/DENY decisions recorded as evidence | ✓      |
 | L3    | MCP gateway                | A gateway in front of MCP servers that decides and records every tool call     | ✓      |
-| L4    | Evidence package           | Exported evidence package and an offline verifier CLI                          |        |
+| L4    | Evidence package           | Exported evidence package and an offline verifier CLI                          | ✓      |
 | L5    | Release                    | Compose file, demo and release                                                 |        |
 | M1    | Mandate format             | Signed cross-organization mandates with a status list                          |        |
 | M2    | Verifier SDK               | Mandate verification library                                                   |        |
@@ -46,6 +47,7 @@ interval. Anyone holding the published public key can check the chain and the ch
 |---------------------------|--------------------------------------------------------------------------------------------------------------|
 | `ledger/chain`            | Canonical JSON, evidence entry, hash chain verifier, Ed25519 keys and checkpoints. No framework dependencies |
 | `ledger/server`           | Spring Boot service: evidence API, PostgreSQL storage, checkpoint scheduler, verification                    |
+| `ledger/verifier`         | Offline verifier for evidence packages, a command-line tool with no server dependency                        |
 | `ledger/ledger-e2e-tests` | End-to-end tests against the server and PostgreSQL                                                           |
 
 ## Getting Started
@@ -127,11 +129,13 @@ export LEDGER_SIGNING_PUBLIC_KEY=$(openssl pkey -inform DER -in ledger-signing.d
 | `correlationId` | Caller correlation, for example a conversation                                                                |
 | `attributes`    | Up to 32 string attributes                                                                                    |
 | `previousHash`  | Hash of the previous entry; 64 zeros for the first entry                                                      |
-| `hash`          | SHA-256 of the canonical JSON of every field except `hash`                                                    |
+| `hash`          | SHA-256 of the canonical JSON of `format`, `sequence`, `previousHash` and `contentHash`                       |
 
 <p style="text-align: justify;">
 
-Canonical JSON has sorted keys, no whitespace and `null` for absent fields. Timestamps are UTC with microseconds, for
+The content hash is the SHA-256 of the canonical JSON of `format` and every field except `sequence`, `previousHash`
+and `hash`. The link (`sequence`, `previousHash`, `contentHash`, `hash`) can be checked without the content, so a
+package can keep entries private and still prove the chain. Canonical JSON has sorted keys, no whitespace and `null` for absent fields. Timestamps are UTC with microseconds, for
 example `2026-10-01T08:00:00.123456Z`. A checkpoint signs the canonical JSON of `format`
 (`nexusphere-ledger/checkpoint/v1`), `sequence`, `headHash`, `createdAt` and `keyId`. The key ID is the first 16 hex
 characters of the SHA-256 of the X.509 public key.
@@ -148,6 +152,45 @@ it names and checks the head. The same checks run outside the server with `ledge
 key from `GET /api/v1/keys`.
 
 </p>
+
+## Evidence Packages
+
+<p style="text-align: justify;">
+
+`POST /api/v1/packages` exports an evidence package for an auditor, a court or a counterparty. The request selects
+evidence by `agentId`, `principalId`, `fromSequence` and `toSequence`. The package (`nexusphere-ledger/package/v1`)
+holds the public key, an anchor checkpoint (the last checkpoint before the first selected entry, or genesis), an end
+checkpoint (the first checkpoint at or after the last selected entry, created at the head when none exists yet) and
+every link between them. Only selected links carry their full entry; all others carry only their link, so nothing
+outside the selection is disclosed. A package holds at most 200,000 links.
+
+</p>
+
+<p style="text-align: justify;">
+
+The verifier needs no server and no database. It checks the signatures of both checkpoints, recomputes every link from
+the anchor to the end checkpoint, checks every disclosed entry against its content hash and the scope of the package,
+and exits with `0` for a valid package, `1` for an invalid one and `2` for a usage error. Pass the ledger's public key
+from `GET /api/v1/keys` (or a key published elsewhere) with `--public-key` so the verifier does not trust the key inside
+the package.
+
+</p>
+
+```shell
+curl -X POST http://localhost:8090/api/v1/packages -H "Authorization: Bearer nexusphere-ledger-development-key-change-me" -H "Content-Type: application/json" -d '{"agentId":"invoice-agent"}' -o package.json
+mvn -pl ledger/verifier -am package -DskipTests=true
+java -jar ledger/verifier/target/verifier-1.0.0-SNAPSHOT-exec.jar --public-key "$(curl -s http://localhost:8090/api/v1/keys -H 'Authorization: Bearer nexusphere-ledger-development-key-change-me' | jq -r '.[0].publicKey')" package.json
+```
+
+```text
+Nexusphere Ledger evidence package
+  Signing key : 3f2a9c0d41b7e865 (pinned)
+  Checkpoint  : sequence 42, signed at 2026-10-07T12:00:00.000123Z
+  Anchor      : checkpoint 40
+  Chain       : 2 links from sequence 41
+  Disclosed   : 1 entries, agent invoice-agent
+Result: VALID
+```
 
 ## Agents, Grants and Decisions
 
@@ -231,32 +274,33 @@ curl -X POST http://localhost:8090/mcp/files -H "Authorization: Bearer {agentApi
 All `/api/**` endpoints require `Authorization: Bearer {LEDGER_API_KEY}` or an agent API key. Operator-only endpoints
 answer `403 FORBIDDEN` to agents.
 
-| Method | Path                               | Description                                                                       |
-|--------|------------------------------------|-----------------------------------------------------------------------------------|
-| POST   | `/api/v1/evidence`                 | Record an evidence entry; returns `201` with `Location`                           |
-| GET    | `/api/v1/evidence/{id}`            | Get an evidence entry                                                             |
-| GET    | `/api/v1/evidence`                 | List entries by `agentId`, `principalId`, `after` and `limit` (max 500)           |
-| GET    | `/api/v1/ledger/head`              | Current sequence and hash                                                         |
-| POST   | `/api/v1/checkpoints`              | Sign the current head now; `409 LEDGER_EMPTY` when nothing is recorded (operator) |
-| GET    | `/api/v1/checkpoints/latest`       | Latest checkpoint                                                                 |
-| GET    | `/api/v1/checkpoints`              | List checkpoints by `after` and `limit`                                           |
-| GET    | `/api/v1/keys`                     | Public signing keys                                                               |
-| GET    | `/api/v1/verification`             | Full verification report (operator)                                               |
-| POST   | `/api/v1/agents`                   | Register an agent and return its API key once (operator)                          |
-| GET    | `/api/v1/agents`                   | List agents by `after` and `limit` (operator)                                     |
-| GET    | `/api/v1/agents/{agentId}`         | Get an agent                                                                      |
-| POST   | `/api/v1/agents/{agentId}/disable` | Disable an agent and its key (operator)                                           |
-| POST   | `/api/v1/agents/{agentId}/key`     | Issue a new API key; the old one stops working (operator)                         |
-| POST   | `/api/v1/grants`                   | Create a grant (operator)                                                         |
-| GET    | `/api/v1/grants`                   | List grants by `agentId`, `principalId`, `after` and `limit`                      |
-| GET    | `/api/v1/grants/{id}`              | Get a grant with its status and uses                                              |
-| POST   | `/api/v1/grants/{id}/revoke`       | Revoke a grant with an optional `reason` (operator)                               |
-| POST   | `/api/v1/decisions`                | Decide an action for an agent and record it; returns `201`                        |
-| GET    | `/api/v1/decisions/{id}`           | Get a decision and its outcome                                                    |
-| POST   | `/api/v1/decisions/{id}/outcome`   | Report `SUCCEEDED` or `FAILED` once for an allowed decision                       |
-| POST   | `/mcp/{server}`                    | MCP gateway: decide, forward and record a `tools/call`; forward other messages    |
-| DELETE | `/mcp/{server}`                    | Close an MCP session on the server                                                |
-| GET    | `/actuator/health`                 | Health, open for probes                                                           |
+| Method | Path                               | Description                                                                                        |
+|--------|------------------------------------|----------------------------------------------------------------------------------------------------|
+| POST   | `/api/v1/evidence`                 | Record an evidence entry; returns `201` with `Location`                                            |
+| GET    | `/api/v1/evidence/{id}`            | Get an evidence entry                                                                              |
+| GET    | `/api/v1/evidence`                 | List entries by `agentId`, `principalId`, `after` and `limit` (max 500)                            |
+| GET    | `/api/v1/ledger/head`              | Current sequence and hash                                                                          |
+| POST   | `/api/v1/checkpoints`              | Sign the current head now; `409 LEDGER_EMPTY` when nothing is recorded (operator)                  |
+| GET    | `/api/v1/checkpoints/latest`       | Latest checkpoint                                                                                  |
+| GET    | `/api/v1/checkpoints`              | List checkpoints by `after` and `limit`                                                            |
+| GET    | `/api/v1/keys`                     | Public signing keys                                                                                |
+| POST   | `/api/v1/packages`                 | Export an evidence package by `agentId`, `principalId`, `fromSequence` and `toSequence` (operator) |
+| GET    | `/api/v1/verification`             | Full verification report (operator)                                                                |
+| POST   | `/api/v1/agents`                   | Register an agent and return its API key once (operator)                                           |
+| GET    | `/api/v1/agents`                   | List agents by `after` and `limit` (operator)                                                      |
+| GET    | `/api/v1/agents/{agentId}`         | Get an agent                                                                                       |
+| POST   | `/api/v1/agents/{agentId}/disable` | Disable an agent and its key (operator)                                                            |
+| POST   | `/api/v1/agents/{agentId}/key`     | Issue a new API key; the old one stops working (operator)                                          |
+| POST   | `/api/v1/grants`                   | Create a grant (operator)                                                                          |
+| GET    | `/api/v1/grants`                   | List grants by `agentId`, `principalId`, `after` and `limit`                                       |
+| GET    | `/api/v1/grants/{id}`              | Get a grant with its status and uses                                                               |
+| POST   | `/api/v1/grants/{id}/revoke`       | Revoke a grant with an optional `reason` (operator)                                                |
+| POST   | `/api/v1/decisions`                | Decide an action for an agent and record it; returns `201`                                         |
+| GET    | `/api/v1/decisions/{id}`           | Get a decision and its outcome                                                                     |
+| POST   | `/api/v1/decisions/{id}/outcome`   | Report `SUCCEEDED` or `FAILED` once for an allowed decision                                        |
+| POST   | `/mcp/{server}`                    | MCP gateway: decide, forward and record a `tools/call`; forward other messages                     |
+| DELETE | `/mcp/{server}`                    | Close an MCP session on the server                                                                 |
+| GET    | `/actuator/health`                 | Health, open for probes                                                                            |
 
 ```json
 {

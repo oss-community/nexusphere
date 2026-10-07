@@ -3,6 +3,7 @@ package com.nexusphere.ledger.evidence.infrastructure.persistence;
 import com.nexusphere.ledger.chain.EvidenceEntry;
 import com.nexusphere.ledger.evidence.domain.model.EvidenceQuery;
 import com.nexusphere.ledger.evidence.domain.model.LedgerHead;
+import com.nexusphere.ledger.evidence.domain.model.Selection;
 import com.nexusphere.ledger.evidence.domain.repository.EvidenceRepository;
 import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
@@ -112,6 +113,25 @@ class JdbcEvidenceRepository implements EvidenceRepository {
         return withAttributes(jdbc.query(SELECT + " where sequence > :after order by sequence limit :limit",
                 new MapSqlParameterSource("after", afterSequence).addValue("limit", limit),
                 JdbcEvidenceRepository::row));
+    }
+
+    @Override
+    public Selection select(String agentId, String principalId, long fromSequence, long toSequence) {
+        StringBuilder sql = new StringBuilder("""
+                select count(*) as selected, coalesce(min(sequence), 0) as first, coalesce(max(sequence), 0) as last
+                from ledger.evidence_record where sequence between :from and :to
+                """);
+        MapSqlParameterSource params = new MapSqlParameterSource("from", fromSequence).addValue("to", toSequence);
+        if (agentId != null) {
+            sql.append(" and agent_id = :agentId");
+            params.addValue("agentId", agentId);
+        }
+        if (principalId != null) {
+            sql.append(" and principal_id = :principalId");
+            params.addValue("principalId", principalId);
+        }
+        return jdbc.queryForObject(sql.toString(), params, (rs, row) -> new Selection(rs.getLong("selected"),
+                rs.getLong("first"), rs.getLong("last")));
     }
 
     private Optional<EvidenceEntry> single(String sql, MapSqlParameterSource params) {
