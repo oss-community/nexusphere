@@ -8,6 +8,8 @@ import org.springframework.boot.testcontainers.service.connection.ServiceConnect
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Import;
 import org.springframework.test.context.ActiveProfiles;
+import org.springframework.test.context.DynamicPropertyRegistry;
+import org.springframework.test.context.DynamicPropertySource;
 import org.testcontainers.postgresql.PostgreSQLContainer;
 import org.testcontainers.utility.DockerImageName;
 
@@ -32,8 +34,21 @@ public abstract class LedgerE2ETestBase {
         }
     }
 
+    protected static final FakeMcpServer MCP = FakeMcpServer.start();
+
+    @DynamicPropertySource
+    static void mcpServers(DynamicPropertyRegistry registry) {
+        registry.add("ledger.mcp.servers.files.url", MCP::url);
+        registry.add("ledger.mcp.servers.files.authorization", () -> FakeMcpServer.AUTHORIZATION);
+        registry.add("ledger.mcp.servers.offline.url", () -> "http://localhost:1/mcp");
+    }
+
     @LocalServerPort
     private int port;
+
+    protected String baseUrl() {
+        return "http://localhost:" + port;
+    }
 
     protected LedgerClient ledger() {
         return new LedgerClient("http://localhost:" + port, LedgerClient.DEVELOPMENT_API_KEY);

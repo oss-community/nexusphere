@@ -19,6 +19,8 @@ ledger:
     public-key: ${LEDGER_SIGNING_PUBLIC_KEY:}
   checkpoint:
     interval: ${LEDGER_CHECKPOINT_INTERVAL:1m}
+  mcp:
+    timeout: ${LEDGER_MCP_TIMEOUT:60s}
 management:
   endpoints:
     web:
