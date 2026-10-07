@@ -9,7 +9,7 @@
         <version>1.0.0-SNAPSHOT</version>
     </parent>
 
-    <artifactId>e2e-tests</artifactId>
+    <artifactId>core-e2e-tests</artifactId>
     <name>Nexusphere End-to-End Tests</name>
     <description>
         Black-box tests of the public API. The application is started from the bootstrap module against

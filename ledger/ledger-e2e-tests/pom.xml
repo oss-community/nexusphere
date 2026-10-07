@@ -9,7 +9,7 @@
         <version>1.0.0-SNAPSHOT</version>
     </parent>
 
-    <artifactId>e2e-tests</artifactId>
+    <artifactId>ledger-e2e-tests</artifactId>
     <name>Nexusphere Ledger End-to-End Tests</name>
     <description>
         Black-box tests of the ledger API. The server is started against PostgreSQL in Testcontainers; tests talk to

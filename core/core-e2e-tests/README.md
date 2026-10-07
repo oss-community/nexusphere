@@ -26,13 +26,13 @@ mvn verify
 
 ```shell
 mvn install -DskipTests=true
-mvn -pl core/e2e-tests verify
+mvn -pl core/core-e2e-tests verify
 ```
 
 ### Run One Test Class
 
 ```shell
-mvn -pl core/e2e-tests verify -Dit.test=IdentityMembershipE2ETest
+mvn -pl core/core-e2e-tests verify -Dit.test=IdentityMembershipE2ETest
 ```
 
 ## Test Harness

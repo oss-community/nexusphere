@@ -17,7 +17,7 @@
     <modules>
         <module>chain</module>
         <module>server</module>
-        <module>e2e-tests</module>
+        <module>ledger-e2e-tests</module>
     </modules>
 
     <properties>
