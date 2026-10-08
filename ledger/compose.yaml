@@ -18,6 +18,18 @@ services:
       interval: 5s
       timeout: 3s
       retries: 20
+  ledger-adminer:
+    image: adminer
+    container_name: ledger-adminer
+    hostname: ledger-adminer
+    restart: always
+    ports:
+      - "8092:8080"
+    command: [ "php", "-S", "0.0.0.0:8080", "-t", "/var/www/html" ]
+    environment:
+      ADMINER_DEFAULT_SERVER: ledger-postgresql
+    depends_on:
+      - ledger-postgresql
   demo-mcp:
     image: samanalishiri/nexusphere-ledger-demo-mcp:latest
     build:

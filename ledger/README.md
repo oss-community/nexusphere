@@ -62,6 +62,7 @@ curl -X GET http://localhost:8090/actuator/health
 | `ledger`            | http://localhost:8090     | The ledger with the `dev` profile                |
 | `demo-mcp`          | http://localhost:8091/mcp | Demo MCP server, reached through `/mcp/demo`     |
 | `ledger-postgresql` | localhost:5433            | PostgreSQL, user, password and database `ledger` |
+| `ledger-adminer`    | http://localhost:8092     | Adminer for `ledger-postgresql`                  |
 
 <p style="text-align: justify;">
 

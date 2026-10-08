@@ -47,7 +47,7 @@ mvn package -DskipTests=true
 ### Run
 
 ```shell
-docker compose --file compose.yaml --project-name dev up -d postgresql pgadmin adminer
+docker compose --file compose.yaml --project-name dev up -d postgresql adminer
 mvn install -DskipTests=true
 mvn -pl core/bootstrap spring-boot:start
 ```
@@ -129,11 +129,6 @@ kubectl port-forward service/postgresql 5432:5432 -n dev
 ```
 
 ```shell
-# PgAdmin
-kubectl port-forward service/pgadmin 8081:80 -n dev
-```
-
-```shell
 # Adminer
 kubectl port-forward service/adminer 8082:8080 -n dev
 ```
@@ -157,7 +152,6 @@ kubectl delete all --all -n dev
 kubectl delete secrets dev-credentials -n dev
 kubectl delete configMap dev-config -n dev
 kubectl delete persistentvolumeclaim postgres-pvc -n dev
-kubectl delete persistentvolumeclaim pgadmin-pvc -n dev
 docker image rm samanalishiri/nexusphere:latest
 docker volume prune -f
 ```
@@ -197,19 +191,14 @@ name.
 * Swagger UI: [http://localhost:8080/swagger-ui.html](http://localhost:8080/swagger-ui.html)
 * OpenAPI: [http://localhost:8080/v3/api-docs](http://localhost:8080/v3/api-docs)
 * Health: [http://localhost:8080/actuator/health](http://localhost:8080/actuator/health)
-* PgAdmin: [http://localhost:8081](http://localhost:8081)
 * Adminer: [http://localhost:8082](http://localhost:8082)
 
 ```yaml
-# PgAdmin
-Host: postgresql
-Port: 5432
-Maintenance_database: nexusphere
-# Adminer
+System: PostgreSQL
 Server: postgresql:5432
-
 Username: nexusphere
 Password: nexusphere
+Database: nexusphere
 ```
 
 ---

@@ -14,19 +14,6 @@ services:
     volumes:
       - "postgresql-data:/var/lib/postgresql"
       - "./infrastructure/postgres/init:/docker-entrypoint-initdb.d:ro"
-  pgadmin:
-    image: dpage/pgadmin4
-    container_name: pgadmin
-    hostname: pgadmin
-    restart: always
-    ports:
-      - "8081:80"
-    environment:
-      PGADMIN_DEFAULT_EMAIL: pgadmin4@pgadmin.org
-      PGADMIN_DEFAULT_PASSWORD: "password"
-      PGADMIN_CONFIG_SERVER_MODE: "False"
-    volumes:
-      - "pgadmin-data:/var/lib/pgadmin"
   adminer:
     image: adminer
     container_name: adminer
@@ -34,6 +21,9 @@ services:
     restart: always
     ports:
       - "8082:8080"
+    command: [ "php", "-S", "0.0.0.0:8080", "-t", "/var/www/html" ]
+    environment:
+      ADMINER_DEFAULT_SERVER: postgresql
   application:
     image: samanalishiri/nexusphere:latest
     build:
@@ -59,8 +49,6 @@ services:
       APP_OPERATOR_SECRET: nexusphere-development-operator-secret-change-me
     depends_on:
       - postgresql
-      - pgadmin
       - adminer
 volumes:
   postgresql-data:
-  pgadmin-data:
