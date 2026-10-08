@@ -5,7 +5,6 @@
 ## <p align="center">Table of Content</p>
 
 * [Purpose](#purpose)
-* [Roadmap](#roadmap)
 * [Modules](#modules)
 * [Getting Started](#getting-started)
 * [Environment Variables](#environment-variables)
@@ -29,19 +28,6 @@ a SHA-256 hash chain, the database rejects any change or deletion, and the ledge
 interval. Anyone holding the published public key can check the chain and the checkpoints without trusting the server.
 
 </p>
-
-## Roadmap
-
-| Phase | Name                       | Delivers                                                                       | Status |
-|-------|----------------------------|--------------------------------------------------------------------------------|--------|
-| L1    | Evidence core              | Hash chain, append-only storage, signed checkpoints, verification API          | ✓      |
-| L2    | Grants and decisions       | Grants from a principal to an agent, ALLOW/DENY decisions recorded as evidence | ✓      |
-| L3    | MCP gateway                | A gateway in front of MCP servers that decides and records every tool call     | ✓      |
-| L4    | Evidence package           | Exported evidence package and an offline verifier CLI                          | ✓      |
-| L5    | Release                    | Compose file, demo and release                                                 | ✓      |
-| M1    | Mandate format             | Signed cross-organization mandates with a status list                          | ✓      |
-| M2    | Verifier SDK               | Mandate verification library                                                   | ✓      |
-| M3    | A2A and two-sided evidence | Mandates over A2A with evidence on both sides                                  | ✓      |
 
 ## Modules
 
