@@ -15,13 +15,13 @@ mvn_plugin() {
   printf '%s:%s:%s' "$coordinates" "$(value "$key" "$default_version")" "$goal"
 }
 
-mvn_source_jar()   { mvn_plugin MVN_SOURCE_VERSION org.apache.maven.plugins:maven-source-plugin 3.3.1 jar-no-fork; }
-mvn_javadoc_jar()  { mvn_plugin MVN_JAVADOC_VERSION org.apache.maven.plugins:maven-javadoc-plugin 3.11.2 jar; }
+mvn_source_jar()   { mvn_plugin MVN_SOURCE_VERSION org.apache.maven.plugins:maven-source-plugin 3.4.0 jar-no-fork; }
+mvn_javadoc_jar()  { mvn_plugin MVN_JAVADOC_VERSION org.apache.maven.plugins:maven-javadoc-plugin 3.12.0 jar; }
 mvn_checkstyle()   { mvn_plugin MVN_CHECKSTYLE_VERSION org.apache.maven.plugins:maven-checkstyle-plugin 3.6.0 check; }
-mvn_deploy()       { mvn_plugin MVN_DEPLOY_VERSION org.apache.maven.plugins:maven-deploy-plugin 3.1.3 deploy; }
-mvn_site()         { mvn_plugin MVN_SITE_VERSION org.apache.maven.plugins:maven-site-plugin 3.21.0 "$1"; }
+mvn_deploy()       { mvn_plugin MVN_DEPLOY_VERSION org.apache.maven.plugins:maven-deploy-plugin 3.2.0 deploy; }
+mvn_site()         { mvn_plugin MVN_SITE_VERSION org.apache.maven.plugins:maven-site-plugin 3.22.0 "$1"; }
 mvn_scm_publish()  { mvn_plugin MVN_SCM_PUBLISH_VERSION org.apache.maven.plugins:maven-scm-publish-plugin 3.3.0 publish-scm; }
-mvn_sonar()        { mvn_plugin MVN_SONAR_VERSION org.sonarsource.scanner.maven:sonar-maven-plugin 4.0.0.4121 sonar; }
+mvn_sonar()        { mvn_plugin MVN_SONAR_VERSION org.sonarsource.scanner.maven:sonar-maven-plugin 5.8.0.7211 sonar; }
 
 # Goals that attach the sources and javadoc jars, when enabled in the build module.
 mvn_attach_goals() {
@@ -38,5 +38,8 @@ mvn_deploy_args() {
     "$(mvn_attach_goals)" "$(mvn_deploy)" "$1" "$2" "$3" "$4"
 }
 
-mvn_versions_set() { mvn_plugin MVN_VERSIONS_VERSION org.codehaus.mojo:versions-maven-plugin 2.18.0 set; }
-mvn_evaluate()     { mvn_plugin MVN_HELP_VERSION org.apache.maven.plugins:maven-help-plugin 3.5.1 evaluate; }
+mvn_versions_set() { mvn_plugin MVN_VERSIONS_VERSION org.codehaus.mojo:versions-maven-plugin 2.22.0 set; }
+mvn_evaluate()     { mvn_plugin MVN_HELP_VERSION org.apache.maven.plugins:maven-help-plugin 3.5.2 evaluate; }
+
+# Official Maven image with the project's Java, for pipelines run in containers.
+maven_image() { printf 'maven:%s-eclipse-temurin-%s' "$(value MAVEN_VERSION 3.9)" "$(value JAVA_VERSION 21)"; }

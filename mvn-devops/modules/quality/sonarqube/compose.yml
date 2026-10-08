@@ -1,16 +1,16 @@
 services:
   sonarqube-db:
-    image: postgres:16
+    image: postgres:18
     restart: unless-stopped
     environment:
       POSTGRES_DB: ${SONAR_DB}
       POSTGRES_USER: ${SONAR_DB_USER}
       POSTGRES_PASSWORD: ${SONAR_DB_PASSWORD}
     volumes:
-      - sonarqube-db:/var/lib/postgresql/data
+      - sonarqube-db:/var/lib/postgresql
 
   sonarqube:
-    image: sonarqube:${SONAR_IMAGE_TAG:-lts-community}
+    image: sonarqube:${SONAR_IMAGE_TAG:-26.9.0.129388-community}
     restart: unless-stopped
     depends_on:
       - sonarqube-db

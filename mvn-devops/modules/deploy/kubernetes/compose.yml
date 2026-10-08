@@ -1,0 +1,32 @@
+# A one-node Kubernetes cluster (k3s) for the environments.  Left out when
+# KUBERNETES_SERVER_URL names an existing cluster.  The port of each
+# environment is published by a fragment module_prepare writes (module.sh).
+services:
+  k3s:
+    image: rancher/k3s:${K3S_IMAGE_TAG:-v1.37.1-k3s1}
+    command: >-
+      server --disable traefik --disable metrics-server
+      --tls-san k3s --tls-san localhost --tls-san ${DEVOPS_HOST:-localhost}
+      ${K3S_EXTRA_ARGS:-}
+    privileged: true
+    restart: unless-stopped
+    environment:
+      K3S_KUBECONFIG_OUTPUT: /output/kubeconfig.yaml
+      K3S_KUBECONFIG_MODE: "644"
+    ports:
+      - "${KUBERNETES_API_HOST_PORT}:6443"
+      # Argo CD's web console, when the argocd module installs it.
+      - "${ARGOCD_HOST_PORT:-8443}:30443"
+    tmpfs:
+      - /run
+      - /var/run
+    volumes:
+      - k3s-data:/var/lib/rancher/k3s
+      # Pod logs, read by Grafana Alloy when the loki module is selected.
+      - k3s-pod-logs:/var/log/pods
+      - ${DEVOPS_STATE}/k3s:/output
+      - ${DEVOPS_STATE}/k3s/registries.yaml:/etc/rancher/k3s/registries.yaml:ro
+
+volumes:
+  k3s-data:
+  k3s-pod-logs:

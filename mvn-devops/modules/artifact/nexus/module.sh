@@ -7,14 +7,15 @@
 module_secrets() {
   ask_server NEXUS Nexus https://nexus.example.com
   if server_external NEXUS; then
-    ask NEXUS_USERNAME "Nexus user that may deploy" admin
+    ask_local NEXUS_USERNAME "Nexus user that may deploy" admin
     ask_secret NEXUS_PASSWORD "Password of $(value NEXUS_USERNAME)"
   else
     ask NEXUS_HOST_PORT "Nexus port on the Docker machine" 8084
     ask_secret NEXUS_ADMIN_PASSWORD "New Nexus admin password" "$(random_password)"
     log_dim "  Nexus Community Edition accepts uploads only after you accept its EULA:"
     log_dim "  https://links.sonatype.com/products/nxrm/ce-eula"
-    ask NEXUS_ACCEPT_EULA "Accept the Nexus Community Edition EULA? yes/no" no
+    # A licence is accepted by a person, also with a ready-made pipeline.
+    DEVOPS_PRESET=0 ask NEXUS_ACCEPT_EULA "Accept the Nexus Community Edition EULA? yes/no" no
   fi
   ask NEXUS_SNAPSHOT_REPOSITORY "Nexus snapshot repository" maven-snapshots
   ask NEXUS_RELEASE_REPOSITORY "Nexus release repository" maven-releases

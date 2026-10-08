@@ -8,7 +8,7 @@
 #   compose.yml   optional docker compose fragment
 #
 # A category directory holds category.conf with CATEGORY_TITLE, CATEGORY_ORDER
-# and CATEGORY_MODE (required | single | multi).
+# and CATEGORY_MODE (required | single | optional | multi).
 
 DEVOPS_MODULES_DIR="$DEVOPS_HOME/modules"
 
@@ -100,6 +100,9 @@ module_hook() {
     MODULE_ID=$id
     MODULE_DIR=$dir
     export MODULE_ID MODULE_DIR
+    # The deployment environments, in order (lib/environments.sh).
+    # shellcheck disable=SC2034  # read by the modules
+    ENVIRONMENTS=$(environments)
     # shellcheck disable=SC1091
     source "$dir/module.conf"
     # shellcheck disable=SC1091
@@ -128,7 +131,9 @@ modules_hook() {
 }
 
 # Selected modules that ship a compose fragment, except those using an
-# existing server (MODULE_SERVER prefix with a <PREFIX>_SERVER_URL).
+# existing server (MODULE_SERVER prefix with a <PREFIX>_SERVER_URL).  A
+# module's prepare hook may add to its fragment what depends on the project
+# in $(module_compose_extra <id>), e.g. one published port per environment.
 compose_files() {
   local id server
   for id in $MODULES; do
@@ -136,5 +141,9 @@ compose_files() {
     server=$(module_field "$id" MODULE_SERVER)
     [[ -n $server ]] && server_external "$server" && continue
     printf '%s\n' "$(module_dir "$id")/compose.yml"
+    [[ -f "$(module_compose_extra "$id")" ]] && printf '%s\n' "$(module_compose_extra "$id")"
   done
+  return 0
 }
+
+module_compose_extra() { printf '%s/compose/%s.yml' "$DEVOPS_GENERATED" "${1//\//-}"; }

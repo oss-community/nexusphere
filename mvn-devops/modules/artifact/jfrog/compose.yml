@@ -1,13 +1,13 @@
 services:
   jfrog-db:
-    image: postgres:16
+    image: postgres:18
     restart: unless-stopped
     environment:
       POSTGRES_DB: ${JFROG_DB}
       POSTGRES_USER: ${JFROG_DB_USER}
       POSTGRES_PASSWORD: ${JFROG_DB_PASSWORD}
     volumes:
-      - jfrog-db:/var/lib/postgresql/data
+      - jfrog-db:/var/lib/postgresql
 
   jfrog:
     image: releases-docker.jfrog.io/jfrog/artifactory-oss:${JFROG_IMAGE_TAG:-latest}

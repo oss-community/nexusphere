@@ -41,6 +41,7 @@ Hook functions. Each hook runs in its own subshell with the library loaded,
 | `module_env` | every command | export pipeline variables with `pipeline_var` / `pipeline_secret` |
 | `module_stages` | `stages`, `render`, `run` | contribute stages with `stage` |
 | `module_urls` | `urls`, end of `setup` | print the web console and how to log in |
+| `module_rollback` | `rollback` | put the previous release back (deployment modules) |
 | `module_destroy` | `destroy`, before containers are removed | undo what `configure` did outside Docker (deploy keys, webhooks) |
 | `module_render` | orchestrators: `render`, `publish` | write the pipeline definition |
 | `module_publish` | orchestrators: `publish` | install the pipeline |
@@ -52,7 +53,8 @@ configured) instead of during `configure`.
 ## Helpers
 
 ```bash
-ask KEY "Question" [default]          # stored in .devops/values/KEY; kept on later runs
+ask KEY "Question" [default]          # stored in .devops/values/KEY and shared through devops.conf
+ask_local KEY "Question" [default]    # same, but never shared: user names, addresses of this machine
 ask_secret KEY "Question" [default]   # hidden input, masked everywhere
 value KEY [fallback]                  # read a value
 require_value KEY                     # read or fail
@@ -62,8 +64,13 @@ random_password                       # a random default password
 pipeline_var KEY VALUE                # hand a variable to the pipeline
 pipeline_secret KEY VALUE             # same, masked
 
-stage ORDER PHASE NAME "MAVEN ARGS"   # PHASE is ci or cd; args may use $VARS
+stage ORDER PHASE NAME "MAVEN ARGS"   # PHASE is ci, cd or an environment ("prod": the last); args may use $VARS
 shell_stage ORDER PHASE NAME "CMD"    # a POSIX shell command in the project root instead of mvn
+$ENVIRONMENTS                         # the deployment environments, in order, e.g. "staging production"
+upper NAME                            # STAGING: per-environment values are <PREFIX>_<NAME>_<SETTING>
+env_offset ENV                        # 0 for the last environment, 1 for the one before, ... (default ports)
+env_gates                             # the environments that wait for approval
+rollback_args "$@"                    # parse [environment] [--to TAG] into ROLLBACK_ENV, ROLLBACK_TAG
 mvn_plugin KEY group:artifact VERSION GOAL   # full plugin coordinates, version overridable per project
 mvn_deploy_args SNAP_ID SNAP_URL REL_ID REL_URL   # package + attach + deploy without distributionManagement
 ask_server PREFIX "Title" [example]   # ask <PREFIX>_SERVER_URL; empty means Docker
@@ -73,6 +80,10 @@ server_pipeline_url PREFIX SERVICE PORT HOST_PORT [PATH]   # URL for the pipelin
 pipeline_url SERVICE PORT HOST_PORT [PATH]   # service name or DEVOPS_HOST, depending on the orchestrator
 host_url HOST_PORT [PATH]             # DEVOPS_HOST URL
 github_url / github_host / github_api # github.com or GitHub Enterprise
+
+image_secrets                         # image modules: name, module, builder, base image, port
+image_env PUSH_REPO DEPLOY_REPO [USER] [PASSWORD]   # IMAGE_REPOSITORY and the rest for the pipeline
+image_stages INSECURE AUTH            # the image stage (Jib, or the project's Dockerfile)
 
 compose ...                           # docker compose of the project, e.g. compose exec -T nexus ...
 wait_http URL [timeout] [status regex]
@@ -85,6 +96,12 @@ A deploy target also needs a `<server>` with its id in `templates/settings.xml`.
 
 Stage arguments are embedded in single-quoted strings by the orchestrators, so
 they may not contain `'`, `\`, `|` or `${`. Use `$VAR` instead of `${VAR}`.
+
+A stage that needs more than one command calls a script from
+`templates/scripts/`: `shell_stage 80 cd deploy "sh \"\$DEVOPS_SCRIPTS/deploy.sh\""`.
+`DEVOPS_SCRIPTS` is that directory when the pipeline runs on this machine;
+maven-container, Jenkins and Concourse get a copy in `.devops/scripts` before the first stage.
+Scripts get every pipeline variable in the environment.
 
 ## Example: a new artifact repository
 
@@ -119,7 +136,7 @@ A new category is a directory with a `category.conf`:
 ```bash
 CATEGORY_TITLE="Security scanning"
 CATEGORY_ORDER=45          # position in the menu
-CATEGORY_MODE=multi        # required | single | multi
+CATEGORY_MODE=multi        # required | single (exactly one) | optional (at most one) | multi
 ```
 
 Run `tests/smoke.sh` and `shellcheck` after adding a module.

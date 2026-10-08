@@ -1,0 +1,17 @@
+services:
+  registry:
+    # The Distribution registry (CNCF), without authentication: meant for one
+    # machine.  Docker allows plain HTTP for localhost, so the deploy modules
+    # pull localhost:<port>/<image> on this machine.
+    image: registry:3
+    restart: unless-stopped
+    ports:
+      - "${REGISTRY_HOST_PORT}:5000"
+    environment:
+      REGISTRY_STORAGE_DELETE_ENABLED: "true"
+      REGISTRY_LOG_LEVEL: info
+    volumes:
+      - registry-data:/var/lib/registry
+
+volumes:
+  registry-data:

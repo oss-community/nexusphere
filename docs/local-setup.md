@@ -70,9 +70,9 @@ echo 'export PATH="/usr/local/bin:/usr/bin:$PATH"' >> ~/.bashrc
 
 Open a new terminal and run `command -v bash` again.
 
-mvn-devops 1.0.0 passes Cygwin paths such as `/cygdrive/c/...` to `docker.exe`, which reads them as `C:\cygdrive\c\...`, so
-`setup` fails with `couldn't find env file`. Run `setup`, `up` and the other Docker commands from Git Bash until the
-framework converts these paths.
+The first build of mvn-devops 1.0.0 passed Cygwin paths such as `/cygdrive/c/...` to `docker.exe`, which reads them as
+`C:\cygdrive\c\...`, so `setup` failed with `couldn't find env file`. The release rebuilt on 2026-10-08 converts these
+paths with `cygpath`. If `setup` still fails with that message, run the Docker commands from Git Bash.
 
 ## IntelliJ IDEA Terminal
 

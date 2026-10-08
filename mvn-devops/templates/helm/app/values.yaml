@@ -1,0 +1,58 @@
+# Values of the chart mvn-devops deploys when a project has none of its own
+# (KUBERNETES_CHART).  The deploy step sets image, environment and the
+# service port for each environment.
+
+image:
+  repository: ""
+  tag: ""
+  pullPolicy: IfNotPresent
+
+# Registry login for private images, as a dockerconfigjson document.
+registryAuth: ""
+
+replicas: 2
+environment: ""
+containerPort: 8080
+healthPath: /actuator/health
+
+service:
+  port: 80
+  # A fixed node port makes the application reachable on every node; empty
+  # gives a ClusterIP service.
+  nodePort: ""
+
+# A canary release with Argo Rollouts instead of a rolling update: the new
+# version gets a growing share of the pods, and is rolled back when its pods
+# do not become ready in time.  Needs Argo Rollouts in the cluster.
+canary:
+  enabled: false
+  steps:
+    - setWeight: 25
+    - pause: {duration: 30s}
+    - setWeight: 50
+    - pause: {duration: 30s}
+
+# Extra environment variables of the container.
+env: {}
+
+# Secret environment variables (names and values), kept in the Secret
+# <release>-env; sealedSecretEnv holds them encrypted by kubeseal instead
+# (needs the Sealed Secrets controller), for releases kept in git.
+secretEnv: {}
+sealedSecretEnv: {}
+
+# A PostgreSQL for the environment (a StatefulSet <release>-db); the
+# application reaches it at <release>-db:5432 with the connection in
+# secretEnv (SPRING_DATASOURCE_URL, _USERNAME, _PASSWORD).
+database:
+  enabled: false
+  image: postgres:18
+  name: ""
+  storage: 1Gi
+
+resources:
+  requests:
+    cpu: 100m
+    memory: 256Mi
+  limits:
+    memory: 512Mi

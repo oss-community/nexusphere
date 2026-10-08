@@ -1,0 +1,30 @@
+# Loki keeps the logs; Grafana Alloy collects those of the application's
+# containers on this Docker daemon (the simulated machine of docker-host) and
+# of its pods in k3s.  Alloy's configuration is written by "devops.sh up".
+services:
+  loki:
+    image: grafana/loki:${LOKI_IMAGE_TAG:-3.7.8}
+    restart: unless-stopped
+    command: -config.file=/etc/loki/local-config.yaml
+    ports:
+      - "${LOKI_HOST_PORT}:3100"
+    volumes:
+      - loki-data:/loki
+
+  alloy:
+    image: grafana/alloy:${ALLOY_IMAGE_TAG:-v1.20.1}
+    restart: unless-stopped
+    command: run --storage.path=/var/lib/alloy/data /etc/alloy/config.alloy
+    depends_on:
+      - loki
+    volumes:
+      - alloy-data:/var/lib/alloy/data
+      - ${DEVOPS_STATE}/monitoring/alloy:/etc/alloy:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - k3s-pod-logs:/var/log/pods:ro
+
+volumes:
+  loki-data:
+  alloy-data:
+  # Shared with k3s (deploy/kubernetes), empty without it.
+  k3s-pod-logs:

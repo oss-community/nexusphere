@@ -1,13 +1,13 @@
 services:
   concourse-db:
-    image: postgres:16
+    image: postgres:18
     restart: unless-stopped
     environment:
       POSTGRES_DB: concourse
       POSTGRES_USER: concourse
       POSTGRES_PASSWORD: ${CONCOURSE_DB_PASSWORD}
     volumes:
-      - concourse-db:/var/lib/postgresql/data
+      - concourse-db:/var/lib/postgresql
 
   concourse:
     image: concourse/concourse:${CONCOURSE_IMAGE_TAG:-latest}
@@ -19,6 +19,10 @@ services:
       - concourse-db
     ports:
       - "${CONCOURSE_HOST_PORT}:8080"
+    # Deployed applications publish their ports on this machine (load test);
+    # the worker's DNS answers tasks from its hosts file too.
+    extra_hosts:
+      - host.docker.internal:host-gateway
     environment:
       CONCOURSE_POSTGRES_HOST: concourse-db
       CONCOURSE_POSTGRES_DATABASE: concourse

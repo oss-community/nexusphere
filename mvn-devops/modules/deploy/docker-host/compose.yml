@@ -1,0 +1,20 @@
+# A simulated deploy machine: an SSH server with the Docker CLI, using the
+# Docker daemon of this machine.  The applications it starts are published on
+# this machine's ports.  Left out when DEPLOY_SERVER_URL names a real machine.
+services:
+  deploy-host:
+    build: ${DEVOPS_HOME}/modules/deploy/docker-host/docker
+    image: mvn-devops/deploy-host
+    restart: unless-stopped
+    environment:
+      AUTHORIZED_KEY: ${DEPLOY_SSH_PUBLIC_KEY:-}
+    ports:
+      - "${DEPLOY_SSH_HOST_PORT}:22"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - deploy-host-home:/root
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+volumes:
+  deploy-host-home:

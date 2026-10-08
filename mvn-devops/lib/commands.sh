@@ -31,7 +31,11 @@ menu_pick() {
 
   {
     printf '\n%s%s%s' "$C_BOLD" "$title" "$C_RESET"
-    [[ $mode == single ]] && printf ' (choose one)\n' || printf ' (choose any, comma separated, 0 for none)\n'
+    case $mode in
+      single) printf ' (choose one)\n' ;;
+      optional) printf ' (choose one, 0 for none)\n' ;;
+      *) printf ' (choose any, comma separated, 0 for none)\n' ;;
+    esac
     for i in "${!options[@]}"; do
       id=${options[$i]}
       printf '  %d) %-16s %s\n' $((i + 1)) "${id#*/}" "$(module_field "$id" MODULE_DESCRIPTION)"
@@ -61,6 +65,7 @@ menu_pick() {
       fi
     done
     if [[ $mode == single ]] && (( ${#picked[@]} != 1 )); then ok=0; fi
+    if [[ $mode == optional ]] && (( ${#picked[@]} > 1 )); then ok=0; fi
     (( ok )) && break
     log_warn "Invalid choice '$answer'."
     [[ ${DEVOPS_DEFAULTS:-0} == 1 ]] && die "Default selection for $title is invalid"
@@ -70,20 +75,24 @@ menu_pick() {
 }
 
 cmd_init() {
-  local orchestrator='' with='' name='' id category mode title conf
+  local orchestrator='' with='' name='' preset='' id category mode title conf
   local -a selected=() current=()
   while (( $# )); do
     case $1 in
       --orchestrator) orchestrator=$2; shift 2 ;;
       --with) with=$2; shift 2 ;;
       --name) name=$2; shift 2 ;;
+      --pipeline) preset=$(preset_file "${2:?--pipeline needs a name or file}"); shift 2 ;;
       *) die "init: unknown option $1" ;;
     esac
   done
+  if [[ -n $preset ]]; then
+    [[ -z $orchestrator && -z $with ]] || die "--pipeline sets the orchestrator and the tools; leave out --orchestrator and --with"
+    orchestrator=$(preset_get "$preset" ORCHESTRATOR) || die "$preset has no ORCHESTRATOR"
+    with=$(preset_get "$preset" TOOLS || true)
+  fi
 
-  if profile_exists; then
-    # shellcheck disable=SC1090
-    source "$DEVOPS_PROFILE"
+  if profile_read; then
     read -r -a current <<< "${MODULES:-}"
   fi
   PROJECT_NAME=${name:-${PROJECT_NAME:-$(basename "$PROJECT_DIR")}}
@@ -106,6 +115,9 @@ cmd_init() {
     for category in $(categories); do
       conf=$(category_conf "$category")
       [[ ${conf%%|*} == required ]] && mapfile -t -O "${#selected[@]}" selected < <(category_modules "$category")
+      if [[ ${conf%%|*} == optional ]] && (( $(printf '%s\n' "${selected[@]}" | grep -c "^$category/") > 1 )); then
+        die "Choose only one module of '${conf#*|}'"
+      fi
     done
   else
     for category in $(categories); do
@@ -122,12 +134,16 @@ cmd_init() {
   done
   [[ -n $ORCHESTRATOR ]] || die "An orchestrator must be selected"
   profile_save
+  if [[ -n $preset ]]; then
+    preset_apply "$preset"
+    log_ok "Ready-made pipeline $(preset_name "$preset"): $(preset_description "$preset")"
+  fi
 
   log_step "Selected modules"
   for id in $MODULES; do
     printf '  %-26s %s\n' "$id" "$(module_field "$id" MODULE_TITLE)"
   done
-  log_ok "Saved $DEVOPS_PROFILE"
+  log_ok "Saved $DEVOPS_CONF; commit it so the team gets the same tools"
   log_info "Next: '$DEVOPS_CMD setup' (or the single steps: secrets, up, configure, render, publish)."
 }
 
@@ -138,8 +154,14 @@ cmd_secrets() {
   [[ ${1:-} == --reconfigure ]] && export DEVOPS_RECONFIGURE=1
   load_project
   state_ensure_dirs
+  # A ready-made pipeline asks only what has no default.
+  if preset_selected && [[ ${DEVOPS_RECONFIGURE:-0} != 1 ]]; then export DEVOPS_PRESET=1; fi
   log_step "Docker machine"
-  ask DEVOPS_HOST "Address of the machine Docker runs on, for the tools started in Docker" "$(docker_host_default)"
+  ask_local DEVOPS_HOST "Address of the machine Docker runs on, for the tools started in Docker" "$(docker_host_default)"
+  if deploys_application; then
+    log_step "Environments"
+    environments_secrets
+  fi
   modules_hook module_secrets
   env_generate
   log_ok "Values stored in $DEVOPS_VALUES"
@@ -236,8 +258,9 @@ cmd_run() {
 }
 
 cmd_setup() {
-  # Options are passed to init (e.g. --orchestrator jenkins --with sonarqube,nexus).
-  if ! profile_exists; then
+  # Options are passed to init (e.g. --orchestrator jenkins --with sonarqube,nexus,
+  # or --pipeline jenkins-sonarqube-nexus).
+  if ! profile_exists || (( $# )); then
     cmd_init "$@"
   fi
   cmd_secrets
@@ -250,6 +273,31 @@ cmd_setup() {
 }
 
 # ---------------------------------------------------------------- operations
+
+# rollback [environment] [--to TAG]: the deploy module puts back the previous
+# image (or the given tag) in the environment, production by default.
+# For the scripts a module runs on this machine (rollback): the pipeline
+# variables, with the addresses of the tools as this machine reaches them.
+source_pipeline_env() {
+  # shellcheck disable=SC1091
+  source "$DEVOPS_ENV/pipeline.sh"
+  if [[ -n ${VAULT_ADDR:-} ]] && ! server_external VAULT; then
+    VAULT_ADDR=$(host_url "$(value VAULT_HOST_PORT 8200)")
+  fi
+}
+
+cmd_rollback() {
+  load_project
+  env_generate
+  local id done=0
+  for id in $MODULES; do
+    if module_has_hook "$id" module_rollback; then
+      module_hook "$id" module_rollback "$@"
+      done=1
+    fi
+  done
+  (( done )) || die "No selected module deploys the application. See '$DEVOPS_CMD modules'."
+}
 
 cmd_status() {
   load_project
@@ -297,8 +345,25 @@ cmd_modules() {
   done
 }
 
+# Rewrites files with CRLF line endings to LF.  Done in Bash: Perl and other
+# tools on Windows may write CRLF again.
+fix_line_endings() {
+  local file line
+  while IFS= read -r file; do
+    {
+      while IFS= read -r line || [[ -n $line ]]; do printf '%s\n' "${line//"$CR"/}"; done < "$file"
+    } > "$file.lf" && cat "$file.lf" > "$file" && rm -f "$file.lf"
+    log_ok "LF: $file"
+  done
+}
+
 cmd_doctor() {
   local tool ok=1
+  if [[ ${1:-} == --fix ]]; then
+    grep -rlIU "$CR" --exclude='*.bat' --exclude='*.cmd' --exclude-dir=.git "$DEVOPS_HOME" 2>/dev/null | fix_line_endings
+    return 0
+  fi
+  [[ $# -eq 0 ]] || die "doctor: unknown option $1 (use --fix)"
   log_step "Checking tools"
   for tool in bash curl jq git java mvn docker ssh-keygen; do
     if command -v "$tool" > /dev/null; then
@@ -333,13 +398,14 @@ cmd_doctor() {
     fi
   fi
   # Windows checkouts with core.autocrlf=true turn the scripts into CRLF.
+  # -U keeps grep on Windows from hiding the CR it is looking for.
   local crlf
-  crlf=$(grep -rlI $'\r' --exclude='*.bat' --exclude='*.cmd' --exclude-dir=.git "$DEVOPS_HOME" 2>/dev/null | head -5 || true)
+  crlf=$(grep -rlIU "$CR" --exclude='*.bat' --exclude='*.cmd' --exclude-dir=.git "$DEVOPS_HOME" 2>/dev/null | head -5 || true)
   if [[ -n $crlf ]]; then
     log_warn "Files with Windows (CRLF) line endings, which Bash cannot run:"
     printf '    %s\n' "${crlf//$'\n'/$'\n'    }"
     log_warn "Fix them with:"
-    printf "    find '%s' -type f ! -name '*.bat' ! -name '*.cmd' ! -path '*/.git/*' -exec sed -i '%s' {} +\n" "$DEVOPS_HOME" 's/\r$//'
+    printf '    %s/devops.sh doctor --fix\n' "$DEVOPS_HOME"
     ok=0
   else
     log_ok "line endings (LF)"
