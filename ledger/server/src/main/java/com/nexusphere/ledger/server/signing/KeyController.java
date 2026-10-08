@@ -1,17 +1,35 @@
 package com.nexusphere.ledger.server.signing;
 
+import com.nexusphere.ledger.chain.KeyRotation;
 import com.nexusphere.ledger.chain.SigningKeys;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.time.Instant;
 import java.util.List;
 
 @RestController
 @RequestMapping("/api/v1/keys")
-class KeyController {
+public class KeyController {
 
-    record KeyResponse(String keyId, String algorithm, String publicKey) {
+    public record RotationResponse(String format, String previousKeyId, String keySignature,
+                                   String previousKeySignature) {
+
+        static RotationResponse of(KeyRotation rotation) {
+            return rotation == null ? null : new RotationResponse(KeyRotation.FORMAT, rotation.previousKeyId(),
+                    rotation.keySignature(), rotation.previousKeySignature());
+        }
+    }
+
+    public record KeyResponse(String keyId, String algorithm, String publicKey, String status, Instant activatedAt,
+                              Instant retiredAt, RotationResponse rotation) {
+
+        public static KeyResponse of(SigningKey key) {
+            return new KeyResponse(key.keyId(), SigningKeys.ALGORITHM, key.publicKey().encoded(),
+                    key.active() ? "ACTIVE" : "RETIRED", key.activatedAt(), key.retiredAt(),
+                    RotationResponse.of(key.rotation()));
+        }
     }
 
     private final LedgerSigner signer;
@@ -22,7 +40,6 @@ class KeyController {
 
     @GetMapping
     List<KeyResponse> keys() {
-        SigningKeys.PublicKeyInfo key = signer.publicKey();
-        return List.of(new KeyResponse(key.keyId(), SigningKeys.ALGORITHM, key.encoded()));
+        return signer.keys().stream().map(KeyResponse::of).toList();
     }
 }

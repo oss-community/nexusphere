@@ -27,6 +27,7 @@ record.
 * MCP gateway that decides and records every tool call
 * Evidence packages with selective disclosure for auditors
 * Signed mandates, the revocation status list and the public keys as JWKS
+* Signing key history: rotation at startup with a cross-signed rotation record, retired keys kept for verification
 * A2A gateway that sends and receives requests between two ledgers with evidence and signed receipts on both sides
 
 ## Dependencies

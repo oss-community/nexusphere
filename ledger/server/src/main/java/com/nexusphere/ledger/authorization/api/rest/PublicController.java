@@ -11,7 +11,6 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.time.Duration;
-import java.util.List;
 import java.util.Map;
 
 @RestController
@@ -32,7 +31,7 @@ class PublicController {
     @GetMapping("/keys")
     ResponseEntity<Map<String, Object>> keys() {
         return ResponseEntity.ok().contentType(JWK_SET).cacheControl(CacheControl.maxAge(Duration.ofHours(1)))
-                .body(Map.of("keys", List.of(Jwk.of(signer.publicKey()))));
+                .body(Map.of("keys", signer.keys().stream().map(k -> Jwk.of(k.publicKey())).toList()));
     }
 
     @GetMapping("/mandates/status")

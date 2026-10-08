@@ -1,6 +1,7 @@
 package com.nexusphere.ledger.a2a;
 
 import com.nexusphere.ledger.authorization.application.MandateService;
+import com.nexusphere.ledger.chain.SigningKeys;
 import com.nexusphere.ledger.mandate.HttpFetcher;
 import com.nexusphere.ledger.mandate.JwksKeyResolver;
 import com.nexusphere.ledger.mandate.KeyResolver;
@@ -47,8 +48,7 @@ class A2aKeys implements KeyResolver {
     @Override
     public Optional<PublicKey> resolve(String issuer, String keyId) {
         if (mandates.issuer().equals(issuer)) {
-            return signer.publicKey().keyId().equals(keyId) ? Optional.of(signer.publicKey().publicKey())
-                    : Optional.empty();
+            return signer.find(keyId).map(SigningKeys.PublicKeyInfo::publicKey);
         }
         return jwks.resolve(issuer, keyId);
     }

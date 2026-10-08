@@ -5,7 +5,7 @@ import java.util.List;
 public record PackageReport(
         boolean valid,
         String keyId,
-        boolean keyPinned,
+        String pinnedKeyId,
         Long anchorSequence,
         long checkpointSequence,
         String checkpointCreatedAt,

@@ -38,6 +38,8 @@ answers `initialize`, `tools/list` and `tools/call`, and streams the answer of t
 `A2aE2ETest` starts a second ledger, `SupplierLedger`, with its own PostgreSQL container and signing key, which trusts
 the first one and forwards to `FakeA2aAgent`, so mandates, request proofs and receipts cross between two ledgers over
 HTTP.
+`KeyRotationE2ETest` restarts a `StandaloneLedger` against one PostgreSQL container with a new signing key, so the
+rotation happens at startup as it does in production.
 
 </p>
 
@@ -98,6 +100,9 @@ HTTP.
 |                          | The receiver rejects a revoked mandate and records the denial                 |
 |                          | Replayed, tampered or forged requests are rejected without reaching the agent |
 |                          | An unreachable peer or streaming is answered without delivery                 |
+| `KeyRotationE2ETest`     | An endorsed rotation keeps earlier checkpoints and mandates valid             |
+|                          | A new key without the previous key is refused unless the operator allows it   |
+|                          | A retired key cannot sign again                                               |
 
 ##
 

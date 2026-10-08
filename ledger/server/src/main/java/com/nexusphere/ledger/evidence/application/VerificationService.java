@@ -53,9 +53,10 @@ public class VerificationService {
             long last = page.getLast().sequence();
             for (SignedCheckpoint signed : checkpoints.between(after, last)) {
                 long sequence = signed.checkpoint().sequence();
-                if (!signed.verify(signer.publicKey())) {
+                String keyId = signed.checkpoint().keyId();
+                if (!signer.find(keyId).map(signed::verify).orElse(false)) {
                     return checkpointFailure(verifier.result(), head, checkedCheckpoints, latestCheckpoint, sequence,
-                            "checkpoint signature is not valid for key " + signer.publicKey().keyId());
+                            "checkpoint signature is not valid for key " + keyId);
                 }
                 if (!signed.checkpoint().headHash().equals(hashes.get(sequence))) {
                     return checkpointFailure(verifier.result(), head, checkedCheckpoints, latestCheckpoint, sequence,

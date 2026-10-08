@@ -47,7 +47,7 @@ operator -X POST "${LEDGER_URL}/api/v1/packages" -d "{\"agentId\":\"${AGENT_ID}\
 jq '{format, disclosed, links: (.links | length), checkpoint: .checkpoint.sequence}' "${WORK_DIR}/package.json"
 
 step "Verify the package offline with the ledger's published key"
-PUBLIC_KEY=$(operator "${LEDGER_URL}/api/v1/keys" | jq -r '.[0].publicKey')
+PUBLIC_KEY=$(operator "${LEDGER_URL}/api/v1/keys" | jq -r '.[] | select(.status == "ACTIVE") | .publicKey')
 java -jar "${VERIFIER_JAR}" --public-key "${PUBLIC_KEY}" "${WORK_DIR}/package.json"
 
 step "Change one disclosed entry and verify again"

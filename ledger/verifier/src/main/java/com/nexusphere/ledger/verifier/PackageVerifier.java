@@ -6,13 +6,15 @@ import com.nexusphere.ledger.chain.Checkpoint;
 import com.nexusphere.ledger.chain.EvidenceEntry;
 import com.nexusphere.ledger.chain.EvidenceLink;
 import com.nexusphere.ledger.chain.Hashes;
+import com.nexusphere.ledger.chain.KeyRotation;
 import com.nexusphere.ledger.chain.SignedCheckpoint;
 import com.nexusphere.ledger.chain.SigningKeys;
+import com.nexusphere.ledger.chain.TrustedKeys;
 import tools.jackson.databind.JsonNode;
 
-import java.security.PublicKey;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
@@ -29,7 +31,7 @@ public final class PackageVerifier {
         List<String> problems = new ArrayList<>();
         if (!FORMAT.equals(text(pkg, "format"))) {
             problems.add("unknown package format " + text(pkg, "format"));
-            return report(false, null, false, null, 0, null, 0, 0, 0, pkg, problems);
+            return report(false, null, null, null, 0, null, 0, 0, 0, pkg, problems);
         }
         SignedCheckpoint checkpoint;
         SignedCheckpoint anchor;
@@ -38,17 +40,18 @@ public final class PackageVerifier {
             anchor = pkg.path("anchor").isObject() ? checkpoint(pkg.path("anchor")) : null;
         } catch (RuntimeException e) {
             problems.add("the checkpoints cannot be read: " + e.getMessage());
-            return report(false, null, false, null, 0, null, 0, 0, 0, pkg, problems);
+            return report(false, null, null, null, 0, null, 0, 0, 0, pkg, problems);
         }
-        SigningKeys.PublicKeyInfo key = key(pkg, checkpoint.checkpoint().keyId(), pinnedPublicKey, problems);
+        Map<String, SigningKeys.PublicKeyInfo> keys = keys(pkg, pinnedPublicKey, problems);
         boolean pinned = pinnedPublicKey != null;
-        if (key != null) {
-            if (!checkpoint.verify(key)) {
-                problems.add("the signature of checkpoint " + checkpoint.checkpoint().sequence() + " is not valid");
-            }
-            if (anchor != null && !anchor.verify(key)) {
-                problems.add("the signature of anchor checkpoint " + anchor.checkpoint().sequence() + " is not valid");
-            }
+        SigningKeys.PublicKeyInfo key = keys == null ? null : key(keys, checkpoint, pinned, problems);
+        if (key != null && !checkpoint.verify(key)) {
+            problems.add("the signature of checkpoint " + checkpoint.checkpoint().sequence() + " is not valid");
+        }
+        SigningKeys.PublicKeyInfo anchorKey = keys == null || anchor == null ? null
+                : key(keys, anchor, pinned, problems);
+        if (anchorKey != null && !anchor.verify(anchorKey)) {
+            problems.add("the signature of anchor checkpoint " + anchor.checkpoint().sequence() + " is not valid");
         }
         long first = anchor == null ? 1 : anchor.checkpoint().sequence() + 1;
         ChainVerifier chain = new ChainVerifier(first, anchor == null ? Hashes.GENESIS : anchor.checkpoint().headHash());
@@ -83,7 +86,7 @@ public final class PackageVerifier {
         if (disclosed == 0) {
             problems.add("the package discloses no evidence");
         }
-        return report(problems.isEmpty(), key == null ? checkpoint.checkpoint().keyId() : key.keyId(), pinned,
+        return report(problems.isEmpty(), checkpoint.checkpoint().keyId(), pinnedKeyId(pinnedPublicKey),
                 anchor == null ? null : anchor.checkpoint().sequence(), checkpoint.checkpoint().sequence(),
                 checkpoint.checkpoint().createdAt().toString(), first, result.checkedEntries(), disclosed, pkg,
                 problems);
@@ -126,32 +129,57 @@ public final class PackageVerifier {
         return null;
     }
 
-    private static SigningKeys.PublicKeyInfo key(JsonNode pkg, String keyId, String pinned, List<String> problems) {
+    private static Map<String, SigningKeys.PublicKeyInfo> keys(JsonNode pkg, String pinned, List<String> problems) {
+        Map<String, SigningKeys.PublicKeyInfo> listed = new LinkedHashMap<>();
+        List<KeyRotation> rotations = new ArrayList<>();
         try {
-            if (pinned != null) {
-                SigningKeys.PublicKeyInfo key = SigningKeys.PublicKeyInfo.of(SigningKeys.decodePublic(pinned));
+            for (JsonNode node : pkg.path("keys")) {
+                String keyId = text(node, "keyId");
+                SigningKeys.PublicKeyInfo key = SigningKeys.PublicKeyInfo.of(
+                        SigningKeys.decodePublic(text(node, "publicKey")));
                 if (!key.keyId().equals(keyId)) {
-                    problems.add("the checkpoint is signed with key " + keyId + ", not with the pinned key "
-                            + key.keyId());
+                    problems.add("the key " + keyId + " in the package does not match its key ID");
                     return null;
                 }
-                return key;
-            }
-            for (JsonNode node : pkg.path("keys")) {
-                if (keyId.equals(text(node, "keyId"))) {
-                    PublicKey publicKey = SigningKeys.decodePublic(text(node, "publicKey"));
-                    SigningKeys.PublicKeyInfo key = SigningKeys.PublicKeyInfo.of(publicKey);
-                    if (!key.keyId().equals(keyId)) {
-                        problems.add("the key " + keyId + " in the package does not match its key ID");
-                        return null;
-                    }
-                    return key;
+                listed.put(keyId, key);
+                JsonNode rotation = node.path("rotation");
+                if (rotation.isObject()) {
+                    rotations.add(new KeyRotation(keyId, key.encoded(), text(rotation, "previousKeyId"),
+                            Instant.parse(text(node, "activatedAt")), text(rotation, "keySignature"),
+                            nullable(rotation, "previousKeySignature")));
                 }
             }
-            problems.add("the package has no key " + keyId);
-            return null;
+            if (pinned == null) {
+                return listed;
+            }
+            SigningKeys.PublicKeyInfo pinnedKey = SigningKeys.PublicKeyInfo.of(SigningKeys.decodePublic(pinned));
+            Map<String, SigningKeys.PublicKeyInfo> trusted = new LinkedHashMap<>();
+            TrustedKeys.from(pinnedKey, listed.values(), rotations).all()
+                    .forEach(key -> trusted.put(key.keyId(), key));
+            return trusted;
         } catch (RuntimeException e) {
-            problems.add("the public key cannot be read: " + e.getMessage());
+            problems.add("the public keys cannot be read: " + e.getMessage());
+            return null;
+        }
+    }
+
+    private static SigningKeys.PublicKeyInfo key(Map<String, SigningKeys.PublicKeyInfo> keys,
+                                                 SignedCheckpoint signed, boolean pinned, List<String> problems) {
+        String keyId = signed.checkpoint().keyId();
+        SigningKeys.PublicKeyInfo key = keys.get(keyId);
+        if (key == null) {
+            problems.add(pinned
+                    ? "checkpoint " + signed.checkpoint().sequence() + " is signed with key " + keyId
+                    + ", which the pinned key does not reach through signed key rotations"
+                    : "the package has no key " + keyId);
+        }
+        return key;
+    }
+
+    private static String pinnedKeyId(String pinned) {
+        try {
+            return pinned == null ? null : SigningKeys.keyIdOf(SigningKeys.decodePublic(pinned));
+        } catch (RuntimeException e) {
             return null;
         }
     }
@@ -161,10 +189,10 @@ public final class PackageVerifier {
                 Instant.parse(text(node, "createdAt")), text(node, "keyId")), text(node, "signature"));
     }
 
-    private static PackageReport report(boolean valid, String keyId, boolean pinned, Long anchor, long checkpoint,
+    private static PackageReport report(boolean valid, String keyId, String pinnedKeyId, Long anchor, long checkpoint,
                                         String createdAt, long first, long checked, long disclosed, JsonNode pkg,
                                         List<String> problems) {
-        return new PackageReport(valid, keyId, pinned, anchor, checkpoint, createdAt, first, checked, disclosed,
+        return new PackageReport(valid, keyId, pinnedKeyId, anchor, checkpoint, createdAt, first, checked, disclosed,
                 nullable(pkg.path("scope"), "agentId"), nullable(pkg.path("scope"), "principalId"),
                 List.copyOf(problems));
     }
