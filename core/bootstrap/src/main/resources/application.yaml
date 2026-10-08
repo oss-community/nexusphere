@@ -41,6 +41,12 @@ nexusphere:
       - agreement
       - transaction
       - audit
+      - integration
+  ledger:
+    url: ${APP_LEDGER_URL:}
+    api-key: ${APP_LEDGER_API_KEY:}
+    forward-interval: ${APP_LEDGER_FORWARD_INTERVAL:5s}
+    batch-size: ${APP_LEDGER_BATCH_SIZE:100}
 management:
   endpoints:
     web:

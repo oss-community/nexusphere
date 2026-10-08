@@ -37,7 +37,7 @@ class ApplicationIT {
     @Test
     void everyOwningModuleHasItsOwnSchemaAndMigrationHistory() {
         List<String> expected = List.of("network", "organization", "identity", "membership", "capability", "trust",
-                "federation", "authorization", "delegation", "agreement", "transaction", "audit");
+                "federation", "authorization", "delegation", "agreement", "transaction", "audit", "integration");
 
         List<String> schemas = jdbc.queryForList(
                 "select schema_name from information_schema.schemata", String.class);

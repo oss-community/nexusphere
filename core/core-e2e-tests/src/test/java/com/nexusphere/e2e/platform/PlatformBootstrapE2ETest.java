@@ -84,6 +84,6 @@ class PlatformBootstrapE2ETest extends E2ETestBase {
 
         assertThat(info.path("name").asString()).isEqualTo("Nexusphere Core");
         assertThat(info.path("version").asString()).isEqualTo("1.0.0-SNAPSHOT");
-        assertThat(info.path("modules")).hasSize(12);
+        assertThat(info.path("modules")).hasSize(13);
     }
 }
