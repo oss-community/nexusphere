@@ -2,11 +2,15 @@
 # Concourse orchestrator.
 #
 # render  writes generated/concourse/pipeline.yml and vars.yml.  Job "ci" runs
-#         the ci stages on every push; job "cd" runs all stages and is started
-#         by hand once ci passed.
+#         the ci stages on every push; job "cd" runs the ci and cd stages and
+#         deploys to the environments before the first approval; it is
+#         started by hand once ci passed.  Each environment that needs
+#         approval has a job of its own, started by hand (the approval) once
+#         the job before it passed; it deploys to that environment and the
+#         ones after it up to the next approval.
 # publish downloads fly from the server and sets the pipeline.  The server is
 #         started in Docker, or an existing one (CONCOURSE_SERVER_URL).
-# run     triggers a job and watches it:  run [--phase ci|cd]
+# run     triggers a job and watches it:  run [--phase ci|cd|<environment>]
 
 pipeline_name() { printf '%s' "$PROJECT_NAME"; }
 concourse_url() { server_url CONCOURSE "$(value CONCOURSE_HOST_PORT 8083)"; }
@@ -17,9 +21,9 @@ module_secrets() {
   ask_server CONCOURSE Concourse https://ci.example.com
   if server_external CONCOURSE; then
     ask CONCOURSE_TEAM "Concourse team" main
-    ask CONCOURSE_USER "Concourse user (local user of the team)" admin
+    ask_local CONCOURSE_USER "Concourse user (local user of the team)" admin
     ask_secret CONCOURSE_PASSWORD "Password of $(value CONCOURSE_USER)"
-    ask MAVEN_IMAGE "Docker image for build tasks" "$(build_image)"
+    ask MAVEN_IMAGE "Docker image for build tasks" "$(maven_image)"
     return
   fi
   ask CONCOURSE_HOST_PORT "Concourse port on the Docker machine" 8083
@@ -28,45 +32,52 @@ module_secrets() {
   ask_secret CONCOURSE_DB_PASSWORD "Concourse database password" "$(random_password)"
   ask_secret CONCOURSE_CLIENT_SECRET "Concourse web client secret" "$(random_password)"
   ask_secret CONCOURSE_TSA_CLIENT_SECRET "Concourse TSA client secret" "$(random_password)"
-  ask MAVEN_IMAGE "Docker image for build tasks" "$(build_image)"
+  ask MAVEN_IMAGE "Docker image for build tasks" "$(maven_image)"
 }
 
-build_image() { printf 'maven:%s-eclipse-temurin-%s' "$(value MAVEN_VERSION 3.9)" "$(value JAVA_VERSION 21)"; }
 
 yaml_quote() { local v=${1//\'/\'\'}; printf "'%s'" "$v"; }
 
-# render_job <ci|cd>: the ci job runs ci stages, the cd job runs all stages.
+# render_job <ci|cd|environment> [previous job]: the ci job runs ci stages,
+# the cd job ci, cd and the stages of the environments before the first
+# approval, an environment's job the stages behind its approval, for the
+# commit the previous job deployed.
 render_job() {
-  local job=$1 flags phase name args key image
+  local job=$1 previous=${2:-} flags phase name args key image group
   flags="$(maven_flags "" "$CI_SETTINGS") -Dmaven.repo.local=../.m2/repository"
-  image=$(value MAVEN_IMAGE "$(build_image)")
+  image=$(value MAVEN_IMAGE "$(maven_image)")
 
   printf '  - name: %s\n    plan:\n      - get: source\n' "$job"
-  if [[ $job == ci ]]; then
-    printf '        trigger: true\n'
-  else
-    printf '        passed: [ci]\n'
-  fi
+  case $job in
+    ci) printf '        trigger: true\n' ;;
+    cd) printf '        passed: [ci]\n' ;;
+    *) printf '        passed: [%s]\n' "$previous" ;;
+  esac
   printf '      - task: %s\n        config:\n          platform: linux\n' "$job"
   printf '          image_resource:\n            type: registry-image\n            source:\n'
   printf '              repository: %s\n              tag: %s\n' "${image%:*}" "$(yaml_quote "${image##*:}")"
   printf '          inputs:\n            - name: source\n'
-  printf '          caches:\n            - path: .m2\n'
+  printf '          caches:\n            - path: .m2\n            - path: .tools\n'
   printf '          params:\n'
   while IFS= read -r key; do
     printf '            %s: ((%s))\n' "$key" "$key"
   done < "$DEVOPS_ENV/pipeline.keys"
   printf '          run:\n            dir: source\n            path: sh\n            args:\n              - -ec\n              - |\n'
-  printf '                command -v git > /dev/null || { apt-get update -qq && apt-get install -y -qq git openssh-client > /dev/null; }\n'
+  printf '                export DEVOPS_TOOLS="$PWD/../.tools"\n'
+  printf '                { command -v git && command -v ssh && command -v curl; } > /dev/null || { apt-get update -qq && apt-get install -y -qq git openssh-client curl > /dev/null; }\n'
   printf '                %s\n' "$(pipeline_ci_setup)"
   while IFS='|' read -r _ phase name args; do
-    [[ $job == ci && $phase != ci ]] && continue
+    group=$(phase_group "$phase")
+    case $job:$group in
+      ci:ci | cd:ci | cd:cd) ;;
+      *) [[ $group == "$job" ]] || continue ;;
+    esac
     printf '                echo "==> %s"\n                %s\n' "$name" "$(stage_command "$flags" "$args")"
   done < <(pipeline_stages)
 }
 
 module_render() {
-  local dir="$DEVOPS_GENERATED/concourse" line key
+  local dir="$DEVOPS_GENERATED/concourse" line key previous gate
   mkdir -p "$dir"
   {
     printf '# Generated by mvn-devops. Re-create with: devops.sh render\n'
@@ -78,6 +89,11 @@ module_render() {
     printf 'jobs:\n'
     render_job ci
     render_job cd
+    previous='cd'
+    for gate in $(pipeline_gates); do
+      render_job "$gate" "$previous"
+      previous=$gate
+    done
   } > "$dir/pipeline.yml"
 
   ( umask 077
@@ -136,11 +152,24 @@ module_run() {
   while (( $# )); do
     case $1 in
       --phase) job=$2; shift 2 ;;
-      *) die "run: unknown option $1 (use --phase ci|cd)" ;;
+      *) die "run: unknown option $1 (use --phase ci|cd|<environment>)" ;;
     esac
   done
-  [[ $job == ci || $job == cd ]] || die "--phase must be ci or cd"
+  if [[ $job != ci && $job != cd ]]; then
+    job=$(env_resolve "$job") || die "--phase must be ci, cd or an environment ($(environments))"
+    [[ $(phase_group "$job") == "$job" ]] \
+      || die "$job needs no approval: it is deployed by the job $(phase_group "$job")"
+  fi
   fly status > /dev/null 2>&1 || module_configure
+  # Build the latest commit, not the one Concourse saw at its last check.
+  # Right after setup the worker may not have registered yet.
+  if [[ $job == ci ]]; then
+    local tries
+    for (( tries = 0; tries < 30; tries++ )); do
+      fly check-resource --resource "$(pipeline_name)/source" > /dev/null 2>&1 && break
+      sleep 2
+    done
+  fi
   fly trigger-job --job "$(pipeline_name)/$job" --watch
 }
 

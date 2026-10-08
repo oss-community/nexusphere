@@ -1,6 +1,12 @@
 # shellcheck shell=bash
 # Docker compose wrapper and readiness checks.
 
+# Docker on Windows does not understand Git Bash paths (/c/Users/..., /tmp/...),
+# so paths written into compose files and their .env are native ones.
+native_path() {
+  if command -v cygpath > /dev/null; then cygpath -m "$1"; else printf '%s' "$1"; fi
+}
+
 compose_project() {
   printf 'devops-%s' "$(printf '%s' "$PROJECT_NAME" | tr '[:upper:]' '[:lower:]' | tr -c 'a-z0-9-\n' '-')"
 }
@@ -37,9 +43,10 @@ compose_export() {
   while IFS= read -r file; do
     copy="$tmp/$(printf '%s' "${file#"$DEVOPS_MODULES_DIR"/}" | tr / -)"
     content=$(< "$file")
-    for var in DEVOPS_HOME DEVOPS_STATE PROJECT_DIR PROJECT_NAME; do
-      content=${content//"\${$var}"/${!var}}
+    for var in DEVOPS_HOME DEVOPS_STATE PROJECT_DIR; do
+      content=${content//"\${$var}"/$(native_path "${!var}")}
     done
+    content=${content//'${PROJECT_NAME}'/$PROJECT_NAME}
     printf '%s\n' "$content" > "$copy"
     files+=(-f "$copy")
   done < <(compose_files)

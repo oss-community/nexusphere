@@ -8,8 +8,8 @@ plugin declarations and no settings file of its own:
 
 ```
 org.apache.maven.plugins:maven-checkstyle-plugin:3.6.0:check -Dcheckstyle.config.location=google_checks.xml
-org.sonarsource.scanner.maven:sonar-maven-plugin:4.0.0.4121:sonar -Dsonar.host.url=$SONAR_URL -Dsonar.token=$SONAR_TOKEN
-package ... org.apache.maven.plugins:maven-deploy-plugin:3.1.3:deploy -DaltSnapshotDeploymentRepository=nexus-snapshots::$NEXUS_ARTIFACTORY_SNAPSHOT_URL ...
+org.sonarsource.scanner.maven:sonar-maven-plugin:5.8.0.7211:sonar -Dsonar.host.url=$SONAR_URL -Dsonar.token=$SONAR_TOKEN
+package ... org.apache.maven.plugins:maven-deploy-plugin:3.2.0:deploy -DaltSnapshotDeploymentRepository=nexus-snapshots::$NEXUS_ARTIFACTORY_SNAPSHOT_URL ...
 ```
 
 `./devops.sh stages` prints the exact commands for the selected modules.
@@ -70,7 +70,7 @@ key when the `maven` orchestrator runs on your machine, and a deploy key
 Concourse runs the build.
 
 Create the `site` branch once and point GitHub Pages at it, as described in
-[Project site on GitHub Pages](../README.md#project-site-on-github-pages).
+[Project site on GitHub Pages](github-pages.md).
 
 ## Tokens
 

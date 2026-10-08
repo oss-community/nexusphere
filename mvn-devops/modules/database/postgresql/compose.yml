@@ -1,0 +1,17 @@
+# The database the ci phase checks the Flyway migrations against: emptied and
+# migrated from scratch on every run.
+services:
+  database:
+    image: postgres:${DATABASE_IMAGE_TAG:-18}
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${DATABASE_NAME}
+      POSTGRES_USER: ${DATABASE_NAME}
+      POSTGRES_PASSWORD: ${DATABASE_CI_PASSWORD}
+    ports:
+      - "${DATABASE_HOST_PORT}:5432"
+    volumes:
+      - database-data:/var/lib/postgresql
+
+volumes:
+  database-data:

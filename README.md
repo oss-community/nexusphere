@@ -165,14 +165,17 @@ docker volume prune -f
 ## DevOps
 
 The project ships [mvn-devops](https://github.com/oss-community/mvn-devops) 1.0.0 in the `mvn-devops` folder. It
-starts the chosen tools in Docker (SonarQube, Nexus, Artifactory, Jenkins or Concourse), configures them and runs the
-pipeline stages against this Maven project. Its own guide is [mvn-devops/README.md](mvn-devops/README.md). Values and
+starts the chosen tools in Docker, configures them and runs the pipeline stages against this Maven project, either from
+the menu or from one of its 16 ready-made pipelines. Step-by-step use for this project, from `maven-sonarqube-nexus` up
+to `jenkins-complete`, is in [DevOps Step by Step](docs/devops-guide.md); its own guide is
+[mvn-devops/README.md](mvn-devops/README.md). Values and
 tokens are kept in `.devops/`, which is never committed. Shell, IntelliJ IDEA terminal and line-ending settings are in
 [Local Environment Setup](docs/local-setup.md).
 
 ```shell
 mvn-devops/devops.sh doctor
-mvn-devops/devops.sh setup
+mvn-devops/devops.sh pipelines
+mvn-devops/devops.sh setup --pipeline maven-sonarqube-nexus
 mvn-devops/devops.sh stages
 mvn-devops/devops.sh run
 mvn-devops/devops.sh urls
@@ -184,8 +187,9 @@ Windows:
 mvn-devops\devops.bat setup
 ```
 
-Upgrade by deleting the `mvn-devops` folder, extracting the new release zip in its place and renaming the folder to
-`mvn-devops`.
+Upgrade with `mvn-devops/devops.sh upgrade`, which replaces the folder with the latest release after checking its
+`SHA256SUMS`, or by deleting the `mvn-devops` folder and extracting the new release zip in its place under the same
+name.
 
 ## UI
 

@@ -17,6 +17,7 @@ only once.
 | | | `admin:repo_hook` | only with `JENKINS_TRIGGER=webhook`: `configure` registers the push webhook |
 | Packages token (optional) | `GITHUB_PACKAGE_TOKEN` | `write:packages`, `read:packages` | the `deploy-github` stage. Empty: the repository token is used, so give it these scopes too |
 | | | `delete:packages` | only if you want to delete package versions later |
+| | | `write:packages` on `GITHUB_TOKEN` | the `image` stage of the `github-container` module pushes to ghcr.io with the repository token |
 
 With a public repository and no private dependencies, `public_repo` is enough
 instead of `repo`.

@@ -12,7 +12,7 @@ module_secrets() {
   ask JFROG_RELEASE_REPOSITORY "Artifactory release repository" "$prefix-libs-release-local"
   ask JFROG_SNAPSHOT_REPOSITORY "Artifactory snapshot repository" "$prefix-libs-snapshot-local"
   if server_external JFROG; then
-    ask JFROG_USERNAME "Artifactory user that may deploy" admin
+    ask_local JFROG_USERNAME "Artifactory user that may deploy" admin
     ask_secret JFROG_PASSWORD "Password, API key or identity token of $(value JFROG_USERNAME)"
     return
   fi
