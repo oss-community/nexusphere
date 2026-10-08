@@ -157,6 +157,7 @@ LEDGER_A2A_PEERS_{NAME}_URL:
 LEDGER_A2A_PEERS_{NAME}_ISSUER:
 LEDGER_A2A_AGENTS_{NAME}_URL:
 LEDGER_A2A_AGENTS_{NAME}_AUTHORIZATION:
+LEDGER_STREAM_TIMEOUT: 1h
 ```
 
 <p style="text-align: justify;">
@@ -368,8 +369,20 @@ answer: a JSON-RPC error, `isError: true`, a non-2xx status or an unreachable se
 `FAILED`. The input hash is the SHA-256 of the request body, the output hash is the SHA-256 of the answer, the MCP
 session ID is the correlation ID, and every answer to a decided call carries the `X-Ledger-Decision` header. Other
 messages, such as `initialize`, `tools/list` and notifications, pass through unchanged with the `Mcp-Session-Id`
-header. Answers streamed as server-sent events are returned as one JSON response; batches and the server-to-client
-stream (`GET`) are not supported.
+header.
+
+</p>
+
+<p style="text-align: justify;">
+
+When the client accepts `text/event-stream`, a streamed answer is relayed event by event as it arrives, including the
+requests and notifications the server sends inside it (for example `elicitation/create` or progress), and the outcome
+is recorded when the stream ends from the event that answers the call, with `mcp.events` (the number of events) and
+`mcp.stream` (`COMPLETE` or `BROKEN`) as attributes. A client that accepts only JSON gets the answer as one JSON
+response. `GET /mcp/{name}` relays the server-to-client stream with `Mcp-Session-Id` and `Last-Event-ID`, and the
+client's answers to server requests pass through on `POST`. A stream stays open for at most `LEDGER_STREAM_TIMEOUT`.
+JSON-RPC batches are not supported, because MCP removed them in protocol version 2025-06-18; a batch is answered with
+`-32600`.
 
 </p>
 
@@ -510,10 +523,21 @@ The sending ledger verifies the receipt with the peer's published key, records t
 `a2a.receipt` set to `VERIFIED`, `INVALID` or `MISSING` and the peer's evidence sequence and hash, and returns the
 answer with `X-Ledger-Decision`, `X-Ledger-Exchange`, `X-Ledger-Receipt` and the receipt. Both ledgers keep the
 mandate, the request proof and the receipt of every exchange at `GET /api/v1/a2a/exchanges/{id}`, so either side can
-later show what the other signed. Streaming methods (`message/stream`, `tasks/resubscribe`) are answered with
-`-32004`. The receiving ledger also counts the uses of every mandate on its own: once the requests it accepted under a
+later show what the other signed. The receiving ledger also counts the uses of every mandate on its own: once the requests it accepted under a
 mandate reach `mandate.maxUses`, it denies the next one with `USES_EXHAUSTED`, so a sender that ignores its own count
 gets nowhere. A request that could not reach the receiving agent does not count.
+
+</p>
+
+<p style="text-align: justify;">
+
+Streaming methods (`message/stream`, `tasks/resubscribe`) work the same way. When the agent answers with
+server-sent events, both ledgers relay every event as it arrives. The response hash of a stream is the SHA-256 of the
+`data` of every event, each followed by a newline, so both sides compute the same value. The exchange fails when an
+event is a JSON-RPC error, a task ends `failed` or `rejected`, or the stream breaks. When the stream ends, the
+receiving ledger records its entry and sends the receipt as a last event named `nexusphere-receipt`; the sending
+ledger takes that event out, verifies the receipt and records the outcome with `a2a.events` and `a2a.stream`, so the
+agent sees only the events of the task.
 
 </p>
 

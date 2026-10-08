@@ -36,8 +36,8 @@ outside caller, and rebuilds evidence entries from the JSON so they can be check
 the server. `FakeMcpServer` is a small MCP server on a random port, configured as the `files` server of the gateway; it
 answers `initialize`, `tools/list` and `tools/call`, and streams the answer of tools ending in `_sse`.
 `A2aE2ETest` starts a second ledger, `SupplierLedger`, with its own PostgreSQL container and signing key, which trusts
-the first one and forwards to `FakeA2aAgent`, so mandates, request proofs and receipts cross between two ledgers over
-HTTP.
+the first one and forwards to `FakeA2aAgent`, which streams `message/stream` and `tasks/resubscribe`, so mandates,
+request proofs and receipts cross between two ledgers over HTTP.
 `KeyRotationE2ETest` restarts a `StandaloneLedger` against one PostgreSQL container with a new signing key, so the
 rotation happens at startup as it does in production.
 
@@ -82,6 +82,8 @@ rotation happens at startup as it does in production.
 |                          | A denied tool call never reaches the server                                   |
 |                          | Tool errors are recorded as failed outcomes                                   |
 |                          | Streamed responses are returned as JSON                                       |
+|                          | A streamed answer is relayed live with the server requests inside             |
+|                          | The server stream is relayed on GET                                           |
 |                          | Other messages pass through with the session                                  |
 |                          | Bad requests are answered as JSON-RPC errors                                  |
 |                          | An unreachable server is recorded as a failed call                            |
@@ -100,7 +102,9 @@ rotation happens at startup as it does in production.
 |                          | The receiver rejects a revoked mandate and records the denial                 |
 |                          | Replayed, tampered or forged requests are rejected without reaching the agent |
 |                          | The receiver counts the uses of a mandate on its own                          |
-|                          | An unreachable peer or streaming is answered without delivery                 |
+|                          | An unreachable peer is answered without delivery                              |
+|                          | A streamed task is relayed live and the receipt covers every event            |
+|                          | A stream that ends in a failed task is recorded as failed on both sides       |
 | `KeyRotationE2ETest`     | An endorsed rotation keeps earlier checkpoints and mandates valid             |
 |                          | A new key without the previous key is refused unless the operator allows it   |
 |                          | A retired key cannot sign again                                               |

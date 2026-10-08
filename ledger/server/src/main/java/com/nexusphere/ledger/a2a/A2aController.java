@@ -2,6 +2,7 @@ package com.nexusphere.ledger.a2a;
 
 import com.nexusphere.ledger.server.security.Caller;
 import com.nexusphere.ledger.server.web.LedgerException;
+import org.springframework.http.CacheControl;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -11,6 +12,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.servlet.mvc.method.annotation.StreamingResponseBody;
 
 import java.time.Instant;
 import java.util.UUID;
@@ -43,17 +45,19 @@ class A2aController {
     }
 
     @PostMapping("/a2a/out/{peer}")
-    ResponseEntity<byte[]> send(Caller caller, @PathVariable String peer,
-                                @RequestHeader(name = PRINCIPAL_HEADER, required = false) String principalId,
-                                @RequestBody byte[] body) {
+    ResponseEntity<StreamingResponseBody> send(
+            Caller caller, @PathVariable String peer,
+            @RequestHeader(name = PRINCIPAL_HEADER, required = false) String principalId,
+            @RequestBody byte[] body) {
         return respond(outbound.send(caller, peer, principalId, body));
     }
 
     @PostMapping("/a2a/in/{agent}")
-    ResponseEntity<byte[]> receive(@PathVariable String agent,
-                                   @RequestHeader(name = A2aOutbound.MANDATE_HEADER, required = false) String mandate,
-                                   @RequestHeader(name = A2aOutbound.REQUEST_HEADER, required = false) String request,
-                                   @RequestBody byte[] body) {
+    ResponseEntity<StreamingResponseBody> receive(
+            @PathVariable String agent,
+            @RequestHeader(name = A2aOutbound.MANDATE_HEADER, required = false) String mandate,
+            @RequestHeader(name = A2aOutbound.REQUEST_HEADER, required = false) String request,
+            @RequestBody byte[] body) {
         return respond(inbound.receive(agent, mandate, request, body));
     }
 
@@ -63,12 +67,18 @@ class A2aController {
                 .orElseThrow(() -> LedgerException.notFound("Exchange " + id));
     }
 
-    private static ResponseEntity<byte[]> respond(A2aResponse response) {
+    private static ResponseEntity<StreamingResponseBody> respond(A2aResponse response) {
         HttpHeaders headers = new HttpHeaders();
-        if (response.body().length > 0) {
+        response.headers().forEach(headers::set);
+        if (response.stream() != null) {
+            headers.setContentType(MediaType.TEXT_EVENT_STREAM);
+            headers.setCacheControl(CacheControl.noCache());
+            return ResponseEntity.status(response.status()).headers(headers).body(response.stream());
+        }
+        byte[] body = response.body();
+        if (body.length > 0) {
             headers.setContentType(MediaType.APPLICATION_JSON);
         }
-        response.headers().forEach(headers::set);
-        return ResponseEntity.status(response.status()).headers(headers).body(response.body());
+        return ResponseEntity.status(response.status()).headers(headers).body(out -> out.write(body));
     }
 }
