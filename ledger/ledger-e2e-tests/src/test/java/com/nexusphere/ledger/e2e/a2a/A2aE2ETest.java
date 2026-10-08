@@ -200,13 +200,39 @@ class A2aE2ETest extends LedgerE2ETestBase {
     }
 
     @Test
+    void theReceiverCountsTheUsesOfAMandateOnItsOwn() {
+        RegisteredAgent agent = registerAgent("acme");
+        Map<String, Object> body = grantBody("alice", agent.agentId(), List.of("a2a/send"), List.of("supplier/*"));
+        body.put("maxUses", 1);
+        String grantId = grant(body);
+        JsonNode mandate = agent.client().post("/api/v1/mandates",
+                LedgerClient.json(Map.of("grantId", grantId, "audience", SUPPLIER_ISSUER))).json();
+        String token = mandate.path("token").asString();
+        String first = message("message/send", "m-12");
+        String second = message("message/send", "m-13");
+
+        LedgerClient.Response used = deliver(token, proof(agent.agentId(), mandate.path("id").asString(), first,
+                Instant.now()), first);
+        int before = sales.calls();
+        LedgerClient.Response exhausted = deliver(token, proof(agent.agentId(), mandate.path("id").asString(),
+                second, Instant.now()), second);
+
+        assertThat(used.status()).isEqualTo(200);
+        assertThat(exhausted.status()).isEqualTo(403);
+        assertThat(exhausted.json().path("error").path("data").path("problems").toString())
+                .contains("USES_EXHAUSTED");
+        assertThat(sales.calls()).isEqualTo(before);
+    }
+
+    @Test
     void anUnreachablePeerOrStreamingIsAnsweredWithoutDelivery() {
         RegisteredAgent agent = registerAgent("acme");
-        grant(grantBody("alice", agent.agentId(), List.of("a2a/send"), List.of("*")));
+        String grantId = grant(grantBody("alice", agent.agentId(), List.of("a2a/send"), List.of("*")));
 
         LedgerClient.Response offline = agent.client().post("/a2a/out/offline", message("message/send", "m-7"),
                 principal());
         JsonNode sent = outcomeOf(agent.agentId());
+        long uses = ledger().get("/api/v1/grants/" + grantId).json().path("uses").asLong();
         LedgerClient.Response stream = agent.client().post("/a2a/out/supplier", message("message/stream", "m-8"),
                 principal());
         LedgerClient.Response operator = ledger().post("/a2a/out/supplier", message("message/send", "m-9"),
@@ -220,6 +246,8 @@ class A2aE2ETest extends LedgerE2ETestBase {
         assertThat(offline.json().path("error").path("code").asInt()).isEqualTo(-32002);
         assertThat(sent.path("outcome").asString()).isEqualTo("FAILED");
         assertThat(sent.path("attributes").path("a2a.receipt").asString()).isEqualTo("MISSING");
+        assertThat(sent.path("attributes").path("grant.useReturned").asString()).isEqualTo("true");
+        assertThat(uses).isZero();
         assertThat(stream.json().path("error").path("code").asInt()).isEqualTo(-32004);
         assertThat(operator.status()).isEqualTo(403);
         assertThat(unknown.status()).isEqualTo(404);

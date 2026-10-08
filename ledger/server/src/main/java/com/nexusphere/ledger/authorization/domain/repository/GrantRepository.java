@@ -23,5 +23,7 @@ public interface GrantRepository {
 
     void use(UUID id);
 
+    void release(UUID id);
+
     void revoke(UUID id, Instant revokedAt, String reason);
 }

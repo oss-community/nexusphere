@@ -99,6 +99,11 @@ class JdbcGrantRepository implements GrantRepository {
     }
 
     @Override
+    public void release(UUID id) {
+        jdbc.update("update ledger.grant_record set uses = greatest(uses - 1, 0) where id = :id", Map.of("id", id));
+    }
+
+    @Override
     public void revoke(UUID id, Instant revokedAt, String reason) {
         jdbc.update("""
                 update ledger.grant_record set status = 'REVOKED', revoked_at = :revokedAt, revoke_reason = :reason
