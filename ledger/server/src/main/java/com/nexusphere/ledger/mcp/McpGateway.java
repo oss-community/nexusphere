@@ -22,6 +22,7 @@ import java.io.IOException;
 import java.time.Duration;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 
 @Service
@@ -33,6 +34,7 @@ class McpGateway {
     static final int INVALID_PARAMS = -32602;
     static final int UPSTREAM_UNAVAILABLE = -32002;
     static final int DENIED = -32003;
+    static final Set<Integer> REJECTED_CODES = Set.of(PARSE_ERROR, INVALID_REQUEST, -32601, INVALID_PARAMS);
 
     private static final Logger log = LoggerFactory.getLogger(McpGateway.class);
 
@@ -62,7 +64,7 @@ class McpGateway {
         }
         JsonNode id = message.get("id");
         if (!TOOLS_CALL.equals(message.path("method").asString(null)) || id == null) {
-            return forward(server, sessionId, protocolVersion, body, id, null);
+            return forward(server, sessionId, protocolVersion, body, id, null).response();
         }
         if (caller.isOperator()) {
             return error(403, id, DENIED, "Only agents may call tools through the gateway.", null);
@@ -90,11 +92,17 @@ class McpGateway {
                     data);
             return new GatewayResponse(denied.status(), sessionId, denied.body(), decisionId);
         }
-        GatewayResponse response = forward(server, sessionId, protocolVersion, body, id, decisionId);
+        Forwarded forwarded = forward(server, sessionId, protocolVersion, body, id, decisionId);
+        GatewayResponse response = forwarded.response();
         Outcome outcome = outcome(response);
         String reason = outcome == Outcome.FAILED ? failure(response) : null;
-        decisions.reportOutcome(decisionId, caller.agentId(), new OutcomeReport(outcome,
-                Hashes.sha256(response.body()), reason, Map.of("mcp.status", String.valueOf(response.status()))));
+        OutcomeReport report = new OutcomeReport(outcome, Hashes.sha256(response.body()), reason,
+                Map.of("mcp.status", String.valueOf(response.status())));
+        if (!forwarded.reached() || rejected(response)) {
+            decisions.reportUndelivered(decisionId, caller.agentId(), report);
+        } else {
+            decisions.reportOutcome(decisionId, caller.agentId(), report);
+        }
         return response;
     }
 
@@ -111,19 +119,35 @@ class McpGateway {
         }
     }
 
-    private GatewayResponse forward(LedgerProperties.Mcp.Server server, String sessionId, String protocolVersion,
-                                    byte[] body, JsonNode id, UUID decisionId) {
+    private record Forwarded(GatewayResponse response, boolean reached) {
+    }
+
+    private Forwarded forward(LedgerProperties.Mcp.Server server, String sessionId, String protocolVersion,
+                              byte[] body, JsonNode id, UUID decisionId) {
         try {
             UpstreamResponse response = upstream.post(server, timeout(), sessionId, protocolVersion, body, id);
-            return new GatewayResponse(response.status(),
-                    response.sessionId() == null ? sessionId : response.sessionId(), response.body(), decisionId);
+            return new Forwarded(new GatewayResponse(response.status(),
+                    response.sessionId() == null ? sessionId : response.sessionId(), response.body(), decisionId),
+                    true);
         } catch (IOException e) {
             log.warn("MCP server {} is unavailable: {}", server.url(), e.getMessage());
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
         }
         GatewayResponse failed = error(502, id, UPSTREAM_UNAVAILABLE, "The MCP server is unavailable.", null);
-        return new GatewayResponse(failed.status(), sessionId, failed.body(), decisionId);
+        return new Forwarded(new GatewayResponse(failed.status(), sessionId, failed.body(), decisionId), false);
+    }
+
+    private boolean rejected(GatewayResponse response) {
+        if (response.status() >= 400 && response.status() < 500) {
+            return true;
+        }
+        try {
+            JsonNode message = json.readTree(response.body());
+            return message != null && REJECTED_CODES.contains(message.path("error").path("code").asInt(0));
+        } catch (JacksonException e) {
+            return false;
+        }
     }
 
     private Outcome outcome(GatewayResponse response) {

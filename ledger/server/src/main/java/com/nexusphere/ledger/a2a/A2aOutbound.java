@@ -122,7 +122,7 @@ class A2aOutbound {
             log.warn("A2A peer {} is unavailable: {}", peer.url(), e.getMessage());
             A2aResponse failed = rpc.error(502, id, JsonRpc.UPSTREAM_UNAVAILABLE, "The A2A peer is unavailable.",
                     null, headers);
-            decisions.reportOutcome(decisionId, caller.agentId(), new OutcomeReport(Outcome.FAILED,
+            decisions.reportUndelivered(decisionId, caller.agentId(), new OutcomeReport(Outcome.FAILED,
                     Hashes.sha256(failed.body()), "The A2A peer " + peerName + " is unavailable.",
                     Map.of("a2a.receipt", "MISSING")));
             exchanges.complete(exchangeId, Hashes.sha256(failed.body()), 502, Outcome.FAILED.name(), null, null,
@@ -138,9 +138,14 @@ class A2aOutbound {
         attributes.put("a2a.receipt", receiptStatus);
         boolean failed = rpc.failed(reply.status(), reply.body());
         Outcome outcome = failed ? Outcome.FAILED : Outcome.SUCCEEDED;
-        decisions.reportOutcome(decisionId, caller.agentId(), new OutcomeReport(outcome, responseHash,
+        OutcomeReport report = new OutcomeReport(outcome, responseHash,
                 failed ? "The A2A peer answered with HTTP " + reply.status() + " or a JSON-RPC error." : null,
-                attributes));
+                attributes);
+        if (receipt == null && reply.status() >= 400) {
+            decisions.reportUndelivered(decisionId, caller.agentId(), report);
+        } else {
+            decisions.reportOutcome(decisionId, caller.agentId(), report);
+        }
         exchanges.complete(exchangeId, responseHash, reply.status(), outcome.name(), null, receipt, receiptStatus);
         if (receipt != null) {
             headers.put(RECEIPT_HEADER, receipt);

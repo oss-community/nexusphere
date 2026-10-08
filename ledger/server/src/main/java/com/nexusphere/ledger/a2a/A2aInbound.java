@@ -39,6 +39,7 @@ import java.util.UUID;
 class A2aInbound {
 
     static final String ACTION = "a2a/receive";
+    static final String USES_EXHAUSTED = "USES_EXHAUSTED";
 
     private static final Logger log = LoggerFactory.getLogger(A2aInbound.class);
     private static final Set<MandateProblem> UNAUTHENTICATED = EnumSet.of(MandateProblem.MALFORMED,
@@ -125,6 +126,10 @@ class A2aInbound {
         if (!claims.coversAction(A2aOutbound.ACTION)) {
             problems.add(MandateProblem.NOT_COVERED.name());
         }
+        if (problems.isEmpty() && claims.maxUses() != null
+                && !exchanges.claimUse(exchangeId, claims.issuer(), claims.mandateId(), claims.maxUses())) {
+            problems.add(USES_EXHAUSTED);
+        }
         if (!problems.isEmpty()) {
             EvidenceEntry denied = record(agentName, claims, method, request, Decision.DENY, Outcome.DENIED,
                     String.join(", ", problems), null, attributes);
@@ -147,6 +152,7 @@ class A2aInbound {
                 Thread.currentThread().interrupt();
             }
             log.warn("A2A agent {} is unavailable: {}", agent.url(), e.getMessage());
+            exchanges.releaseUse(exchangeId);
             A2aResponse failed = rpc.error(502, id, JsonRpc.UPSTREAM_UNAVAILABLE, "The agent is unavailable.", null,
                     Map.of());
             status = failed.status();

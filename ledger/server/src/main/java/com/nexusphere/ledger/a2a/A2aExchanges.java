@@ -4,6 +4,7 @@ import org.springframework.dao.DuplicateKeyException;
 import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 import org.springframework.stereotype.Repository;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.sql.ResultSet;
 import java.sql.SQLException;
@@ -45,6 +46,25 @@ class A2aExchanges {
         } catch (DuplicateKeyException duplicate) {
             return false;
         }
+    }
+
+    @Transactional
+    public boolean claimUse(UUID id, String peer, UUID mandateId, long maxUses) {
+        jdbc.queryForList("select pg_advisory_xact_lock(hashtext(:key))",
+                Map.of("key", "ledger.a2a_exchange." + peer + "." + mandateId));
+        Long used = jdbc.queryForObject("""
+                select count(*) from ledger.a2a_exchange
+                where direction = 'INBOUND' and peer = :peer and mandate_id = :mandateId and use_counted
+                """, Map.of("peer", peer, "mandateId", mandateId), Long.class);
+        if (used != null && used >= maxUses) {
+            return false;
+        }
+        jdbc.update("update ledger.a2a_exchange set use_counted = true where id = :id", Map.of("id", id));
+        return true;
+    }
+
+    void releaseUse(UUID id) {
+        jdbc.update("update ledger.a2a_exchange set use_counted = false where id = :id", Map.of("id", id));
     }
 
     void complete(UUID id, String responseHash, Integer status, String outcome, Long evidenceSequence, String receipt,

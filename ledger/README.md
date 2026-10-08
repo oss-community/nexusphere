@@ -322,7 +322,10 @@ Before acting, an agent asks for a decision. The ledger picks the active grant t
 expires first, counts one use, and records the decision as evidence with outcome `PENDING`, or `DENIED` with the reason.
 The agent then reports `SUCCEEDED` or `FAILED` once; this is a second evidence entry carrying the `decisionId` attribute,
 the grant as `delegationId` and the same `inputHash` and `correlationId`. Concurrent decisions never use a grant more
-than `maxUses` times.
+than `maxUses` times. A reported `FAILED` keeps the use, because the ledger cannot know whether the action ran. The
+gateways return the use themselves when they see that the call never ran: the MCP or A2A server could not be reached,
+the MCP server rejected the request (HTTP 4xx, or JSON-RPC parse, invalid request, unknown method or invalid params),
+or the peer ledger refused the A2A request without a receipt. The outcome entry then carries `grant.useReturned`.
 
 </p>
 
@@ -508,7 +511,9 @@ The sending ledger verifies the receipt with the peer's published key, records t
 answer with `X-Ledger-Decision`, `X-Ledger-Exchange`, `X-Ledger-Receipt` and the receipt. Both ledgers keep the
 mandate, the request proof and the receipt of every exchange at `GET /api/v1/a2a/exchanges/{id}`, so either side can
 later show what the other signed. Streaming methods (`message/stream`, `tasks/resubscribe`) are answered with
-`-32004`; the use limit of a grant is counted by the sender only.
+`-32004`. The receiving ledger also counts the uses of every mandate on its own: once the requests it accepted under a
+mandate reach `mandate.maxUses`, it denies the next one with `USES_EXHAUSTED`, so a sender that ignores its own count
+gets nowhere. A request that could not reach the receiving agent does not count.
 
 </p>
 

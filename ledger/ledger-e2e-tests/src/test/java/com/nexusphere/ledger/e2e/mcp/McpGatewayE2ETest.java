@@ -79,7 +79,7 @@ class McpGatewayE2ETest extends LedgerE2ETestBase {
     @Test
     void toolErrorsAreRecordedAsFailedOutcomes() {
         RegisteredAgent agent = registerAgent("acme");
-        grant(grantBody("carol", agent.agentId(), List.of("tools/call"), List.of("files/*")));
+        String grantId = grant(grantBody("carol", agent.agentId(), List.of("tools/call"), List.of("files/*")));
 
         String failed = agent.client().post(FILES, toolCall(9, "fail"), as("carol")).header("X-Ledger-Decision")
                 .orElseThrow();
@@ -92,6 +92,7 @@ class McpGatewayE2ETest extends LedgerE2ETestBase {
         assertThat(crash.path("outcome").asString()).isEqualTo("FAILED");
         assertThat(ledger().get("/api/v1/evidence/" + crash.path("outcomeEvidenceId").asString()).json()
                 .path("reason").asString()).contains("Tool crashed");
+        assertThat(ledger().get("/api/v1/grants/" + grantId).json().path("uses").asLong()).isEqualTo(2);
     }
 
     @Test
@@ -157,14 +158,18 @@ class McpGatewayE2ETest extends LedgerE2ETestBase {
     @Test
     void anUnreachableServerIsRecordedAsAFailedCall() {
         RegisteredAgent agent = registerAgent("acme");
-        grant(grantBody("frank", agent.agentId(), List.of("tools/call"), List.of("offline/*")));
+        String grantId = grant(grantBody("frank", agent.agentId(), List.of("tools/call"), List.of("offline/*")));
 
         LedgerClient.Response response = agent.client().post("/mcp/offline", toolCall(12, "ping"), as("frank"));
 
         assertThat(response.status()).isEqualTo(502);
         assertThat(response.json().path("error").path("code").asInt()).isEqualTo(-32002);
-        assertThat(ledger().get("/api/v1/decisions/" + response.header("X-Ledger-Decision").orElseThrow()).json()
-                .path("outcome").asString()).isEqualTo("FAILED");
+        JsonNode decision = ledger().get("/api/v1/decisions/" + response.header("X-Ledger-Decision").orElseThrow())
+                .json();
+        assertThat(decision.path("outcome").asString()).isEqualTo("FAILED");
+        assertThat(ledger().get("/api/v1/evidence/" + decision.path("outcomeEvidenceId").asString()).json()
+                .path("attributes").path("grant.useReturned").asString()).isEqualTo("true");
+        assertThat(ledger().get("/api/v1/grants/" + grantId).json().path("uses").asLong()).isZero();
         assertThat(ledger().get("/api/v1/verification").json().path("valid").asBoolean()).isTrue();
     }
 }

@@ -99,6 +99,7 @@ rotation happens at startup as it does in production.
 |                          | A failed task is recorded as failed on both sides with a receipt              |
 |                          | The receiver rejects a revoked mandate and records the denial                 |
 |                          | Replayed, tampered or forged requests are rejected without reaching the agent |
+|                          | The receiver counts the uses of a mandate on its own                          |
 |                          | An unreachable peer or streaming is answered without delivery                 |
 | `KeyRotationE2ETest`     | An endorsed rotation keeps earlier checkpoints and mandates valid             |
 |                          | A new key without the previous key is refused unless the operator allows it   |

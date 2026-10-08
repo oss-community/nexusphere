@@ -17,6 +17,8 @@ First release of the Nexusphere Ledger, a self-hosted evidence ledger for AI age
   inbound requests are verified, recorded and answered with a signed receipt, so both sides hold matching evidence
 * Signing key rotation at startup with a rotation record signed by the old and the new key; retired keys stay
   published, so everything they signed still verifies, and the offline verifier follows rotations from a pinned key
+* Grant uses are returned when a gateway sees that the call never ran, and a receiving ledger counts the uses of
+  each mandate on its own
 * Dockerfiles, compose file with Adminer, demo MCP server and demo script
 
 ##

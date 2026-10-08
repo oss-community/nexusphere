@@ -32,6 +32,7 @@ import java.util.UUID;
 public class DecisionService {
 
     static final String DECISION_ATTRIBUTE = "decisionId";
+    static final String USE_RETURNED_ATTRIBUTE = "grant.useReturned";
 
     private record Verdict(ReasonCode code, String reason, Grant grant) {
 
@@ -76,6 +77,19 @@ public class DecisionService {
 
     @Transactional
     public DecisionResult reportOutcome(UUID decisionId, String callerAgentId, OutcomeReport report) {
+        return reportOutcome(decisionId, callerAgentId, report, false);
+    }
+
+    @Transactional
+    public DecisionResult reportUndelivered(UUID decisionId, String callerAgentId, OutcomeReport report) {
+        if (report.outcome() != Outcome.FAILED) {
+            throw new IllegalArgumentException("An undelivered action can only fail");
+        }
+        return reportOutcome(decisionId, callerAgentId, report, true);
+    }
+
+    private DecisionResult reportOutcome(UUID decisionId, String callerAgentId, OutcomeReport report,
+                                         boolean returnUse) {
         DecisionRecord decision = decisions.lock(decisionId)
                 .filter(d -> callerAgentId == null || d.agentId().equals(callerAgentId))
                 .orElseThrow(() -> LedgerException.notFound("Decision " + decisionId));
@@ -93,6 +107,11 @@ public class DecisionService {
         EvidenceEntry decided = evidence.get(decisionId);
         Map<String, String> attributes = new TreeMap<>(report.attributes() == null ? Map.of() : report.attributes());
         attributes.put(DECISION_ATTRIBUTE, decisionId.toString());
+        if (returnUse && decision.grantId() != null) {
+            grants.lock(decision.grantId());
+            grants.release(decision.grantId());
+            attributes.put(USE_RETURNED_ATTRIBUTE, "true");
+        }
         EvidenceEntry entry = evidence.record(new EvidenceSubmission(clock.instant(), decision.agentId(),
                 decision.principalId(), decision.action(), decision.target(), Decision.ALLOW, report.reason(),
                 decided.delegationId(), decided.inputHash(), report.outputHash(), report.outcome(),
