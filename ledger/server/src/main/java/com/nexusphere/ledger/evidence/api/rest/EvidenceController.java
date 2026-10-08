@@ -125,6 +125,16 @@ class EvidenceController {
         return new EvidencePage(entries.stream().map(EvidenceResponse::of).toList(), nextAfter);
     }
 
+    @GetMapping("/principal/evidence")
+    EvidencePage forPrincipal(Caller caller,
+                              @RequestParam(defaultValue = "0") long after,
+                              @RequestParam(defaultValue = "100") int limit) {
+        String principalId = caller.requirePrincipal().principalId();
+        List<EvidenceEntry> entries = evidence.find(new EvidenceQuery(null, principalId, after, limit));
+        Long nextAfter = entries.size() == limit ? entries.getLast().sequence() : null;
+        return new EvidencePage(entries.stream().map(EvidenceResponse::of).toList(), nextAfter);
+    }
+
     @GetMapping("/ledger/head")
     HeadResponse head() {
         LedgerHead head = evidence.head();

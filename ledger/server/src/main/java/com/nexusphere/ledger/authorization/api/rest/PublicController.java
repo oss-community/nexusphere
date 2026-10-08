@@ -2,7 +2,9 @@ package com.nexusphere.ledger.authorization.api.rest;
 
 import com.nexusphere.ledger.authorization.application.MandateService;
 import com.nexusphere.ledger.mandate.Jwk;
+import com.nexusphere.ledger.server.config.LedgerProperties;
 import com.nexusphere.ledger.server.signing.LedgerSigner;
+import com.nexusphere.ledger.server.web.LedgerException;
 import org.springframework.http.CacheControl;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -20,12 +22,25 @@ class PublicController {
     private static final MediaType STATUS_LIST = MediaType.parseMediaType("application/statuslist+jwt");
     private static final MediaType JWK_SET = MediaType.parseMediaType("application/jwk-set+json");
 
+    record OidcResponse(String issuer, String clientId) {
+    }
+
     private final MandateService mandates;
     private final LedgerSigner signer;
+    private final LedgerProperties properties;
 
-    PublicController(MandateService mandates, LedgerSigner signer) {
+    PublicController(MandateService mandates, LedgerSigner signer, LedgerProperties properties) {
         this.mandates = mandates;
         this.signer = signer;
+        this.properties = properties;
+    }
+
+    @GetMapping("/oidc")
+    OidcResponse oidc() {
+        if (!properties.consentRequired()) {
+            throw LedgerException.notFound("OIDC sign-in");
+        }
+        return new OidcResponse(properties.oidc().issuer(), properties.oidc().publicClientId());
     }
 
     @GetMapping("/keys")

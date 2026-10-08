@@ -38,6 +38,7 @@ ledger:
     audience: ${LEDGER_OIDC_AUDIENCE:}
     jwks-uri: ${LEDGER_OIDC_JWKS_URI:}
     principal-claim: ${LEDGER_OIDC_PRINCIPAL_CLAIM:sub}
+    client-id: ${LEDGER_OIDC_CLIENT_ID:}
 management:
   endpoints:
     web:

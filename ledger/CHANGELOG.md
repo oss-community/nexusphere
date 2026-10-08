@@ -23,7 +23,9 @@ First release of the Nexusphere Ledger, a self-hosted evidence ledger for AI age
   `tasks/resubscribe` are relayed live, with the A2A receipt sent as the last event and covering every event
 * Principal login with any OpenID Connect provider: principals approve, deny, create and revoke their own grants,
   grants from the operator or an agent wait for that consent, and every consent is evidence tied to the sign-in
-* Dockerfiles, compose file with Adminer and Keycloak, demo MCP server and demo script
+* Web UI (React and TypeScript) for operators and principals: evidence, agents, grants, mandates, packages, A2A
+  exchanges, ledger verification, and principal sign-in with PKCE to approve, deny and revoke grants
+* Dockerfiles, compose file with Adminer, Keycloak and the web UI, demo MCP server and demo script
 
 ##
 

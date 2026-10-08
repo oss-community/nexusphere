@@ -29,12 +29,13 @@ record.
 * Signed mandates, the revocation status list and the public keys as JWKS
 * Signing key history: rotation at startup with a cross-signed rotation record, retired keys kept for verification
 * A2A gateway that sends and receives requests between two ledgers with evidence and signed receipts on both sides
+* Principal sign-in with an OpenID Connect provider and principal consent on grants
 
 ## Dependencies
 
-| Depends on         | Used by |
-|--------------------|---------|
-| `chain`, `mandate` | none    |
+| Depends on                     | Used by |
+|--------------------------------|---------|
+| `chain`, `mandate`, `verifier` | none    |
 
 ## API
 
@@ -43,7 +44,7 @@ record.
 | `/api/v1/**`                         | Evidence, checkpoints, packages, agents, grants, decisions, mandates and exchanges |
 | `/mcp/{server}`                      | MCP gateway                                                                        |
 | `/a2a/out/{peer}`, `/a2a/in/{agent}` | A2A gateway                                                                        |
-| `/public/v1/**`                      | Public keys and the mandate status list                                            |
+| `/public/v1/**`                      | Public keys, the mandate status list and the OIDC sign-in settings                 |
 
 ## Storage
 

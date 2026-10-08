@@ -87,5 +87,19 @@ services:
         condition: service_started
       keycloak:
         condition: service_started
+  ledger-ui:
+    image: samanalishiri/nexusphere-frontend:latest
+    build:
+      context: ../frontend
+      dockerfile: Dockerfile
+    container_name: ledger-ui
+    hostname: ledger-ui
+    restart: always
+    ports:
+      - "5173:80"
+    environment:
+      LEDGER_URL: http://ledger:8090
+    depends_on:
+      - ledger
 volumes:
   ledger-postgresql-data:

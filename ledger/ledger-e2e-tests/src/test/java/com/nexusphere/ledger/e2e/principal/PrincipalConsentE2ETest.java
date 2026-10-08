@@ -116,6 +116,7 @@ class PrincipalConsentE2ETest {
                 .get("/api/v1/principal");
         LedgerClient.Response evidence = as(token).get("/api/v1/evidence");
         LedgerClient.Response operatorOnPrincipal = operator().get("/api/v1/principal");
+        JsonNode discovery = ledger.client().withApiKey(null).get("/public/v1/oidc").json();
 
         assertThat(me.path("principalId").asString()).isEqualTo("alice");
         assertThat(me.path("name").asString()).isEqualTo("Alice");
@@ -128,6 +129,8 @@ class PrincipalConsentE2ETest {
         assertThat(otherIssuer.status()).isEqualTo(401);
         assertThat(evidence.status()).isEqualTo(403);
         assertThat(operatorOnPrincipal.status()).isEqualTo(403);
+        assertThat(discovery.path("issuer").asString()).isEqualTo(oidc.issuer());
+        assertThat(discovery.path("clientId").asString()).isEqualTo(FakeOidcProvider.AUDIENCE);
     }
 
     @Test
@@ -237,12 +240,17 @@ class PrincipalConsentE2ETest {
         LedgerClient.Response onBehalf = as(mallory).post("/api/v1/principal/grants",
                 LedgerClient.json(grantBody("erin", agentId)));
         JsonNode listed = as(mallory).get("/api/v1/principal/grants").json().path("items");
+        JsonNode malloryEvidence = as(mallory).get("/api/v1/principal/evidence").json().path("items");
+        JsonNode erinEvidence = as(erin).get("/api/v1/principal/evidence").json().path("items");
 
         assertThat(read.status()).isEqualTo(404);
         assertThat(approve.status()).isEqualTo(404);
         assertThat(revoke.status()).isEqualTo(404);
         assertThat(onBehalf.status()).isEqualTo(403);
         assertThat(listed.findValuesAsString("id")).doesNotContain(grantId);
+        assertThat(malloryEvidence.findValuesAsString("target")).doesNotContain(grantId);
+        assertThat(erinEvidence.findValuesAsString("target")).contains(grantId);
+        assertThat(erinEvidence.findValuesAsString("principalId")).containsOnly("erin");
         assertThat(as(erin).get("/api/v1/principal/grants/" + grantId).json().path("status").asString())
                 .isEqualTo("PENDING");
     }

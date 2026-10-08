@@ -62,6 +62,7 @@ rotation happens at startup as it does in production.
 |                           | A package starts at the last checkpoint before the evidence                   |
 |                           | Any change to a package is detected                                           |
 |                           | Packages are for the operator and need matching evidence                      |
+|                           | The operator can have the ledger verify a package                             |
 | `ApiKeyE2ETest`           | The API requires the ledger key                                               |
 |                           | Health is open for probes                                                     |
 | `AgentE2ETest`            | A registered agent gets its own key once                                      |

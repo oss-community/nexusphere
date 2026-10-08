@@ -9,11 +9,15 @@ import com.nexusphere.ledger.evidence.domain.model.PackageRequest;
 import com.nexusphere.ledger.server.security.Caller;
 import com.nexusphere.ledger.server.signing.KeyController;
 import com.nexusphere.ledger.server.signing.LedgerSigner;
+import com.nexusphere.ledger.verifier.PackageReport;
+import com.nexusphere.ledger.verifier.PackageVerifier;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import tools.jackson.databind.JsonNode;
 
 import java.time.Instant;
 import java.util.List;
@@ -78,5 +82,12 @@ class PackageController {
                 .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"evidence-package-"
                         + p.checkpoint().checkpoint().sequence() + ".json\"")
                 .body(body);
+    }
+
+    @PostMapping("/api/v1/packages/verify")
+    PackageReport verify(Caller caller, @RequestParam(required = false) String publicKey,
+                         @RequestBody JsonNode body) {
+        caller.requireOperator();
+        return PackageVerifier.verify(body, publicKey == null || publicKey.isBlank() ? null : publicKey);
     }
 }

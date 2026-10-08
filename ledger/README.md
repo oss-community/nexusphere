@@ -66,6 +66,7 @@ curl -X GET http://localhost:8090/actuator/health
 | `ledger-postgresql` | localhost:5433            | PostgreSQL, user, password and database `ledger` |
 | `ledger-adminer`    | http://localhost:8092     | Adminer for `ledger-postgresql`                  |
 | `keycloak`          | http://localhost:8180     | Keycloak, admin `admin`/`admin`                  |
+| `ledger-ui`         | http://localhost:5173     | The web UI, built from `frontend`                |
 
 <p style="text-align: justify;">
 
@@ -77,7 +78,8 @@ file trusts this realm, so grants created by the operator wait for the principal
 
 <p style="text-align: justify;">
 
-The MCP addresses have no web page. `/mcp/demo` on the ledger and `/mcp` on `demo-mcp` accept only MCP JSON-RPC
+The web UI on http://localhost:5173 opens with the operator key or a Keycloak sign-in; it is described in
+[Nexusphere Frontend](../frontend/README.md). The MCP addresses have no web page. `/mcp/demo` on the ledger and `/mcp` on `demo-mcp` accept only MCP JSON-RPC
 `POST` requests, and the gateway also needs an agent API key, so opening them in a browser shows nothing. Run the
 demo script below to see calls go through the gateway.
 
@@ -173,6 +175,7 @@ LEDGER_OIDC_ISSUER:
 LEDGER_OIDC_AUDIENCE:
 LEDGER_OIDC_JWKS_URI:
 LEDGER_OIDC_PRINCIPAL_CLAIM: sub
+LEDGER_OIDC_CLIENT_ID:
 ```
 
 <p style="text-align: justify;">
@@ -375,7 +378,8 @@ any other) and decide on their own grants. The ledger accepts the provider's acc
 `/api/v1/principal/**` only. It checks the signature with the provider's keys (from the discovery document, or from
 `LEDGER_OIDC_JWKS_URI` when the ledger reaches the provider at another address than the issuer), the issuer, the
 expiry, and that `LEDGER_OIDC_AUDIENCE` is in `aud` or is the `azp` client. The principal ID is the claim named by
-`LEDGER_OIDC_PRINCIPAL_CLAIM`, for example `preferred_username` or `email`.
+`LEDGER_OIDC_PRINCIPAL_CLAIM`, for example `preferred_username` or `email`. `GET /public/v1/oidc` tells a sign-in
+page the issuer and the public client to use, `LEDGER_OIDC_CLIENT_ID` or else the audience.
 
 </p>
 
@@ -610,6 +614,7 @@ API key, except `/api/v1/principal/**`, which requires a principal token from th
 | GET    | `/api/v1/checkpoints`                   | List checkpoints by `after` and `limit`                                                                |
 | GET    | `/api/v1/keys`                          | Signing keys with their status and rotation records                                                    |
 | POST   | `/api/v1/packages`                      | Export an evidence package by `agentId`, `principalId`, `fromSequence` and `toSequence` (operator)     |
+| POST   | `/api/v1/packages/verify`               | Verify a package with the verifier library, pinned to `publicKey` when given (operator)                |
 | GET    | `/api/v1/verification`                  | Full verification report (operator)                                                                    |
 | POST   | `/api/v1/agents`                        | Register an agent and return its API key once (operator)                                               |
 | GET    | `/api/v1/agents`                        | List agents by `after` and `limit` (operator)                                                          |
@@ -620,6 +625,7 @@ API key, except `/api/v1/principal/**`, which requires a principal token from th
 | GET    | `/api/v1/grants`                        | List grants by `agentId`, `principalId`, `after` and `limit`                                           |
 | GET    | `/api/v1/grants/{id}`                   | Get a grant with its status and uses                                                                   |
 | POST   | `/api/v1/grants/{id}/revoke`            | Revoke a grant with an optional `reason` (operator)                                                    |
+| GET    | `/api/v1/principal/evidence`            | The evidence about the principal by `after` and `limit`                                                |
 | GET    | `/api/v1/principal`                     | The signed-in principal                                                                                |
 | GET    | `/api/v1/principal/grants`              | List the principal's grants by `state`, `after` and `limit`                                            |
 | GET    | `/api/v1/principal/grants/{id}`         | Get one of the principal's grants                                                                      |
@@ -636,6 +642,7 @@ API key, except `/api/v1/principal/**`, which requires a principal token from th
 | POST   | `/api/v1/mandates/{id}/revoke`          | Revoke a mandate with an optional `reason` (operator)                                                  |
 | GET    | `/public/v1/keys`                       | Active and retired signing keys as a JWK set, no API key                                               |
 | GET    | `/public/v1/mandates/status`            | Signed mandate status list, no API key                                                                 |
+| GET    | `/public/v1/oidc`                       | The OIDC issuer and client for principal sign-in, `404` without OIDC                                   |
 | POST   | `/mcp/{server}`                         | MCP gateway: decide, forward and record a `tools/call`; forward other messages                         |
 | GET    | `/mcp/{server}`                         | Relay the MCP server-to-client stream                                                                  |
 | DELETE | `/mcp/{server}`                         | Close an MCP session on the server                                                                     |
