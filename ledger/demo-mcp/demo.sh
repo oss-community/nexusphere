@@ -2,6 +2,7 @@
 set -euo pipefail
 
 LEDGER_URL="${LEDGER_URL:-http://localhost:8090}"
+KEYCLOAK_URL="${KEYCLOAK_URL:-http://localhost:8180/realms/nexusphere}"
 OPERATOR_KEY="${LEDGER_API_KEY:-nexusphere-ledger-development-key-change-me}"
 VERIFIER_JAR="${VERIFIER_JAR:-$(dirname "$0")/../verifier/target/verifier-1.0.0-SNAPSHOT-exec.jar}"
 WORK_DIR="${WORK_DIR:-$(mktemp -d)}"
@@ -23,11 +24,21 @@ AGENT_KEY=$(operator -X POST "${LEDGER_URL}/api/v1/agents" \
   -d "{\"agentId\":\"${AGENT_ID}\",\"name\":\"Invoice agent\",\"ownerId\":\"acme\"}" | jq -r '.apiKey')
 echo "agent key: ${AGENT_KEY:0:10}..."
 
-step "${PRINCIPAL} grants read_file and send_email on the demo server, at most 5 uses, for one hour"
+step "The operator asks ${PRINCIPAL} to grant read_file and send_email on the demo server, at most 5 uses, for one hour"
 EXPIRES=$(date -u -d '+1 hour' +%Y-%m-%dT%H:%M:%SZ 2>/dev/null || date -u -v+1H +%Y-%m-%dT%H:%M:%SZ)
 operator -X POST "${LEDGER_URL}/api/v1/grants" -d "{\"principalId\":\"${PRINCIPAL}\",\"agentId\":\"${AGENT_ID}\",\
 \"actions\":[\"tools/call\"],\"targets\":[\"demo/read_file\",\"demo/send_email\"],\"expiresAt\":\"${EXPIRES}\",\
-\"maxUses\":5,\"reason\":\"Monthly invoicing\"}" | jq '{id, status, targets, maxUses, termsHash}'
+\"maxUses\":5,\"reason\":\"Monthly invoicing\"}" -o "${WORK_DIR}/grant.json"
+jq '{id, status, targets, maxUses, termsHash}' "${WORK_DIR}/grant.json"
+
+if [ "$(jq -r '.status' "${WORK_DIR}/grant.json")" = "PENDING" ]; then
+  step "${PRINCIPAL} signs in with Keycloak and approves the grant"
+  PRINCIPAL_TOKEN=$(curl -sS "${KEYCLOAK_URL}/protocol/openid-connect/token" -d grant_type=password \
+    -d client_id=nexusphere-ledger -d username="${PRINCIPAL}" -d password="${PRINCIPAL}" | jq -r '.access_token')
+  curl -sS -X POST -H "Authorization: Bearer ${PRINCIPAL_TOKEN}" \
+    "${LEDGER_URL}/api/v1/principal/grants/$(jq -r '.id' "${WORK_DIR}/grant.json")/approve" \
+    | jq '{id, status, consent, consentedAt}'
+fi
 
 step "The agent reads the invoice through the gateway (allowed)"
 tool 1 read_file '{"path":"/invoices/2026-10.txt"}' | jq -c '.result.content[0].text'

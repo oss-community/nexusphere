@@ -11,14 +11,22 @@ public record Grant(
         GrantState state,
         String reason,
         Instant revokedAt,
-        String revokeReason) {
+        String revokeReason,
+        Consent consent,
+        Instant consentedAt) {
 
     public GrantStatus status(Instant now) {
         if (state == GrantState.REVOKED) {
             return GrantStatus.REVOKED;
         }
+        if (state == GrantState.DENIED) {
+            return GrantStatus.DENIED;
+        }
         if (!now.isBefore(terms.expiresAt())) {
             return GrantStatus.EXPIRED;
+        }
+        if (state == GrantState.PENDING) {
+            return GrantStatus.PENDING;
         }
         if (terms.maxUses() != null && uses >= terms.maxUses()) {
             return GrantStatus.EXHAUSTED;

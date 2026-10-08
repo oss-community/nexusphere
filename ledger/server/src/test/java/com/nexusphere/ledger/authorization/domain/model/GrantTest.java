@@ -16,7 +16,7 @@ class GrantTest {
     private static Grant grant(Instant notBefore, Instant expiresAt, Long maxUses, long uses, GrantState state) {
         GrantTerms terms = new GrantTerms(UUID.randomUUID(), "alice", "agent", List.of("*"), List.of("*"),
                 notBefore, expiresAt, maxUses, NOW.minusSeconds(60));
-        return new Grant(1, terms, uses, state, null, null, null);
+        return new Grant(1, terms, uses, state, null, null, null, Consent.OPERATOR, NOW.minusSeconds(60));
     }
 
     @Test
@@ -29,5 +29,8 @@ class GrantTest {
                 .isEqualTo(GrantStatus.NOT_YET_VALID);
         assertThat(grant(null, NOW, null, 0, GrantState.ACTIVE).status(NOW)).isEqualTo(GrantStatus.EXPIRED);
         assertThat(grant(null, later, null, 0, GrantState.REVOKED).status(NOW)).isEqualTo(GrantStatus.REVOKED);
+        assertThat(grant(null, later, null, 0, GrantState.PENDING).status(NOW)).isEqualTo(GrantStatus.PENDING);
+        assertThat(grant(null, NOW, null, 0, GrantState.PENDING).status(NOW)).isEqualTo(GrantStatus.EXPIRED);
+        assertThat(grant(null, later, null, 0, GrantState.DENIED).status(NOW)).isEqualTo(GrantStatus.DENIED);
     }
 }

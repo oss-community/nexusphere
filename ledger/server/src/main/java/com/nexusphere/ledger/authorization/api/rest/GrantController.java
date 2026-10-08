@@ -36,13 +36,14 @@ class GrantController {
     record GrantResponse(String format, UUID id, String principalId, String agentId, List<String> actions,
                          List<String> targets, Instant notBefore, Instant expiresAt, Long maxUses, Instant createdAt,
                          String termsHash, long uses, String status, String reason, Instant revokedAt,
-                         String revokeReason) {
+                         String revokeReason, String consent, Instant consentedAt) {
 
         static GrantResponse of(Grant g, Instant now) {
             GrantTerms t = g.terms();
             return new GrantResponse(GrantTerms.FORMAT, t.id(), t.principalId(), t.agentId(), t.actions(),
                     t.targets(), t.notBefore(), t.expiresAt(), t.maxUses(), t.createdAt(), t.hash(), g.uses(),
-                    g.status(now).name(), g.reason(), g.revokedAt(), g.revokeReason());
+                    g.status(now).name(), g.reason(), g.revokedAt(), g.revokeReason(),
+                    g.consent() == null ? null : g.consent().name(), g.consentedAt());
         }
     }
 
@@ -59,7 +60,14 @@ class GrantController {
 
     @PostMapping
     ResponseEntity<GrantResponse> create(Caller caller, @RequestBody CreateGrantRequest request) {
-        caller.requireOperator();
+        if (!caller.isOperator()) {
+            if (!grants.consentRequired()) {
+                caller.requireOperator();
+            }
+            if (!caller.canActAs(request.agentId())) {
+                throw LedgerException.forbidden("An agent may only ask for grants for itself.");
+            }
+        }
         Grant grant = grants.create(new GrantRequest(request.principalId(), request.agentId(), request.actions(),
                 request.targets(), request.notBefore(), request.expiresAt(), request.maxUses(), request.reason()));
         return ResponseEntity.created(URI.create("/api/v1/grants/" + grant.terms().id()))
@@ -93,7 +101,7 @@ class GrantController {
             }
             agentId = caller.agentId();
         }
-        List<Grant> page = grants.find(new GrantQuery(agentId, principalId, after, limit));
+        List<Grant> page = grants.find(new GrantQuery(agentId, principalId, null, after, limit));
         Instant now = clock.instant();
         Long nextAfter = page.size() == limit ? page.getLast().seq() : null;
         return new GrantPage(page.stream().map(g -> GrantResponse.of(g, now)).toList(), nextAfter);
