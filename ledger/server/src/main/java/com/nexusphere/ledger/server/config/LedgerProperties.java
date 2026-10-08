@@ -22,10 +22,14 @@ public record LedgerProperties(Security security, Signing signing, Checkpoint ch
                           boolean unendorsedRotation) {
     }
 
-    public record Oidc(String issuer, String audience, URI jwksUri, String principalClaim) {
+    public record Oidc(String issuer, String audience, URI jwksUri, String principalClaim, String clientId) {
 
         public boolean enabled() {
             return issuer != null && !issuer.isBlank();
+        }
+
+        public String publicClientId() {
+            return clientId == null || clientId.isBlank() ? audience : clientId;
         }
     }
 

@@ -14,6 +14,7 @@ import tools.jackson.databind.node.ObjectNode;
 
 import java.io.ByteArrayOutputStream;
 import java.io.PrintStream;
+import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -128,5 +129,30 @@ class PackageE2ETest extends LedgerE2ETestBase {
         assertThat(nothing.status()).isEqualTo(409);
         assertThat(nothing.json().path("code").asString()).isEqualTo("NOTHING_SELECTED");
         assertThat(invalid.status()).isEqualTo(400);
+    }
+
+    @Test
+    void theOperatorCanHaveTheLedgerVerifyAPackage() {
+        String agent = unique("agent");
+        ledger().recordEvidence(toolCall(agent, "frank", "read_file"));
+        JsonNode genuine = export(Map.of("agentId", agent));
+        ObjectNode changed = (ObjectNode) genuine.deepCopy();
+        for (JsonNode link : changed.path("links")) {
+            if (link.path("entry").isObject()) {
+                ((ObjectNode) link.path("entry")).put("target", "delete_file");
+            }
+        }
+        String key = URLEncoder.encode(publicKey(), StandardCharsets.UTF_8);
+
+        JsonNode valid = ledger().post("/api/v1/packages/verify?publicKey=" + key, genuine.toString()).json();
+        JsonNode invalid = ledger().post("/api/v1/packages/verify?publicKey=" + key, changed.toString()).json();
+        LedgerClient.Response byAgent = registerAgent("acme").client().post("/api/v1/packages/verify",
+                genuine.toString());
+
+        assertThat(valid.path("valid").asBoolean()).isTrue();
+        assertThat(valid.path("pinnedKeyId").isString()).isTrue();
+        assertThat(invalid.path("valid").asBoolean()).isFalse();
+        assertThat(invalid.path("problems").get(0).asString()).isNotBlank();
+        assertThat(byAgent.status()).isEqualTo(403);
     }
 }

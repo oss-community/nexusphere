@@ -27,9 +27,9 @@ database, so an auditor, a court or a counterparty can verify what a ledger hand
 
 ## Dependencies
 
-| Depends on         | Used by |
-|--------------------|---------|
-| `chain`, `mandate` | none    |
+| Depends on         | Used by  |
+|--------------------|----------|
+| `chain`, `mandate` | `server` |
 
 Usage is in [Evidence Packages](../README.md#evidence-packages) and [Verifying a
 Mandate](../README.md#verifying-a-mandate).
