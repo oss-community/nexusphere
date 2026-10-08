@@ -292,7 +292,7 @@ authorized and a denied transaction, a delegation revocation and a complete audi
 public API.
 
 After V1 the first product is the Nexusphere Ledger in `ledger/`, a standalone evidence ledger for agent actions,
-followed by signed cross-organization mandates. Its phases and status are in [Nexusphere Ledger](../ledger/README.md#roadmap).
+followed by signed cross-organization mandates. It is described in [Nexusphere Ledger](../ledger/README.md).
 
 ## Out of Scope
 

@@ -442,7 +442,7 @@ Every response carries an `X-Correlation-Id` header. Errors use one model:
 `ledger/` is a separate product built on the same stack: a self-hosted, tamper-evident evidence ledger for the actions
 of AI agents, with a hash chain, append-only storage and Ed25519-signed checkpoints that anyone can verify offline, and
 signed mandates an agent carries to other organizations. It is a standalone service and does not depend on the core.
-Its roadmap, configuration and API are in [Nexusphere Ledger](ledger/README.md).
+Its configuration and API are in [Nexusphere Ledger](ledger/README.md).
 
 </p>
 
