@@ -3,11 +3,11 @@ package com.nexusphere.ledger.evidence.api.rest;
 import com.nexusphere.ledger.chain.Checkpoint;
 import com.nexusphere.ledger.chain.EvidenceLink;
 import com.nexusphere.ledger.chain.SignedCheckpoint;
-import com.nexusphere.ledger.chain.SigningKeys;
 import com.nexusphere.ledger.evidence.application.PackageService;
 import com.nexusphere.ledger.evidence.domain.model.EvidencePackage;
 import com.nexusphere.ledger.evidence.domain.model.PackageRequest;
 import com.nexusphere.ledger.server.security.Caller;
+import com.nexusphere.ledger.server.signing.KeyController;
 import com.nexusphere.ledger.server.signing.LedgerSigner;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseEntity;
@@ -25,9 +25,6 @@ class PackageController {
     }
 
     record Scope(String agentId, String principalId, long fromSequence, long toSequence) {
-    }
-
-    record KeyResponse(String keyId, String algorithm, String publicKey) {
     }
 
     record CheckpointResponse(String format, long sequence, String headHash, Instant createdAt, String keyId,
@@ -53,7 +50,7 @@ class PackageController {
         }
     }
 
-    record PackageResponse(String format, Instant createdAt, Scope scope, List<KeyResponse> keys,
+    record PackageResponse(String format, Instant createdAt, Scope scope, List<KeyController.KeyResponse> keys,
                            CheckpointResponse anchor, CheckpointResponse checkpoint, long disclosed,
                            List<LinkResponse> links) {
     }
@@ -72,10 +69,9 @@ class PackageController {
         ExportRequest r = request == null ? new ExportRequest(null, null, null, null) : request;
         EvidencePackage p = packages.export(new PackageRequest(r.agentId(), r.principalId(), r.fromSequence(),
                 r.toSequence()));
-        SigningKeys.PublicKeyInfo key = signer.publicKey();
         PackageResponse body = new PackageResponse(EvidencePackage.FORMAT, p.createdAt(),
                 new Scope(p.agentId(), p.principalId(), p.fromSequence(), p.toSequence()),
-                List.of(new KeyResponse(key.keyId(), SigningKeys.ALGORITHM, key.encoded())),
+                signer.keys().stream().map(KeyController.KeyResponse::of).toList(),
                 CheckpointResponse.of(p.anchor()), CheckpointResponse.of(p.checkpoint()), p.disclosed(),
                 p.items().stream().map(LinkResponse::of).toList());
         return ResponseEntity.ok()

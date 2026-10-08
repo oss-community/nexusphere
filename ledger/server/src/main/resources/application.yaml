@@ -17,6 +17,8 @@ ledger:
   signing:
     private-key: ${LEDGER_SIGNING_PRIVATE_KEY:}
     public-key: ${LEDGER_SIGNING_PUBLIC_KEY:}
+    previous-private-key: ${LEDGER_SIGNING_PREVIOUS_PRIVATE_KEY:}
+    unendorsed-rotation: ${LEDGER_SIGNING_UNENDORSED_ROTATION:false}
   checkpoint:
     interval: ${LEDGER_CHECKPOINT_INTERVAL:1m}
   mcp:

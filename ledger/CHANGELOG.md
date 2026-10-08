@@ -1,15 +1,6 @@
 # <p align="center">Nexusphere Ledger Changelog</p>
 
-## Unreleased
-
-* Signed mandates (EdDSA JWS) issued from grants, a signed revocation status list and the ledger keys as a JWK set
-  on public endpoints, with issue and revoke recorded as evidence
-* `MandateVerifier` SDK that checks a mandate's issuer, key, signature, time, audience, coverage and revocation, and
-  the `mandate` command of the verifier jar
-* A2A gateway between two ledgers: outbound requests are decided and carry a mandate and a signed request proof,
-  inbound requests are verified, recorded and answered with a signed receipt, so both sides hold matching evidence
-
-## 0.1.0
+## 1.0.0 (not released yet)
 
 First release of the Nexusphere Ledger, a self-hosted evidence ledger for AI agent actions.
 
@@ -18,7 +9,15 @@ First release of the Nexusphere Ledger, a self-hosted evidence ledger for AI age
   outcome reports, all recorded as evidence
 * MCP gateway that decides every `tools/call`, forwards only allowed calls and records their outcome
 * Evidence packages with selective disclosure and the offline verifier command-line tool
-* Dockerfiles, compose file, demo MCP server and demo script
+* Signed mandates (EdDSA JWS) issued from grants, a signed revocation status list and the ledger keys as a JWK set
+  on public endpoints, with issue and revoke recorded as evidence
+* `MandateVerifier` SDK that checks a mandate's issuer, key, signature, time, audience, coverage and revocation, and
+  the `mandate` command of the verifier jar
+* A2A gateway between two ledgers: outbound requests are decided and carry a mandate and a signed request proof,
+  inbound requests are verified, recorded and answered with a signed receipt, so both sides hold matching evidence
+* Signing key rotation at startup with a rotation record signed by the old and the new key; retired keys stay
+  published, so everything they signed still verifies, and the offline verifier follows rotations from a pinned key
+* Dockerfiles, compose file with Adminer, demo MCP server and demo script
 
 ##
 

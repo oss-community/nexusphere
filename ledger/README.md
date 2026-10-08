@@ -11,6 +11,7 @@
 * [Evidence Format](#evidence-format)
 * [Verification](#verification)
 * [Evidence Packages](#evidence-packages)
+* [Key Rotation](#key-rotation)
 * [Agents, Grants and Decisions](#agents-grants-and-decisions)
 * [MCP Gateway](#mcp-gateway)
 * [Mandates](#mandates)
@@ -140,6 +141,8 @@ LEDGER_DATABASE_PASSWORD: ledger
 LEDGER_API_KEY:
 LEDGER_SIGNING_PRIVATE_KEY:
 LEDGER_SIGNING_PUBLIC_KEY:
+LEDGER_SIGNING_PREVIOUS_PRIVATE_KEY:
+LEDGER_SIGNING_UNENDORSED_ROTATION: false
 LEDGER_CHECKPOINT_INTERVAL: 1m
 LEDGER_MCP_TIMEOUT: 60s
 LEDGER_MCP_SERVERS_{NAME}_URL:
@@ -212,8 +215,8 @@ characters of the SHA-256 of the X.509 public key.
 
 `GET /api/v1/verification` recomputes every hash and link, checks the signature of every checkpoint against the entry
 it names and checks the head. The same checks run outside the server with `ledger/chain`: page through
-`GET /api/v1/evidence`, feed the entries to `ChainVerifier`, and verify checkpoints with `SignedCheckpoint.verify` and the
-key from `GET /api/v1/keys`.
+`GET /api/v1/evidence`, feed the entries to `ChainVerifier`, and verify each checkpoint with `SignedCheckpoint.verify` and
+the key it names from `GET /api/v1/keys`.
 
 </p>
 
@@ -223,10 +226,10 @@ key from `GET /api/v1/keys`.
 
 `POST /api/v1/packages` exports an evidence package for an auditor, a court or a counterparty. The request selects
 evidence by `agentId`, `principalId`, `fromSequence` and `toSequence`. The package (`nexusphere-ledger/package/v1`)
-holds the public key, an anchor checkpoint (the last checkpoint before the first selected entry, or genesis), an end
-checkpoint (the first checkpoint at or after the last selected entry, created at the head when none exists yet) and
-every link between them. Only selected links carry their full entry; all others carry only their link, so nothing
-outside the selection is disclosed. A package holds at most 200,000 links.
+holds the public keys with their rotation records, an anchor checkpoint (the last checkpoint before the first selected
+entry, or genesis), an end checkpoint (the first checkpoint at or after the last selected entry, created at the head
+when none exists yet) and every link between them. Only selected links carry their full entry; all others carry only
+their link, so nothing outside the selection is disclosed. A package holds at most 200,000 links.
 
 </p>
 
@@ -243,7 +246,7 @@ the package.
 ```shell
 curl -X POST http://localhost:8090/api/v1/packages -H "Authorization: Bearer nexusphere-ledger-development-key-change-me" -H "Content-Type: application/json" -d '{"agentId":"invoice-agent"}' -o package.json
 mvn -pl ledger/verifier -am package -DskipTests=true
-java -jar ledger/verifier/target/verifier-1.0.0-SNAPSHOT-exec.jar --public-key "$(curl -s http://localhost:8090/api/v1/keys -H 'Authorization: Bearer nexusphere-ledger-development-key-change-me' | jq -r '.[0].publicKey')" package.json
+java -jar ledger/verifier/target/verifier-1.0.0-SNAPSHOT-exec.jar --public-key "$(curl -s http://localhost:8090/api/v1/keys -H 'Authorization: Bearer nexusphere-ledger-development-key-change-me' | jq -r '.[] | select(.status == "ACTIVE") | .publicKey')" package.json
 ```
 
 ```text
@@ -254,6 +257,44 @@ Nexusphere Ledger evidence package
   Chain       : 2 links from sequence 41
   Disclosed   : 1 entries, agent invoice-agent
 Result: VALID
+```
+
+## Key Rotation
+
+<p style="text-align: justify;">
+
+The ledger keeps every signing key it has used. Checkpoints, mandates, status lists and A2A receipts are signed with the
+active key, and everything signed with a retired key still verifies, because each signature names its key and the
+retired keys stay published in `GET /api/v1/keys`, `GET /public/v1/keys` and every evidence package.
+
+</p>
+
+<p style="text-align: justify;">
+
+To rotate, start the ledger with a new key pair in `LEDGER_SIGNING_PRIVATE_KEY` and `LEDGER_SIGNING_PUBLIC_KEY` and the
+old private key in `LEDGER_SIGNING_PREVIOUS_PRIVATE_KEY`. At startup the ledger retires the old key and stores a
+rotation record (`nexusphere-ledger/key-rotation/v1`) that both keys sign: the old key endorses the new one and the new
+key names the old one as its predecessor. A verifier that pinned either key reaches the other through this record. The
+rotation is recorded as a `key/rotate` evidence entry (the first key as `key/activate`), and the previous key can be
+removed from the settings after the restart. Every instance has to restart with the new key.
+
+</p>
+
+<p style="text-align: justify;">
+
+When the old private key is lost, set `LEDGER_SIGNING_UNENDORSED_ROTATION` to `true` instead. The rotation record then
+carries only the new key's signature, so a verifier that pinned the old key does not trust the new key, while one that
+pins the new key still trusts the old checkpoints. A retired key can never become active again, and the ledger refuses
+to start when the configured key changes without one of these two settings.
+
+</p>
+
+```shell
+openssl genpkey -algorithm ed25519 -outform DER -out ledger-signing-2.der
+export LEDGER_SIGNING_PREVIOUS_PRIVATE_KEY=${LEDGER_SIGNING_PRIVATE_KEY}
+export LEDGER_SIGNING_PRIVATE_KEY=$(base64 -w0 ledger-signing-2.der)
+export LEDGER_SIGNING_PUBLIC_KEY=$(openssl pkey -inform DER -in ledger-signing-2.der -pubout -outform DER | base64 -w0)
+curl http://localhost:8090/api/v1/keys -H "Authorization: Bearer nexusphere-ledger-development-key-change-me"
 ```
 
 ## Agents, Grants and Decisions
@@ -489,7 +530,7 @@ API key. Operator-only endpoints answer `403 FORBIDDEN` to agents.
 | POST   | `/api/v1/checkpoints`              | Sign the current head now; `409 LEDGER_EMPTY` when nothing is recorded (operator)                      |
 | GET    | `/api/v1/checkpoints/latest`       | Latest checkpoint                                                                                      |
 | GET    | `/api/v1/checkpoints`              | List checkpoints by `after` and `limit`                                                                |
-| GET    | `/api/v1/keys`                     | Public signing keys                                                                                    |
+| GET    | `/api/v1/keys`                     | Signing keys with their status and rotation records                                                    |
 | POST   | `/api/v1/packages`                 | Export an evidence package by `agentId`, `principalId`, `fromSequence` and `toSequence` (operator)     |
 | GET    | `/api/v1/verification`             | Full verification report (operator)                                                                    |
 | POST   | `/api/v1/agents`                   | Register an agent and return its API key once (operator)                                               |
@@ -508,7 +549,7 @@ API key. Operator-only endpoints answer `403 FORBIDDEN` to agents.
 | GET    | `/api/v1/mandates`                 | List the mandates of a `grantId`                                                                       |
 | GET    | `/api/v1/mandates/{id}`            | Get a mandate, its token and status                                                                    |
 | POST   | `/api/v1/mandates/{id}/revoke`     | Revoke a mandate with an optional `reason` (operator)                                                  |
-| GET    | `/public/v1/keys`                  | Public signing keys as a JWK set, no API key                                                           |
+| GET    | `/public/v1/keys`                  | Active and retired signing keys as a JWK set, no API key                                               |
 | GET    | `/public/v1/mandates/status`       | Signed mandate status list, no API key                                                                 |
 | POST   | `/mcp/{server}`                    | MCP gateway: decide, forward and record a `tools/call`; forward other messages                         |
 | DELETE | `/mcp/{server}`                    | Close an MCP session on the server                                                                     |

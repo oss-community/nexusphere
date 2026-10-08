@@ -24,6 +24,7 @@ to verify evidence on their own.
 * `EvidenceEntry` with its content hash and link hash, and `EvidenceLink` for entries disclosed without their content
 * `ChainVerifier`, which checks the hash chain from genesis or from an anchor
 * Ed25519 keys and signatures (`SigningKeys`) and signed checkpoints (`Checkpoint`, `SignedCheckpoint`)
+* Signed key rotations (`KeyRotation`) and the keys a pinned key reaches through them (`TrustedKeys`)
 * `GrantTerms`, the hashed terms of a grant
 
 ## Dependencies

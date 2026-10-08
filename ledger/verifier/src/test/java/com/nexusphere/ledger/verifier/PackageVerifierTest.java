@@ -3,6 +3,7 @@ package com.nexusphere.ledger.verifier;
 import com.nexusphere.ledger.chain.Checkpoint;
 import com.nexusphere.ledger.chain.EvidenceEntry;
 import com.nexusphere.ledger.chain.Hashes;
+import com.nexusphere.ledger.chain.KeyRotation;
 import com.nexusphere.ledger.chain.SigningKeys;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -79,7 +80,7 @@ class PackageVerifierTest {
 
         assertThat(report.problems()).isEmpty();
         assertThat(report.valid()).isTrue();
-        assertThat(report.keyPinned()).isTrue();
+        assertThat(report.pinnedKeyId()).isEqualTo(SigningKeys.keyIdOf(KEYS.getPublic()));
         assertThat(report.checkedLinks()).isEqualTo(4);
         assertThat(report.disclosedEntries()).isEqualTo(1);
     }
@@ -111,6 +112,46 @@ class PackageVerifierTest {
 
         assertThat(report.valid()).isFalse();
         assertThat(report.problems()).anyMatch(p -> p.contains("pinned key"));
+    }
+
+    private static ObjectNode rotated(KeyPair next, boolean endorsed) {
+        ObjectNode pkg = pkg(3, 1);
+        SigningKeys.PublicKeyInfo key = SigningKeys.PublicKeyInfo.of(next.getPublic());
+        KeyRotation rotation = KeyRotation.issue(key, next.getPrivate(), SigningKeys.keyIdOf(KEYS.getPublic()),
+                endorsed ? KEYS.getPrivate() : null, NOW);
+        ObjectNode listed = ((ArrayNode) pkg.path("keys")).addObject().put("keyId", key.keyId())
+                .put("algorithm", "Ed25519").put("publicKey", key.encoded()).put("activatedAt", NOW.toString());
+        listed.putObject("rotation").put("previousKeyId", rotation.previousKeyId())
+                .put("keySignature", rotation.keySignature())
+                .put("previousKeySignature", rotation.previousKeySignature());
+        ObjectNode checkpoint = (ObjectNode) pkg.path("checkpoint");
+        Checkpoint signed = new Checkpoint(checkpoint.path("sequence").asLong(), checkpoint.path("headHash").asString(),
+                NOW, key.keyId());
+        checkpoint.put("keyId", key.keyId()).put("signature", SigningKeys.sign(next.getPrivate(), signed.signedBytes()));
+        return pkg;
+    }
+
+    @Test
+    void aCheckpointOfAnEndorsedNewKeyIsValidWithTheOldKeyPinned() {
+        KeyPair next = SigningKeys.generate();
+
+        PackageReport report = PackageVerifier.verify(rotated(next, true), SigningKeys.encode(KEYS.getPublic()));
+
+        assertThat(report.problems()).isEmpty();
+        assertThat(report.keyId()).isEqualTo(SigningKeys.keyIdOf(next.getPublic()));
+        assertThat(report.pinnedKeyId()).isEqualTo(SigningKeys.keyIdOf(KEYS.getPublic()));
+    }
+
+    @Test
+    void aCheckpointOfAnUnendorsedNewKeyNeedsTheNewKeyPinned() {
+        KeyPair next = SigningKeys.generate();
+
+        PackageReport old = PackageVerifier.verify(rotated(next, false), SigningKeys.encode(KEYS.getPublic()));
+        PackageReport current = PackageVerifier.verify(rotated(next, false), SigningKeys.encode(next.getPublic()));
+
+        assertThat(old.valid()).isFalse();
+        assertThat(old.problems()).anyMatch(p -> p.contains("does not reach"));
+        assertThat(current.problems()).isEmpty();
     }
 
     @Test

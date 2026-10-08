@@ -81,8 +81,10 @@ public final class VerifierCli {
 
     private static void print(PackageReport r, PrintStream out) {
         out.println("Nexusphere Ledger evidence package");
-        out.println("  Signing key : " + r.keyId() + (r.keyPinned() ? " (pinned)"
-                : " (taken from the package; pass --public-key to pin the ledger's key)"));
+        out.println("  Signing key : " + r.keyId() + (r.pinnedKeyId() == null
+                ? " (taken from the package; pass --public-key to pin the ledger's key)"
+                : r.pinnedKeyId().equals(r.keyId()) ? " (pinned)"
+                : " (reached from pinned key " + r.pinnedKeyId() + " through signed key rotations)"));
         out.println("  Checkpoint  : sequence " + r.checkpointSequence() + ", signed at " + r.checkpointCreatedAt());
         out.println("  Anchor      : " + (r.anchorSequence() == null ? "genesis" : "checkpoint " + r.anchorSequence()));
         out.println("  Chain       : " + r.checkedLinks() + " links from sequence " + r.firstSequence());

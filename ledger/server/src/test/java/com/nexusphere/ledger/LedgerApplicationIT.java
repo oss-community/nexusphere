@@ -59,7 +59,7 @@ class LedgerApplicationIT {
                 "select table_name from information_schema.tables where table_schema = 'ledger'", String.class);
 
         assertThat(tables).contains("ledger_head", "evidence_record", "evidence_attribute", "checkpoint", "agent",
-                "grant_record", "decision", "flyway_schema_history");
+                "grant_record", "decision", "signing_key", "flyway_schema_history");
     }
 
     @Test

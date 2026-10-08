@@ -14,7 +14,8 @@ public record LedgerProperties(Security security, Signing signing, Checkpoint ch
     public record Security(String apiKey) {
     }
 
-    public record Signing(String privateKey, String publicKey) {
+    public record Signing(String privateKey, String publicKey, String previousPrivateKey,
+                          boolean unendorsedRotation) {
     }
 
     public record Checkpoint(Duration interval) {
