@@ -11,6 +11,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Clock;
 import java.time.Instant;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
@@ -20,6 +21,7 @@ import java.util.UUID;
 public class EvidenceService {
 
     public static final int MAX_PAGE_SIZE = 500;
+    public static final int MAX_BATCH_SIZE = 500;
 
     private final EvidenceRepository evidence;
     private final Clock clock;
@@ -35,12 +37,45 @@ public class EvidenceService {
 
     @Transactional
     public EvidenceEntry record(EvidenceSubmission submission) {
+        return recordAll(List.of(submission)).getFirst();
+    }
+
+    @Transactional
+    public List<EvidenceEntry> recordAll(List<EvidenceSubmission> submissions) {
+        if (submissions == null || submissions.isEmpty() || submissions.size() > MAX_BATCH_SIZE) {
+            throw LedgerException.invalid("The batch has invalid fields.",
+                    Map.of("items", "must have between 1 and " + MAX_BATCH_SIZE + " entries"));
+        }
         Instant now = clock.instant();
-        EvidenceValidator.validate(submission, now);
+        for (int i = 0; i < submissions.size(); i++) {
+            try {
+                EvidenceValidator.validate(submissions.get(i), now);
+            } catch (LedgerException e) {
+                if (submissions.size() == 1) {
+                    throw e;
+                }
+                throw new LedgerException(e.status(), e.code(), "Item " + i + ": " + e.getMessage(),
+                        Map.of("index", i, "item", e.details()));
+            }
+        }
         LedgerHead head = evidence.lockHead();
-        EvidenceEntry entry = new EvidenceEntry(
+        long sequence = head.sequence();
+        String previousHash = head.hash();
+        List<EvidenceEntry> entries = new ArrayList<>(submissions.size());
+        for (EvidenceSubmission submission : submissions) {
+            EvidenceEntry entry = entry(submission, ++sequence, previousHash, now);
+            evidence.append(entry);
+            entries.add(entry);
+            previousHash = entry.hash();
+        }
+        return entries;
+    }
+
+    private static EvidenceEntry entry(EvidenceSubmission submission, long sequence, String previousHash,
+                                       Instant now) {
+        return new EvidenceEntry(
                 UUID.randomUUID(),
-                head.sequence() + 1,
+                sequence,
                 submission.occurredAt() == null ? now : submission.occurredAt(),
                 now,
                 submission.agentId(),
@@ -55,10 +90,8 @@ public class EvidenceService {
                 submission.outcome().name(),
                 submission.correlationId(),
                 new TreeMap<>(submission.attributes() == null ? Map.of() : submission.attributes()),
-                head.hash(),
+                previousHash,
                 null).sealed();
-        evidence.append(entry);
-        return entry;
     }
 
     @Transactional(readOnly = true)

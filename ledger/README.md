@@ -107,6 +107,36 @@ docker compose --file ledger/compose.yaml --project-name ledger down
 docker volume prune -f
 ```
 
+### Kubernetes
+
+<p style="text-align: justify;">
+
+`ledger/kube-dev.yaml` runs the same services as the compose file in the `dev` namespace, next to the core from the
+root `kube-dev.yaml`. The Keycloak realm comes from the `keycloak-realm` ConfigMap. Keycloak and the UI are reached
+on the same local ports as with compose, so the sign-in redirect and the token issuer stay
+`http://localhost:8180` and `http://localhost:5173`.
+
+</p>
+
+```shell
+mvn -pl ledger/server,ledger/verifier,ledger/demo-mcp -am package -DskipTests=true
+docker compose --file ledger/compose.yaml --project-name ledger build
+kubectl apply -f ledger/kube-dev.yaml
+kubectl get all -n dev
+kubectl port-forward service/ledger 8090:8090 -n dev
+kubectl port-forward service/keycloak 8180:8080 -n dev
+kubectl port-forward service/ledger-ui 5173:80 -n dev
+kubectl port-forward service/ledger-adminer 8092:8080 -n dev
+```
+
+```shell
+kubectl set env deployment/application -n dev APP_LEDGER_URL=http://ledger:8090 APP_LEDGER_API_KEY=nexusphere-ledger-development-key-change-me
+```
+
+```shell
+kubectl delete -f ledger/kube-dev.yaml
+```
+
 ### Run
 
 ```shell
@@ -620,6 +650,7 @@ API key, except `/api/v1/principal/**`, which requires a principal token from th
 | Method | Path                                    | Description                                                                                            |
 |--------|-----------------------------------------|--------------------------------------------------------------------------------------------------------|
 | POST   | `/api/v1/evidence`                      | Record an evidence entry; returns `201` with `Location`                                                |
+| POST   | `/api/v1/evidence/batch`                | Record up to 500 entries in order as one run, all or none; an item error names its `index`             |
 | GET    | `/api/v1/evidence/{id}`                 | Get an evidence entry                                                                                  |
 | GET    | `/api/v1/evidence`                      | List entries by `agentId`, `principalId`, `after` and `limit` (max 500)                                |
 | GET    | `/api/v1/ledger/head`                   | Current sequence and hash                                                                              |

@@ -1,0 +1,391 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: dev
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: ledger-credentials
+  namespace: dev
+type: Opaque
+data:
+  POSTGRES_USER: bGVkZ2Vy
+  POSTGRES_PASSWORD: bGVkZ2Vy
+  LEDGER_DATABASE_USERNAME: bGVkZ2Vy
+  LEDGER_DATABASE_PASSWORD: bGVkZ2Vy
+  KC_BOOTSTRAP_ADMIN_USERNAME: YWRtaW4=
+  KC_BOOTSTRAP_ADMIN_PASSWORD: YWRtaW4=
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: ledger-config
+  namespace: dev
+data:
+  POSTGRES_DB: ledger
+  LEDGER_HOST: "0.0.0.0"
+  LEDGER_PORT: "8090"
+  LEDGER_PROFILES: postgresql,dev
+  LEDGER_DATABASE_HOST: ledger-postgresql
+  LEDGER_DATABASE_PORT: "5432"
+  LEDGER_DATABASE_DB: ledger
+  LEDGER_CHECKPOINT_INTERVAL: 30s
+  LEDGER_MCP_SERVERS_DEMO_URL: http://demo-mcp:8091/mcp
+  LEDGER_OIDC_ISSUER: http://localhost:8180/realms/nexusphere
+  LEDGER_OIDC_AUDIENCE: nexusphere-ledger
+  LEDGER_OIDC_JWKS_URI: http://keycloak:8080/realms/nexusphere/protocol/openid-connect/certs
+  LEDGER_OIDC_PRINCIPAL_CLAIM: preferred_username
+  KC_HOSTNAME: http://localhost:8180
+  KC_HOSTNAME_BACKCHANNEL_DYNAMIC: "true"
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: keycloak-realm
+  namespace: dev
+data:
+  nexusphere-realm.json: |
+    {
+      "realm": "nexusphere",
+      "enabled": true,
+      "sslRequired": "none",
+      "accessTokenLifespan": 900,
+      "clients": [
+        {
+          "clientId": "nexusphere-ledger",
+          "name": "Nexusphere Ledger",
+          "enabled": true,
+          "publicClient": true,
+          "standardFlowEnabled": true,
+          "directAccessGrantsEnabled": true,
+          "redirectUris": [
+            "http://localhost:5173/*",
+            "http://localhost:8090/*"
+          ],
+          "webOrigins": [
+            "+"
+          ],
+          "attributes": {
+            "pkce.code.challenge.method": "S256",
+            "post.logout.redirect.uris": "+"
+          }
+        }
+      ],
+      "users": [
+        {
+          "username": "alice",
+          "enabled": true,
+          "email": "alice@nexusphere.example",
+          "emailVerified": true,
+          "firstName": "Alice",
+          "lastName": "Example",
+          "credentials": [
+            {
+              "type": "password",
+              "value": "alice",
+              "temporary": false
+            }
+          ]
+        },
+        {
+          "username": "bob",
+          "enabled": true,
+          "email": "bob@nexusphere.example",
+          "emailVerified": true,
+          "firstName": "Bob",
+          "lastName": "Example",
+          "credentials": [
+            {
+              "type": "password",
+              "value": "bob",
+              "temporary": false
+            }
+          ]
+        }
+      ]
+    }
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: ledger-postgres-pvc
+  namespace: dev
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Gi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ledger-postgresql
+  namespace: dev
+  labels:
+    app: ledger-postgresql
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ledger-postgresql
+  template:
+    metadata:
+      labels:
+        app: ledger-postgresql
+    spec:
+      containers:
+        - name: ledger-postgresql
+          image: postgres:18-alpine
+          imagePullPolicy: "IfNotPresent"
+          ports:
+            - containerPort: 5432
+          envFrom:
+            - configMapRef:
+                name: ledger-config
+            - secretRef:
+                name: ledger-credentials
+          volumeMounts:
+            - mountPath: /var/lib/postgresql
+              name: ledger-postgres-data
+      volumes:
+        - name: ledger-postgres-data
+          persistentVolumeClaim:
+            claimName: ledger-postgres-pvc
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ledger-postgresql
+  namespace: dev
+spec:
+  selector:
+    app: ledger-postgresql
+  ports:
+    - protocol: TCP
+      port: 5432
+      targetPort: 5432
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ledger-adminer
+  namespace: dev
+  labels:
+    app: ledger-adminer
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ledger-adminer
+  template:
+    metadata:
+      labels:
+        app: ledger-adminer
+    spec:
+      containers:
+        - name: ledger-adminer
+          image: adminer:latest
+          imagePullPolicy: "IfNotPresent"
+          command: [ "php", "-S", "0.0.0.0:8080", "-t", "/var/www/html" ]
+          ports:
+            - containerPort: 8080
+          env:
+            - name: ADMINER_DEFAULT_SERVER
+              value: ledger-postgresql
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ledger-adminer
+  namespace: dev
+spec:
+  selector:
+    app: ledger-adminer
+  ports:
+    - protocol: TCP
+      port: 8080
+      targetPort: 8080
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: keycloak
+  namespace: dev
+  labels:
+    app: keycloak
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: keycloak
+  template:
+    metadata:
+      labels:
+        app: keycloak
+    spec:
+      containers:
+        - name: keycloak
+          image: keycloak/keycloak:26.4.2
+          imagePullPolicy: "IfNotPresent"
+          args: [ "start-dev", "--import-realm" ]
+          ports:
+            - containerPort: 8080
+          envFrom:
+            - configMapRef:
+                name: ledger-config
+            - secretRef:
+                name: ledger-credentials
+          volumeMounts:
+            - mountPath: /opt/keycloak/data/import
+              name: keycloak-realm
+              readOnly: true
+      volumes:
+        - name: keycloak-realm
+          configMap:
+            name: keycloak-realm
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: keycloak
+  namespace: dev
+spec:
+  selector:
+    app: keycloak
+  ports:
+    - protocol: TCP
+      port: 8080
+      targetPort: 8080
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: demo-mcp
+  namespace: dev
+  labels:
+    app: demo-mcp
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: demo-mcp
+  template:
+    metadata:
+      labels:
+        app: demo-mcp
+    spec:
+      containers:
+        - name: demo-mcp
+          image: samanalishiri/nexusphere-ledger-demo-mcp:latest
+          imagePullPolicy: "IfNotPresent"
+          ports:
+            - containerPort: 8091
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: demo-mcp
+  namespace: dev
+spec:
+  selector:
+    app: demo-mcp
+  ports:
+    - protocol: TCP
+      port: 8091
+      targetPort: 8091
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ledger
+  namespace: dev
+  labels:
+    app: ledger
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ledger
+  template:
+    metadata:
+      labels:
+        app: ledger
+    spec:
+      containers:
+        - name: ledger
+          image: samanalishiri/nexusphere-ledger:latest
+          imagePullPolicy: "IfNotPresent"
+          ports:
+            - containerPort: 8090
+          envFrom:
+            - configMapRef:
+                name: ledger-config
+            - secretRef:
+                name: ledger-credentials
+          readinessProbe:
+            httpGet:
+              path: /actuator/health/readiness
+              port: 8090
+            initialDelaySeconds: 10
+            periodSeconds: 5
+          livenessProbe:
+            httpGet:
+              path: /actuator/health/liveness
+              port: 8090
+            initialDelaySeconds: 30
+            periodSeconds: 10
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ledger
+  namespace: dev
+spec:
+  selector:
+    app: ledger
+  ports:
+    - protocol: TCP
+      port: 8090
+      targetPort: 8090
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ledger-ui
+  namespace: dev
+  labels:
+    app: ledger-ui
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ledger-ui
+  template:
+    metadata:
+      labels:
+        app: ledger-ui
+    spec:
+      containers:
+        - name: ledger-ui
+          image: samanalishiri/nexusphere-frontend:latest
+          imagePullPolicy: "IfNotPresent"
+          ports:
+            - containerPort: 80
+          env:
+            - name: LEDGER_URL
+              value: http://ledger:8090
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ledger-ui
+  namespace: dev
+spec:
+  selector:
+    app: ledger-ui
+  ports:
+    - protocol: TCP
+      port: 80
+      targetPort: 80

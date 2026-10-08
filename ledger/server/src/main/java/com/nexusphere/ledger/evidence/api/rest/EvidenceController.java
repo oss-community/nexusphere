@@ -9,6 +9,7 @@ import com.nexusphere.ledger.evidence.domain.model.LedgerHead;
 import com.nexusphere.ledger.evidence.domain.model.Outcome;
 import com.nexusphere.ledger.server.security.Caller;
 import com.nexusphere.ledger.server.web.LedgerException;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -81,6 +82,12 @@ class EvidenceController {
     record EvidencePage(List<EvidenceResponse> items, Long nextAfter) {
     }
 
+    record EvidenceBatch(List<EvidenceRequest> items) {
+    }
+
+    record EvidenceBatchResponse(List<EvidenceResponse> items) {
+    }
+
     record HeadResponse(long sequence, String hash) {
     }
 
@@ -97,6 +104,22 @@ class EvidenceController {
         }
         EvidenceEntry entry = evidence.record(request.toSubmission());
         return ResponseEntity.created(URI.create("/api/v1/evidence/" + entry.id())).body(EvidenceResponse.of(entry));
+    }
+
+    @PostMapping("/evidence/batch")
+    ResponseEntity<EvidenceBatchResponse> recordAll(Caller caller, @RequestBody EvidenceBatch batch) {
+        List<EvidenceRequest> items = batch == null || batch.items() == null ? List.of() : batch.items();
+        for (EvidenceRequest request : items) {
+            if (request == null) {
+                throw LedgerException.invalid("The batch has invalid fields.", Map.of("items", "must not be null"));
+            }
+            if (request.agentId() != null && !caller.canActAs(request.agentId())) {
+                throw LedgerException.forbidden("An agent may only record evidence for itself.");
+            }
+        }
+        List<EvidenceEntry> entries = evidence.recordAll(items.stream().map(EvidenceRequest::toSubmission).toList());
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(new EvidenceBatchResponse(entries.stream().map(EvidenceResponse::of).toList()));
     }
 
     @GetMapping("/evidence/{id}")

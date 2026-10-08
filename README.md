@@ -145,6 +145,9 @@ curl -X GET http://localhost:8080/actuator/health
 curl -X GET http://localhost:8080/api/v1/platform
 ```
 
+The ledger, its Keycloak and its UI have their own manifest in the same namespace, described in
+[Nexusphere Ledger](ledger/README.md#kubernetes).
+
 ### Down
 
 ```shell

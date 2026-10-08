@@ -163,10 +163,25 @@ class LedgerIntegrationE2ETest extends E2ETestBase {
                 assertThat(e.path("action").asString()).isEqualTo("delegation/grant"));
     }
 
-    private void drain() {
-        for (int i = 0; i < 100 && forwarder.forward() > 0; i++) {
-            assertThat(i).isLessThan(99);
+    @Test
+    @DisplayName("E2E-LDG-04 consecutive evidence goes to the ledger in batches and one run empties the outbox")
+    void evidenceIsSentInBatches() {
+        String delegation = granted(manager, network, agentPrincipal, "\"agreement:propose\"");
+        for (int i = 0; i < 150; i++) {
+            evaluate(agent, "agreement:propose", network, null, delegation);
         }
+        int batches = LEDGER.calls("/api/v1/evidence/batch").size();
+
+        assertThat(forwarder.forward()).isGreaterThanOrEqualTo(150);
+
+        assertThat(LEDGER.calls("/api/v1/evidence/batch").size() - batches).isBetween(2, 4);
+        assertThat(evidenceFor(delegation).stream()
+                .filter(e -> e.path("action").asString().equals("agreement:propose"))).hasSize(150);
+        assertThat(forwarder.forward()).isZero();
+    }
+
+    private void drain() {
+        forwarder.forward();
     }
 
     private ApiClient.Response mandate(ApiClient as, String delegation) {
@@ -175,7 +190,7 @@ class LedgerIntegrationE2ETest extends E2ETestBase {
     }
 
     private static List<JsonNode> evidenceFor(String delegation) {
-        return LEDGER.calls("/api/v1/evidence").stream().map(FakeLedger.Call::body)
+        return LEDGER.evidence().stream()
                 .filter(body -> body.path("delegationId").asString("").equals(delegation)).toList();
     }
 
