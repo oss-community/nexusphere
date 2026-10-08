@@ -9,13 +9,24 @@ import java.util.Map;
 
 @ConfigurationProperties("ledger")
 public record LedgerProperties(Security security, Signing signing, Checkpoint checkpoint, Mcp mcp,
-                               Mandate mandate, A2a a2a) {
+                               Mandate mandate, A2a a2a, Oidc oidc) {
+
+    public boolean consentRequired() {
+        return oidc != null && oidc.enabled();
+    }
 
     public record Security(String apiKey) {
     }
 
     public record Signing(String privateKey, String publicKey, String previousPrivateKey,
                           boolean unendorsedRotation) {
+    }
+
+    public record Oidc(String issuer, String audience, URI jwksUri, String principalClaim) {
+
+        public boolean enabled() {
+            return issuer != null && !issuer.isBlank();
+        }
     }
 
     public record Checkpoint(Duration interval) {

@@ -2,6 +2,8 @@ package com.nexusphere.ledger.authorization.application;
 
 import com.nexusphere.ledger.agent.application.AgentService;
 import com.nexusphere.ledger.agent.domain.model.Agent;
+import com.nexusphere.ledger.authorization.domain.model.Consent;
+import com.nexusphere.ledger.authorization.domain.model.ConsentProof;
 import com.nexusphere.ledger.authorization.domain.model.Grant;
 import com.nexusphere.ledger.authorization.domain.model.GrantQuery;
 import com.nexusphere.ledger.authorization.domain.model.GrantRequest;
@@ -12,6 +14,7 @@ import com.nexusphere.ledger.chain.Timestamps;
 import com.nexusphere.ledger.evidence.application.EvidenceService;
 import com.nexusphere.ledger.evidence.domain.model.EvidenceSubmission;
 import com.nexusphere.ledger.evidence.domain.model.Outcome;
+import com.nexusphere.ledger.server.config.LedgerProperties;
 import com.nexusphere.ledger.server.web.FieldErrors;
 import com.nexusphere.ledger.server.web.LedgerException;
 import org.springframework.stereotype.Service;
@@ -39,18 +42,90 @@ public class GrantService {
     private final EvidenceService evidence;
     private final MandateService mandates;
     private final Clock clock;
+    private final boolean consentRequired;
 
     GrantService(GrantRepository grants, AgentService agents, EvidenceService evidence, MandateService mandates,
-                 Clock clock) {
+                 Clock clock, LedgerProperties properties) {
         this.grants = grants;
         this.agents = agents;
         this.evidence = evidence;
         this.mandates = mandates;
         this.clock = clock;
+        this.consentRequired = properties.consentRequired();
+    }
+
+    public boolean consentRequired() {
+        return consentRequired;
     }
 
     @Transactional
     public Grant create(GrantRequest request) {
+        return consentRequired ? insert(request, GrantState.PENDING, null, null)
+                : insert(request, GrantState.ACTIVE, Consent.OPERATOR, null);
+    }
+
+    @Transactional
+    public Grant createByPrincipal(GrantRequest request, ConsentProof proof) {
+        if (!proof.principalId().equals(request.principalId())) {
+            throw LedgerException.forbidden("A principal may only grant on its own behalf.");
+        }
+        return insert(request, GrantState.ACTIVE, Consent.PRINCIPAL, proof);
+    }
+
+    @Transactional
+    public Grant approve(UUID id, ConsentProof proof) {
+        Grant grant = pendingOf(id, proof);
+        if (!clock.instant().isBefore(grant.terms().expiresAt())) {
+            throw LedgerException.conflict("GRANT_EXPIRED", "Grant " + id + " expired before it was approved.");
+        }
+        grants.approve(id, Timestamps.normalize(clock.instant()));
+        record(grant.terms(), "grant/approve", null, consentAttributes(proof));
+        return get(id);
+    }
+
+    @Transactional
+    public Grant deny(UUID id, ConsentProof proof, String reason) {
+        new FieldErrors().text("reason", reason, false, 500).throwIfAny("The denial has invalid fields.");
+        Grant grant = pendingOf(id, proof);
+        grants.deny(id, clock.instant(), reason);
+        record(grant.terms(), "grant/deny", reason, consentAttributes(proof));
+        return get(id);
+    }
+
+    @Transactional
+    public Grant revokeByPrincipal(UUID id, ConsentProof proof, String reason) {
+        Grant grant = ownedBy(id, proof);
+        if (grant.state() == GrantState.PENDING) {
+            return deny(id, proof, reason);
+        }
+        return revoke(grant, reason, consentAttributes(proof));
+    }
+
+    private Grant pendingOf(UUID id, ConsentProof proof) {
+        Grant grant = ownedBy(id, proof);
+        if (grant.state() != GrantState.PENDING) {
+            throw LedgerException.conflict("GRANT_NOT_PENDING", "Grant " + id + " is " + grant.state() + ".");
+        }
+        return grant;
+    }
+
+    private Grant ownedBy(UUID id, ConsentProof proof) {
+        return grants.lock(id).filter(g -> g.terms().principalId().equals(proof.principalId()))
+                .orElseThrow(() -> LedgerException.notFound("Grant " + id));
+    }
+
+    private static Map<String, String> consentAttributes(ConsentProof proof) {
+        Map<String, String> attributes = new LinkedHashMap<>();
+        attributes.put("consent.issuer", proof.issuer());
+        attributes.put("consent.subject", proof.subject());
+        attributes.put("consent.token", proof.tokenHash());
+        if (proof.authTime() != null) {
+            attributes.put("consent.authTime", Timestamps.format(proof.authTime()));
+        }
+        return attributes;
+    }
+
+    private Grant insert(GrantRequest request, GrantState state, Consent consent, ConsentProof proof) {
         Instant now = Timestamps.normalize(clock.instant());
         validate(request, now);
         Agent agent = agents.get(request.agentId());
@@ -59,7 +134,7 @@ public class GrantService {
         }
         GrantTerms terms = new GrantTerms(UUID.randomUUID(), request.principalId(), request.agentId(),
                 request.actions(), request.targets(), request.notBefore(), request.expiresAt(), request.maxUses(), now);
-        grants.insert(terms, request.reason());
+        grants.insert(terms, request.reason(), state, consent);
         Map<String, String> attributes = new LinkedHashMap<>();
         attributes.put("expiresAt", Timestamps.format(terms.expiresAt()));
         if (terms.notBefore() != null) {
@@ -67,6 +142,10 @@ public class GrantService {
         }
         if (terms.maxUses() != null) {
             attributes.put("maxUses", terms.maxUses().toString());
+        }
+        attributes.put("consent", consent == null ? GrantState.PENDING.name() : consent.name());
+        if (proof != null) {
+            attributes.putAll(consentAttributes(proof));
         }
         record(terms, "grant/create", request.reason(), attributes);
         return get(terms.id());
@@ -76,11 +155,17 @@ public class GrantService {
     public Grant revoke(UUID id, String reason) {
         new FieldErrors().text("reason", reason, false, 500).throwIfAny("The revocation has invalid fields.");
         Grant grant = grants.lock(id).orElseThrow(() -> LedgerException.notFound("Grant " + id));
-        if (grant.state() == GrantState.REVOKED) {
+        return revoke(grant, reason, Map.of());
+    }
+
+    private Grant revoke(Grant grant, String reason, Map<String, String> attributes) {
+        new FieldErrors().text("reason", reason, false, 500).throwIfAny("The revocation has invalid fields.");
+        UUID id = grant.terms().id();
+        if (grant.state() == GrantState.REVOKED || grant.state() == GrantState.DENIED) {
             return grant;
         }
         grants.revoke(id, clock.instant(), reason);
-        record(grant.terms(), "grant/revoke", reason, Map.of());
+        record(grant.terms(), "grant/revoke", reason, attributes);
         mandates.revokeForGrant(id, reason == null ? "The grant was revoked." : reason);
         return get(id);
     }

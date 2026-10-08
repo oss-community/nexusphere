@@ -30,6 +30,21 @@ services:
       ADMINER_DEFAULT_SERVER: ledger-postgresql
     depends_on:
       - ledger-postgresql
+  keycloak:
+    image: keycloak/keycloak:26.4.2
+    container_name: keycloak
+    hostname: keycloak
+    restart: always
+    ports:
+      - "8180:8080"
+    command: [ "start-dev", "--import-realm" ]
+    environment:
+      KC_BOOTSTRAP_ADMIN_USERNAME: admin
+      KC_BOOTSTRAP_ADMIN_PASSWORD: admin
+      KC_HOSTNAME: http://localhost:8180
+      KC_HOSTNAME_BACKCHANNEL_DYNAMIC: "true"
+    volumes:
+      - "./keycloak:/opt/keycloak/data/import:ro"
   demo-mcp:
     image: samanalishiri/nexusphere-ledger-demo-mcp:latest
     build:
@@ -61,10 +76,16 @@ services:
       LEDGER_DATABASE_PASSWORD: ledger
       LEDGER_CHECKPOINT_INTERVAL: 30s
       LEDGER_MCP_SERVERS_DEMO_URL: http://demo-mcp:8091/mcp
+      LEDGER_OIDC_ISSUER: http://localhost:8180/realms/nexusphere
+      LEDGER_OIDC_AUDIENCE: nexusphere-ledger
+      LEDGER_OIDC_JWKS_URI: http://keycloak:8080/realms/nexusphere/protocol/openid-connect/certs
+      LEDGER_OIDC_PRINCIPAL_CLAIM: preferred_username
     depends_on:
       ledger-postgresql:
         condition: service_healthy
       demo-mcp:
+        condition: service_started
+      keycloak:
         condition: service_started
 volumes:
   ledger-postgresql-data:

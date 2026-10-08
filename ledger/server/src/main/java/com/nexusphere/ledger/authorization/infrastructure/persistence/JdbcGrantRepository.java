@@ -1,5 +1,6 @@
 package com.nexusphere.ledger.authorization.infrastructure.persistence;
 
+import com.nexusphere.ledger.authorization.domain.model.Consent;
 import com.nexusphere.ledger.authorization.domain.model.Grant;
 import com.nexusphere.ledger.authorization.domain.model.GrantQuery;
 import com.nexusphere.ledger.authorization.domain.model.GrantState;
@@ -24,7 +25,7 @@ class JdbcGrantRepository implements GrantRepository {
 
     private static final String SELECT = """
             select seq, id, principal_id, agent_id, actions, targets, not_before, expires_at, max_uses, uses, status,
-                   reason, created_at, revoked_at, revoke_reason
+                   reason, created_at, revoked_at, revoke_reason, consent, consented_at
             from ledger.grant_record
             """;
 
@@ -35,12 +36,12 @@ class JdbcGrantRepository implements GrantRepository {
     }
 
     @Override
-    public void insert(GrantTerms terms, String reason) {
+    public void insert(GrantTerms terms, String reason, GrantState state, Consent consent) {
         jdbc.update("""
                 insert into ledger.grant_record (id, principal_id, agent_id, actions, targets, not_before, expires_at,
-                    max_uses, status, terms_hash, reason, created_at)
-                values (:id, :principalId, :agentId, :actions, :targets, :notBefore, :expiresAt, :maxUses, 'ACTIVE',
-                    :termsHash, :reason, :createdAt)
+                    max_uses, status, terms_hash, reason, created_at, consent, consented_at)
+                values (:id, :principalId, :agentId, :actions, :targets, :notBefore, :expiresAt, :maxUses, :status,
+                    :termsHash, :reason, :createdAt, :consent, :consentedAt)
                 """, new MapSqlParameterSource()
                 .addValue("id", terms.id())
                 .addValue("principalId", terms.principalId())
@@ -52,7 +53,10 @@ class JdbcGrantRepository implements GrantRepository {
                 .addValue("maxUses", terms.maxUses())
                 .addValue("termsHash", terms.hash())
                 .addValue("reason", reason)
-                .addValue("createdAt", Timestamp.from(terms.createdAt())));
+                .addValue("createdAt", Timestamp.from(terms.createdAt()))
+                .addValue("status", state.name())
+                .addValue("consent", consent == null ? null : consent.name())
+                .addValue("consentedAt", consent == null ? null : Timestamp.from(terms.createdAt())));
     }
 
     @Override
@@ -85,6 +89,10 @@ class JdbcGrantRepository implements GrantRepository {
             sql.append(" and agent_id = :agentId");
             params.addValue("agentId", query.agentId());
         }
+        if (query.state() != null) {
+            sql.append(" and status = :state");
+            params.addValue("state", query.state().name());
+        }
         if (query.principalId() != null) {
             sql.append(" and principal_id = :principalId");
             params.addValue("principalId", query.principalId());
@@ -114,18 +122,42 @@ class JdbcGrantRepository implements GrantRepository {
                 .addValue("reason", reason));
     }
 
+    @Override
+    public void approve(UUID id, Instant approvedAt) {
+        jdbc.update("""
+                update ledger.grant_record set status = 'ACTIVE', consent = 'PRINCIPAL', consented_at = :approvedAt
+                where id = :id
+                """, new MapSqlParameterSource()
+                .addValue("id", id)
+                .addValue("approvedAt", Timestamp.from(approvedAt)));
+    }
+
+    @Override
+    public void deny(UUID id, Instant deniedAt, String reason) {
+        jdbc.update("""
+                update ledger.grant_record set status = 'DENIED', revoked_at = :deniedAt, revoke_reason = :reason
+                where id = :id
+                """, new MapSqlParameterSource()
+                .addValue("id", id)
+                .addValue("deniedAt", Timestamp.from(deniedAt))
+                .addValue("reason", reason));
+    }
+
     private static Grant row(ResultSet rs, int row) throws SQLException {
         long maxUses = rs.getLong("max_uses");
         Long max = rs.wasNull() ? null : maxUses;
         Timestamp notBefore = rs.getTimestamp("not_before");
         Timestamp revokedAt = rs.getTimestamp("revoked_at");
+        Timestamp consentedAt = rs.getTimestamp("consented_at");
+        String consent = rs.getString("consent");
         GrantTerms terms = new GrantTerms(rs.getObject("id", UUID.class), rs.getString("principal_id"),
                 rs.getString("agent_id"), strings(rs.getArray("actions")), strings(rs.getArray("targets")),
                 notBefore == null ? null : notBefore.toInstant(), rs.getTimestamp("expires_at").toInstant(), max,
                 rs.getTimestamp("created_at").toInstant());
         return new Grant(rs.getLong("seq"), terms, rs.getLong("uses"), GrantState.valueOf(rs.getString("status")),
                 rs.getString("reason"), revokedAt == null ? null : revokedAt.toInstant(),
-                rs.getString("revoke_reason"));
+                rs.getString("revoke_reason"), consent == null ? null : Consent.valueOf(consent),
+                consentedAt == null ? null : consentedAt.toInstant());
     }
 
     private static List<String> strings(Array array) throws SQLException {

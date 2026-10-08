@@ -33,6 +33,11 @@ ledger:
     request-max-age: ${LEDGER_A2A_REQUEST_MAX_AGE:5m}
     status-list-cache: ${LEDGER_A2A_STATUS_LIST_CACHE:30s}
     trusted-issuers: ${LEDGER_A2A_TRUSTED_ISSUERS:}
+  oidc:
+    issuer: ${LEDGER_OIDC_ISSUER:}
+    audience: ${LEDGER_OIDC_AUDIENCE:}
+    jwks-uri: ${LEDGER_OIDC_JWKS_URI:}
+    principal-claim: ${LEDGER_OIDC_PRINCIPAL_CLAIM:sub}
 management:
   endpoints:
     web:
