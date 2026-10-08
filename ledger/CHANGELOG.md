@@ -19,6 +19,8 @@ First release of the Nexusphere Ledger, a self-hosted evidence ledger for AI age
   published, so everything they signed still verifies, and the offline verifier follows rotations from a pinned key
 * Grant uses are returned when a gateway sees that the call never ran, and a receiving ledger counts the uses of
   each mandate on its own
+* Streaming in both gateways: MCP answers, server requests and the `GET` stream, and A2A `message/stream` and
+  `tasks/resubscribe` are relayed live, with the A2A receipt sent as the last event and covering every event
 * Dockerfiles, compose file with Adminer, demo MCP server and demo script
 
 ##

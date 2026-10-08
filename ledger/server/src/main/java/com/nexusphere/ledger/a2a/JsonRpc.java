@@ -8,7 +8,6 @@ import tools.jackson.databind.node.ObjectNode;
 
 import java.util.Map;
 import java.util.Optional;
-import java.util.Set;
 
 @Component
 class JsonRpc {
@@ -18,9 +17,6 @@ class JsonRpc {
     static final int INVALID_PARAMS = -32602;
     static final int UPSTREAM_UNAVAILABLE = -32002;
     static final int DENIED = -32003;
-    static final int UNSUPPORTED = -32004;
-
-    static final Set<String> STREAMING = Set.of("message/stream", "tasks/resubscribe");
 
     private final JsonMapper json;
 
@@ -45,10 +41,6 @@ class JsonRpc {
         JsonNode m = message.get();
         if (!m.path("method").isString() || m.get("id") == null || m.get("id").isNull()) {
             return error(400, m.get("id"), INVALID_REQUEST, "A2A requests need a method and an id.", null, Map.of());
-        }
-        if (STREAMING.contains(m.path("method").asString())) {
-            return error(400, m.get("id"), UNSUPPORTED, "Streaming is not supported by the ledger gateway.", null,
-                    Map.of());
         }
         return null;
     }

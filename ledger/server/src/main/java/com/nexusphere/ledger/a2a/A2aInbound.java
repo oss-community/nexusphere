@@ -16,6 +16,7 @@ import com.nexusphere.ledger.mandate.MandateProblem;
 import com.nexusphere.ledger.mandate.MandateVerifier;
 import com.nexusphere.ledger.server.config.LedgerProperties;
 import com.nexusphere.ledger.server.signing.LedgerSigner;
+import com.nexusphere.ledger.server.web.EventStream;
 import com.nexusphere.ledger.server.web.LedgerException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -23,6 +24,8 @@ import org.springframework.stereotype.Service;
 import tools.jackson.databind.JsonNode;
 
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
@@ -140,37 +143,82 @@ class A2aInbound {
             return rpc.error(403, id, JsonRpc.DENIED, "The mandate does not allow this request.", data,
                     Map.of(A2aOutbound.EXCHANGE_HEADER, exchangeId.toString()));
         }
-        int status;
-        byte[] answer;
+        A2aHttp.Reply reply = null;
         try {
-            A2aHttp.Reply reply = http.post(agent.url(), timeout(), Map.of("Authorization",
+            reply = http.post(agent.url(), timeout(), Map.of("Authorization",
                     agent.authorization() == null ? "" : agent.authorization()), body);
-            status = reply.status();
-            answer = reply.body();
         } catch (IOException | InterruptedException e) {
             if (e instanceof InterruptedException) {
                 Thread.currentThread().interrupt();
             }
             log.warn("A2A agent {} is unavailable: {}", agent.url(), e.getMessage());
             exchanges.releaseUse(exchangeId);
+        }
+        if (reply != null && reply.streamed()) {
+            A2aHttp.Reply streamed = reply;
+            return new A2aResponse(streamed.status(), null, Map.of(A2aOutbound.EXCHANGE_HEADER, exchangeId.toString()),
+                    out -> relay(streamed, new Received(agentName, claims, method, request, exchangeId, now),
+                            attributes, out));
+        }
+        int status;
+        byte[] answer;
+        if (reply != null) {
+            status = reply.status();
+            answer = reply.body();
+        } else {
             A2aResponse failed = rpc.error(502, id, JsonRpc.UPSTREAM_UNAVAILABLE, "The agent is unavailable.", null,
                     Map.of());
             status = failed.status();
             answer = failed.body();
         }
-        boolean failed = rpc.failed(status, answer);
-        Outcome outcome = failed ? Outcome.FAILED : Outcome.SUCCEEDED;
-        String responseHash = Hashes.sha256(answer);
-        attributes.put("a2a.status", String.valueOf(status));
-        EvidenceEntry entry = record(agentName, claims, method, request, Decision.ALLOW, outcome,
-                failed ? "The agent answered with HTTP " + status + " or a JSON-RPC error." : null, responseHash,
-                attributes);
-        String receipt = signer.sign(ExchangeReceipt.TYPE, new ExchangeReceipt(mandates.issuer(), claims.issuer(),
-                UUID.randomUUID(), request.requestId(), claims.mandateId(), agentName, requestHash, responseHash,
-                status, outcome.name(), entry.sequence(), entry.hash(), now).toPayload());
-        exchanges.complete(exchangeId, responseHash, status, outcome.name(), entry.sequence(), receipt, "ISSUED");
+        String receipt = finish(new Received(agentName, claims, method, request, exchangeId, now), status,
+                rpc.failed(status, answer), Hashes.sha256(answer), attributes);
         return new A2aResponse(status, answer, Map.of(A2aOutbound.RECEIPT_HEADER, receipt,
                 A2aOutbound.EXCHANGE_HEADER, exchangeId.toString()));
+    }
+
+    private record Received(String agentName, MandateClaims claims, String method, ExchangeRequest request,
+                            UUID exchangeId, Instant receivedAt) {
+    }
+
+    private void relay(A2aHttp.Reply reply, Received received, Map<String, String> attributes, OutputStream out)
+            throws IOException {
+        StreamDigest digest = new StreamDigest(rpc);
+        IOException broken = null;
+        try (InputStream stream = reply.stream()) {
+            EventStream.relay(stream, out, event -> {
+                digest.accept(event.data());
+                return true;
+            });
+        } catch (IOException e) {
+            broken = e;
+        }
+        attributes.put("a2a.events", String.valueOf(digest.events()));
+        attributes.put("a2a.stream", broken == null ? "COMPLETE" : "BROKEN");
+        String receipt = finish(received, reply.status(), broken != null || digest.failed(reply.status()),
+                digest.hash(), attributes);
+        if (broken != null) {
+            throw broken;
+        }
+        EventStream.write(out, StreamDigest.RECEIPT_EVENT, receipt);
+    }
+
+    private String finish(Received received, int status, boolean failed, String responseHash,
+                          Map<String, String> attributes) {
+        Outcome outcome = failed ? Outcome.FAILED : Outcome.SUCCEEDED;
+        attributes.put("a2a.status", String.valueOf(status));
+        MandateClaims claims = received.claims();
+        ExchangeRequest request = received.request();
+        EvidenceEntry entry = record(received.agentName(), claims, received.method(), request, Decision.ALLOW,
+                outcome, failed ? "The agent answered with HTTP " + status + ", a JSON-RPC error or a failed task."
+                        : null, responseHash, attributes);
+        String receipt = signer.sign(ExchangeReceipt.TYPE, new ExchangeReceipt(mandates.issuer(), claims.issuer(),
+                UUID.randomUUID(), request.requestId(), claims.mandateId(), received.agentName(),
+                request.requestHash(), responseHash, status, outcome.name(), entry.sequence(), entry.hash(),
+                received.receivedAt()).toPayload());
+        exchanges.complete(received.exchangeId(), responseHash, status, outcome.name(), entry.sequence(), receipt,
+                "ISSUED");
+        return receipt;
     }
 
     private EvidenceEntry record(String agentName, MandateClaims claims, String method, ExchangeRequest request,

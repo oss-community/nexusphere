@@ -24,6 +24,7 @@ public final class FakeMcpServer {
     private final Map<String, AtomicInteger> calls = new ConcurrentHashMap<>();
     private volatile String lastSessionId;
     private volatile String lastAuthorization;
+    private volatile String lastEventId;
 
     private FakeMcpServer(HttpServer server) {
         this.server = server;
@@ -58,6 +59,10 @@ public final class FakeMcpServer {
         return lastAuthorization;
     }
 
+    public String lastEventId() {
+        return lastEventId;
+    }
+
     private void handle(HttpExchange exchange) throws IOException {
         lastSessionId = exchange.getRequestHeaders().getFirst("Mcp-Session-Id");
         lastAuthorization = exchange.getRequestHeaders().getFirst("Authorization");
@@ -65,9 +70,15 @@ public final class FakeMcpServer {
             send(exchange, 200, "application/json", new byte[0]);
             return;
         }
+        if ("GET".equals(exchange.getRequestMethod())) {
+            lastEventId = exchange.getRequestHeaders().getFirst("Last-Event-ID");
+            send(exchange, 200, "text/event-stream", ("id: e-2\nevent: message\ndata: {\"jsonrpc\":\"2.0\","
+                    + "\"method\":\"notifications/tools/list_changed\"}\n\n").getBytes(StandardCharsets.UTF_8));
+            return;
+        }
         JsonNode request = JSON.readTree(exchange.getRequestBody().readAllBytes());
         String method = request.path("method").asString();
-        if (!request.has("id")) {
+        if (!request.has("id") || !request.has("method")) {
             send(exchange, 202, "application/json", new byte[0]);
             return;
         }
@@ -103,8 +114,10 @@ public final class FakeMcpServer {
                     }
                 }
                 if (tool.endsWith("_sse")) {
+                    String ask = tool.startsWith("ask") ? "event: message\ndata: {\"jsonrpc\":\"2.0\",\"id\":\"srv-1\","
+                            + "\"method\":\"elicitation/create\",\"params\":{\"message\":\"Which folder?\"}}\n\n" : "";
                     String events = "event: message\ndata: {\"jsonrpc\":\"2.0\",\"method\":\"notifications/progress\","
-                            + "\"params\":{\"progress\":1}}\n\nevent: message\ndata: "
+                            + "\"params\":{\"progress\":1}}\n\n" + ask + "event: message\ndata: "
                             + JSON.writeValueAsString(response) + "\n\n";
                     send(exchange, 200, "text/event-stream", events.getBytes(StandardCharsets.UTF_8));
                     return;

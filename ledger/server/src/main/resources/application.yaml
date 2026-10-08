@@ -6,6 +6,8 @@ spring:
   mvc:
     problemdetails:
       enabled: false
+    async:
+      request-timeout: ${LEDGER_STREAM_TIMEOUT:1h}
   flyway:
     schemas: ledger
     default-schema: ledger

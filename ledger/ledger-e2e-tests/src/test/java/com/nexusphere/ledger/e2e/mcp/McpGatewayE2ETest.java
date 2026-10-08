@@ -8,6 +8,7 @@ import org.junit.jupiter.api.Test;
 import tools.jackson.databind.JsonNode;
 
 import java.nio.charset.StandardCharsets;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -108,6 +109,62 @@ class McpGatewayE2ETest extends LedgerE2ETestBase {
         assertThat(response.json().has("result")).isTrue();
         assertThat(ledger().get("/api/v1/decisions/" + response.header("X-Ledger-Decision").orElseThrow()).json()
                 .path("outcome").asString()).isEqualTo("SUCCEEDED");
+    }
+
+    private JsonNode settledDecision(String decisionId) {
+        for (int attempt = 0; attempt < 50; attempt++) {
+            JsonNode decision = ledger().get("/api/v1/decisions/" + decisionId).json();
+            if (decision.path("outcome").isString()) {
+                return decision;
+            }
+            try {
+                Thread.sleep(100);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                throw new IllegalStateException(e);
+            }
+        }
+        throw new IllegalStateException("Decision " + decisionId + " has no outcome");
+    }
+
+    @Test
+    void aStreamedAnswerIsRelayedLiveWithTheServerRequestsInside() {
+        RegisteredAgent agent = registerAgent("acme");
+        grant(grantBody("dave", agent.agentId(), List.of("tools/call"), List.of("files/*")));
+        Map<String, String> headers = new HashMap<>(as("dave"));
+        headers.put("Accept", "application/json, text/event-stream");
+
+        LedgerClient.Response response = agent.client().post(FILES, toolCall(13, "ask_sse"), headers);
+        LedgerClient.Response reply = agent.client().post(FILES,
+                "{\"jsonrpc\":\"2.0\",\"id\":\"srv-1\",\"result\":{\"action\":\"accept\"}}",
+                Map.of("Mcp-Session-Id", FakeMcpServer.SESSION_ID));
+
+        assertThat(response.status()).isEqualTo(200);
+        assertThat(response.header("Content-Type").orElseThrow()).startsWith("text/event-stream");
+        assertThat(response.body()).contains("notifications/progress").contains("elicitation/create")
+                .contains("\"id\":13");
+        assertThat(reply.status()).isEqualTo(202);
+        JsonNode decision = settledDecision(response.header("X-Ledger-Decision").orElseThrow());
+        assertThat(decision.path("outcome").asString()).isEqualTo("SUCCEEDED");
+        JsonNode attributes = ledger().get("/api/v1/evidence/" + decision.path("outcomeEvidenceId").asString())
+                .json().path("attributes");
+        assertThat(attributes.path("mcp.events").asString()).isEqualTo("3");
+        assertThat(attributes.path("mcp.stream").asString()).isEqualTo("COMPLETE");
+    }
+
+    @Test
+    void theServerStreamIsRelayedOnGet() {
+        RegisteredAgent agent = registerAgent("acme");
+
+        LedgerClient.Response stream = agent.client().get(FILES, Map.of("Accept", "text/event-stream",
+                "Mcp-Session-Id", FakeMcpServer.SESSION_ID, "Last-Event-ID", "e-1"));
+        LedgerClient.Response anonymous = anonymous().get(FILES, Map.of("Accept", "text/event-stream"));
+
+        assertThat(stream.status()).isEqualTo(200);
+        assertThat(stream.header("Content-Type").orElseThrow()).startsWith("text/event-stream");
+        assertThat(stream.body()).contains("notifications/tools/list_changed").contains("id: e-2");
+        assertThat(MCP.lastEventId()).isEqualTo("e-1");
+        assertThat(anonymous.status()).isEqualTo(401);
     }
 
     @Test

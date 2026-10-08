@@ -15,6 +15,7 @@ import com.nexusphere.ledger.mandate.Jws;
 import com.nexusphere.ledger.server.config.LedgerProperties;
 import com.nexusphere.ledger.server.security.Caller;
 import com.nexusphere.ledger.server.signing.LedgerSigner;
+import com.nexusphere.ledger.server.web.EventStream;
 import com.nexusphere.ledger.server.web.LedgerException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -22,6 +23,8 @@ import org.springframework.stereotype.Service;
 import tools.jackson.databind.JsonNode;
 
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
@@ -129,6 +132,12 @@ class A2aOutbound {
                     "MISSING");
             return failed;
         }
+        if (reply.streamed()) {
+            Exchange exchange = new Exchange(caller.agentId(), peerName, peer, decisionId, exchangeId, mandate.id(),
+                    requestHash);
+            A2aHttp.Reply streamed = reply;
+            return new A2aResponse(streamed.status(), null, headers, out -> relay(streamed, exchange, out));
+        }
         String responseHash = Hashes.sha256(reply.body());
         String receipt = reply.headers().get(RECEIPT_HEADER);
         Map<String, String> attributes = new LinkedHashMap<>();
@@ -152,6 +161,47 @@ class A2aOutbound {
         }
         headers.put(RECEIPT_STATUS_HEADER, receiptStatus);
         return new A2aResponse(reply.status(), reply.body(), headers);
+    }
+
+    private record Exchange(String agentId, String peerName, LedgerProperties.A2a.Peer peer, UUID decisionId,
+                            UUID exchangeId, UUID mandateId, String requestHash) {
+    }
+
+    private void relay(A2aHttp.Reply reply, Exchange exchange, OutputStream out) throws IOException {
+        StreamDigest digest = new StreamDigest(rpc);
+        String[] receipt = new String[1];
+        IOException broken = null;
+        try (InputStream stream = reply.stream()) {
+            EventStream.relay(stream, out, event -> {
+                if (StreamDigest.RECEIPT_EVENT.equals(event.name())) {
+                    receipt[0] = event.data();
+                    return false;
+                }
+                digest.accept(event.data());
+                return true;
+            });
+        } catch (IOException e) {
+            broken = e;
+        }
+        String responseHash = digest.hash();
+        Map<String, String> attributes = new LinkedHashMap<>();
+        attributes.put("a2a.status", String.valueOf(reply.status()));
+        attributes.put("a2a.mandate", exchange.mandateId().toString());
+        String receiptStatus = checkReceipt(receipt[0], exchange.peer(), exchange.decisionId(),
+                exchange.requestHash(), responseHash, attributes);
+        attributes.put("a2a.receipt", receiptStatus);
+        attributes.put("a2a.events", String.valueOf(digest.events()));
+        attributes.put("a2a.stream", broken == null ? "COMPLETE" : "BROKEN");
+        boolean failed = broken != null || digest.failed(reply.status());
+        Outcome outcome = failed ? Outcome.FAILED : Outcome.SUCCEEDED;
+        decisions.reportOutcome(exchange.decisionId(), exchange.agentId(), new OutcomeReport(outcome, responseHash,
+                failed ? "The A2A stream from " + exchange.peerName()
+                        + " broke or ended with an error or a failed task." : null, attributes));
+        exchanges.complete(exchange.exchangeId(), responseHash, reply.status(), outcome.name(), null, receipt[0],
+                receiptStatus);
+        if (broken != null) {
+            throw broken;
+        }
     }
 
     private String checkReceipt(String token, LedgerProperties.A2a.Peer peer, UUID requestId, String requestHash,

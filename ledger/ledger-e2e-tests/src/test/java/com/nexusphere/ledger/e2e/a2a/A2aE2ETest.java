@@ -225,7 +225,7 @@ class A2aE2ETest extends LedgerE2ETestBase {
     }
 
     @Test
-    void anUnreachablePeerOrStreamingIsAnsweredWithoutDelivery() {
+    void anUnreachablePeerIsAnsweredWithoutDelivery() {
         RegisteredAgent agent = registerAgent("acme");
         String grantId = grant(grantBody("alice", agent.agentId(), List.of("a2a/send"), List.of("*")));
 
@@ -233,8 +233,6 @@ class A2aE2ETest extends LedgerE2ETestBase {
                 principal());
         JsonNode sent = outcomeOf(agent.agentId());
         long uses = ledger().get("/api/v1/grants/" + grantId).json().path("uses").asLong();
-        LedgerClient.Response stream = agent.client().post("/a2a/out/supplier", message("message/stream", "m-8"),
-                principal());
         LedgerClient.Response operator = ledger().post("/a2a/out/supplier", message("message/send", "m-9"),
                 principal());
         LedgerClient.Response unknown = agent.client().post("/a2a/out/nobody", message("message/send", "m-10"),
@@ -248,10 +246,67 @@ class A2aE2ETest extends LedgerE2ETestBase {
         assertThat(sent.path("attributes").path("a2a.receipt").asString()).isEqualTo("MISSING");
         assertThat(sent.path("attributes").path("grant.useReturned").asString()).isEqualTo("true");
         assertThat(uses).isZero();
-        assertThat(stream.json().path("error").path("code").asInt()).isEqualTo(-32004);
         assertThat(operator.status()).isEqualTo(403);
         assertThat(unknown.status()).isEqualTo(404);
         assertThat(anonymous.status()).isEqualTo(401);
+    }
+
+    @Test
+    void aStreamedTaskIsRelayedLiveAndTheReceiptCoversEveryEvent() {
+        RegisteredAgent agent = agentWithGrant(List.of("supplier/*"));
+        Map<String, String> headers = new HashMap<>(principal());
+        headers.put("Accept", "text/event-stream");
+
+        LedgerClient.Response response = agent.client().post("/a2a/out/supplier", message("message/stream", "m-14"),
+                headers);
+        JsonNode outbound = settledExchange(agent.client(), response.header("X-Ledger-Exchange").orElseThrow());
+        ExchangeReceipt receipt = ExchangeReceipt.fromPayload(Jws.parse(outbound.path("receipt").asString())
+                .payload());
+        JsonNode sent = outcomeOf(agent.agentId());
+
+        assertThat(response.status()).isEqualTo(200);
+        assertThat(response.header("Content-Type").orElseThrow()).startsWith("text/event-stream");
+        assertThat(response.body()).contains("\"submitted\"").contains("\"working\"").contains("\"completed\"")
+                .doesNotContain("nexusphere-receipt");
+        assertThat(outbound.path("receiptStatus").asString()).isEqualTo("VERIFIED");
+        assertThat(outbound.path("outcome").asString()).isEqualTo("SUCCEEDED");
+        assertThat(receipt.outcome()).isEqualTo("SUCCEEDED");
+        assertThat(receipt.responseHash()).isEqualTo(outbound.path("responseHash").asString());
+        assertThat(sent.path("attributes").path("a2a.events").asString()).isEqualTo("3");
+        assertThat(sent.path("attributes").path("a2a.stream").asString()).isEqualTo("COMPLETE");
+        assertThat(sent.path("attributes").path("a2a.receipt").asString()).isEqualTo("VERIFIED");
+    }
+
+    @Test
+    void aStreamThatEndsInAFailedTaskIsRecordedAsFailedOnBothSides() {
+        RegisteredAgent agent = agentWithGrant(List.of("supplier/*"));
+
+        LedgerClient.Response response = agent.client().post("/a2a/out/supplier",
+                message("tasks/resubscribe", "m-15"), principal());
+        JsonNode outbound = settledExchange(agent.client(), response.header("X-Ledger-Exchange").orElseThrow());
+        ExchangeReceipt receipt = ExchangeReceipt.fromPayload(Jws.parse(outbound.path("receipt").asString())
+                .payload());
+
+        assertThat(response.body()).contains("\"failed\"");
+        assertThat(outbound.path("receiptStatus").asString()).isEqualTo("VERIFIED");
+        assertThat(outbound.path("outcome").asString()).isEqualTo("FAILED");
+        assertThat(receipt.outcome()).isEqualTo("FAILED");
+    }
+
+    private static JsonNode settledExchange(LedgerClient client, String exchangeId) {
+        for (int attempt = 0; attempt < 50; attempt++) {
+            JsonNode exchange = client.get("/api/v1/a2a/exchanges/" + exchangeId).json();
+            if (exchange.path("receiptStatus").isString()) {
+                return exchange;
+            }
+            try {
+                Thread.sleep(100);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+                throw new IllegalStateException(e);
+            }
+        }
+        throw new IllegalStateException("Exchange " + exchangeId + " has not settled");
     }
 
     private LedgerClient.Response deliver(String mandate, String proof, String body) {

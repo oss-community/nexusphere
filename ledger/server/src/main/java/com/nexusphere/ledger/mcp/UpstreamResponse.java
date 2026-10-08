@@ -1,4 +1,10 @@
 package com.nexusphere.ledger.mcp;
 
-record UpstreamResponse(int status, String sessionId, byte[] body) {
+import java.io.InputStream;
+
+record UpstreamResponse(int status, String sessionId, byte[] body, InputStream stream) {
+
+    boolean streamed() {
+        return stream != null;
+    }
 }

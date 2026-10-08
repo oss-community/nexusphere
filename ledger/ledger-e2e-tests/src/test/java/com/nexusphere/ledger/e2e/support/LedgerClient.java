@@ -53,6 +53,12 @@ public final class LedgerClient {
         return send(request(path).GET());
     }
 
+    public Response get(String path, Map<String, String> headers) {
+        HttpRequest.Builder builder = request(path).GET();
+        headers.forEach(builder::header);
+        return send(builder);
+    }
+
     public Response post(String path, String jsonBody) {
         return send(request(path).header("Content-Type", "application/json")
                 .POST(HttpRequest.BodyPublishers.ofString(jsonBody)));

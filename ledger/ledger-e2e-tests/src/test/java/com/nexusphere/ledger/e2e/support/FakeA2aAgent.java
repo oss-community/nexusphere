@@ -8,6 +8,7 @@ import tools.jackson.databind.node.ObjectNode;
 
 import java.io.IOException;
 import java.net.InetSocketAddress;
+import java.nio.charset.StandardCharsets;
 import java.util.concurrent.atomic.AtomicInteger;
 
 public final class FakeA2aAgent {
@@ -58,10 +59,15 @@ public final class FakeA2aAgent {
         lastAuthorization = exchange.getRequestHeaders().getFirst("Authorization");
         lastBody = exchange.getRequestBody().readAllBytes();
         JsonNode request = JSON.readTree(lastBody);
+        String method = request.path("method").asString();
+        if ("message/stream".equals(method) || "tasks/resubscribe".equals(method)) {
+            stream(exchange, request.get("id"), "message/stream".equals(method) ? "completed" : "failed");
+            return;
+        }
         ObjectNode response = JSON.createObjectNode();
         response.put("jsonrpc", "2.0");
         response.set("id", request.get("id"));
-        if ("message/send".equals(request.path("method").asString())) {
+        if ("message/send".equals(method)) {
             ObjectNode result = response.putObject("result");
             result.put("kind", "message");
             result.put("role", "agent");
@@ -74,6 +80,26 @@ public final class FakeA2aAgent {
         exchange.getResponseHeaders().set("Content-Type", "application/json");
         exchange.sendResponseHeaders(200, body.length);
         exchange.getResponseBody().write(body);
+        exchange.close();
+    }
+
+    private static void stream(HttpExchange exchange, JsonNode id, String finalState) throws IOException {
+        exchange.getResponseHeaders().set("Content-Type", "text/event-stream");
+        exchange.sendResponseHeaders(200, 0);
+        for (String state : new String[] {"submitted", "working", finalState}) {
+            ObjectNode event = JSON.createObjectNode();
+            event.put("jsonrpc", "2.0");
+            event.set("id", id);
+            ObjectNode result = event.putObject("result");
+            result.put("kind", "status-update");
+            result.put("taskId", "task-1");
+            result.put("contextId", "context-1");
+            result.putObject("status").put("state", state);
+            result.put("final", state.equals(finalState));
+            exchange.getResponseBody().write(("data: " + JSON.writeValueAsString(event) + "\n\n")
+                    .getBytes(StandardCharsets.UTF_8));
+            exchange.getResponseBody().flush();
+        }
         exchange.close();
     }
 }

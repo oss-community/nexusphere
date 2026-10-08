@@ -9,6 +9,7 @@ import com.nexusphere.ledger.evidence.domain.model.Decision;
 import com.nexusphere.ledger.evidence.domain.model.Outcome;
 import com.nexusphere.ledger.server.config.LedgerProperties;
 import com.nexusphere.ledger.server.security.Caller;
+import com.nexusphere.ledger.server.web.EventStream;
 import com.nexusphere.ledger.server.web.LedgerException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -19,6 +20,9 @@ import tools.jackson.databind.json.JsonMapper;
 import tools.jackson.databind.node.ObjectNode;
 
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
+import java.nio.charset.StandardCharsets;
 import java.time.Duration;
 import java.util.LinkedHashMap;
 import java.util.Map;
@@ -51,7 +55,7 @@ class McpGateway {
     }
 
     GatewayResponse post(Caller caller, String serverName, String principalId, String sessionId,
-                         String protocolVersion, byte[] body) {
+                         String protocolVersion, boolean acceptsStream, byte[] body) {
         LedgerProperties.Mcp.Server server = server(serverName);
         JsonNode message;
         try {
@@ -64,7 +68,7 @@ class McpGateway {
         }
         JsonNode id = message.get("id");
         if (!TOOLS_CALL.equals(message.path("method").asString(null)) || id == null) {
-            return forward(server, sessionId, protocolVersion, body, id, null).response();
+            return forward(server, sessionId, protocolVersion, body, id, acceptsStream);
         }
         if (caller.isOperator()) {
             return error(403, id, DENIED, "Only agents may call tools through the gateway.", null);
@@ -92,18 +96,56 @@ class McpGateway {
                     data);
             return new GatewayResponse(denied.status(), sessionId, denied.body(), decisionId);
         }
-        Forwarded forwarded = forward(server, sessionId, protocolVersion, body, id, decisionId);
-        GatewayResponse response = forwarded.response();
-        Outcome outcome = outcome(response);
-        String reason = outcome == Outcome.FAILED ? failure(response) : null;
-        OutcomeReport report = new OutcomeReport(outcome, Hashes.sha256(response.body()), reason,
-                Map.of("mcp.status", String.valueOf(response.status())));
-        if (!forwarded.reached() || rejected(response)) {
-            decisions.reportUndelivered(decisionId, caller.agentId(), report);
-        } else {
-            decisions.reportOutcome(decisionId, caller.agentId(), report);
+        UpstreamResponse answer;
+        try {
+            answer = upstream.post(server, timeout(), sessionId, protocolVersion, body);
+        } catch (IOException | InterruptedException e) {
+            if (e instanceof InterruptedException) {
+                Thread.currentThread().interrupt();
+            }
+            log.warn("MCP server {} is unavailable: {}", server.url(), e.getMessage());
+            GatewayResponse failed = error(502, id, UPSTREAM_UNAVAILABLE, "The MCP server is unavailable.", null);
+            record(decisionId, caller, failed.status(), failed.body(), Map.of(), false);
+            return new GatewayResponse(failed.status(), sessionId, failed.body(), decisionId);
         }
-        return response;
+        String session = answer.sessionId() == null ? sessionId : answer.sessionId();
+        if (!answer.streamed()) {
+            record(decisionId, caller, answer.status(), answer.body(), Map.of(), true);
+            return new GatewayResponse(answer.status(), session, answer.body(), decisionId);
+        }
+        if (!acceptsStream) {
+            byte[] result;
+            try {
+                result = upstream.answer(answer.stream(), id);
+            } catch (IOException e) {
+                result = null;
+            }
+            record(decisionId, caller, answer.status(), result, Map.of(), true);
+            return new GatewayResponse(answer.status(), session, result == null ? new byte[0] : result, decisionId);
+        }
+        return new GatewayResponse(answer.status(), session, null, decisionId,
+                out -> relayAnswer(answer, id, decisionId, caller, out));
+    }
+
+    GatewayResponse get(String serverName, String sessionId, String protocolVersion, String lastEventId) {
+        LedgerProperties.Mcp.Server server = server(serverName);
+        try {
+            UpstreamResponse response = upstream.get(server, timeout(), sessionId, protocolVersion, lastEventId);
+            String session = response.sessionId() == null ? sessionId : response.sessionId();
+            if (!response.streamed()) {
+                return new GatewayResponse(response.status(), session, response.body(), null);
+            }
+            return new GatewayResponse(response.status(), session, null, null, out -> {
+                try (InputStream stream = response.stream()) {
+                    EventStream.relay(stream, out, event -> true);
+                }
+            });
+        } catch (IOException e) {
+            return error(502, null, UPSTREAM_UNAVAILABLE, "The MCP server " + serverName + " is unavailable.", null);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            return error(502, null, UPSTREAM_UNAVAILABLE, "The MCP server " + serverName + " is unavailable.", null);
+        }
     }
 
     GatewayResponse delete(String serverName, String sessionId, String protocolVersion) {
@@ -119,43 +161,90 @@ class McpGateway {
         }
     }
 
-    private record Forwarded(GatewayResponse response, boolean reached) {
+    private void relayAnswer(UpstreamResponse answer, JsonNode id, UUID decisionId, Caller caller,
+                             OutputStream out) throws IOException {
+        byte[][] result = new byte[1][];
+        int[] events = {0};
+        try (InputStream stream = answer.stream()) {
+            EventStream.relay(stream, out, event -> {
+                events[0]++;
+                if (result[0] == null && event.data() != null) {
+                    byte[] data = event.data().getBytes(StandardCharsets.UTF_8);
+                    if (upstream.isAnswer(data, id)) {
+                        result[0] = data;
+                    }
+                }
+                return true;
+            });
+        } catch (IOException e) {
+            record(decisionId, caller, answer.status(), result[0], Map.of("mcp.events", String.valueOf(events[0]),
+                    "mcp.stream", "BROKEN"), true);
+            throw e;
+        }
+        record(decisionId, caller, answer.status(), result[0], Map.of("mcp.events", String.valueOf(events[0]),
+                "mcp.stream", "COMPLETE"), true);
     }
 
-    private Forwarded forward(LedgerProperties.Mcp.Server server, String sessionId, String protocolVersion,
-                              byte[] body, JsonNode id, UUID decisionId) {
+    private GatewayResponse forward(LedgerProperties.Mcp.Server server, String sessionId, String protocolVersion,
+                                    byte[] body, JsonNode id, boolean acceptsStream) {
         try {
-            UpstreamResponse response = upstream.post(server, timeout(), sessionId, protocolVersion, body, id);
-            return new Forwarded(new GatewayResponse(response.status(),
-                    response.sessionId() == null ? sessionId : response.sessionId(), response.body(), decisionId),
-                    true);
+            UpstreamResponse response = upstream.post(server, timeout(), sessionId, protocolVersion, body);
+            String session = response.sessionId() == null ? sessionId : response.sessionId();
+            if (!response.streamed()) {
+                return new GatewayResponse(response.status(), session, response.body(), null);
+            }
+            if (!acceptsStream) {
+                return new GatewayResponse(response.status(), session, upstream.answer(response.stream(), id), null);
+            }
+            return new GatewayResponse(response.status(), session, null, null, out -> {
+                try (InputStream stream = response.stream()) {
+                    EventStream.relay(stream, out, event -> true);
+                }
+            });
         } catch (IOException e) {
             log.warn("MCP server {} is unavailable: {}", server.url(), e.getMessage());
         } catch (InterruptedException e) {
             Thread.currentThread().interrupt();
         }
         GatewayResponse failed = error(502, id, UPSTREAM_UNAVAILABLE, "The MCP server is unavailable.", null);
-        return new Forwarded(new GatewayResponse(failed.status(), sessionId, failed.body(), decisionId), false);
+        return new GatewayResponse(failed.status(), sessionId, failed.body(), null);
     }
 
-    private boolean rejected(GatewayResponse response) {
-        if (response.status() >= 400 && response.status() < 500) {
+    private void record(UUID decisionId, Caller caller, int status, byte[] body, Map<String, String> extra,
+                        boolean reached) {
+        Outcome outcome = outcome(status, body);
+        Map<String, String> attributes = new LinkedHashMap<>(extra);
+        attributes.put("mcp.status", String.valueOf(status));
+        OutcomeReport report = new OutcomeReport(outcome, Hashes.sha256(body == null ? new byte[0] : body),
+                outcome == Outcome.FAILED ? failure(status, body) : null, attributes);
+        if (!reached || rejected(status, body)) {
+            decisions.reportUndelivered(decisionId, caller.agentId(), report);
+        } else {
+            decisions.reportOutcome(decisionId, caller.agentId(), report);
+        }
+    }
+
+    private boolean rejected(int status, byte[] body) {
+        if (status >= 400 && status < 500) {
             return true;
         }
+        if (body == null) {
+            return false;
+        }
         try {
-            JsonNode message = json.readTree(response.body());
+            JsonNode message = json.readTree(body);
             return message != null && REJECTED_CODES.contains(message.path("error").path("code").asInt(0));
         } catch (JacksonException e) {
             return false;
         }
     }
 
-    private Outcome outcome(GatewayResponse response) {
-        if (response.status() < 200 || response.status() >= 300) {
+    private Outcome outcome(int status, byte[] body) {
+        if (status < 200 || status >= 300 || body == null) {
             return Outcome.FAILED;
         }
         try {
-            JsonNode message = json.readTree(response.body());
+            JsonNode message = json.readTree(body);
             if (message == null || message.has("error") || message.path("result").path("isError").asBoolean(false)) {
                 return Outcome.FAILED;
             }
@@ -165,12 +254,15 @@ class McpGateway {
         }
     }
 
-    private String failure(GatewayResponse response) {
-        if (response.status() < 200 || response.status() >= 300) {
-            return "The MCP server answered with HTTP " + response.status() + ".";
+    private String failure(int status, byte[] body) {
+        if (status < 200 || status >= 300) {
+            return "The MCP server answered with HTTP " + status + ".";
+        }
+        if (body == null) {
+            return "The stream ended without an answer to the tool call.";
         }
         try {
-            JsonNode message = json.readTree(response.body());
+            JsonNode message = json.readTree(body);
             if (message != null && message.has("error")) {
                 return truncate("JSON-RPC error " + message.path("error").path("code").asInt() + ": "
                         + message.path("error").path("message").asString(""), 500);
