@@ -63,6 +63,14 @@ curl -X GET http://localhost:8090/actuator/health
 | `demo-mcp`          | http://localhost:8091/mcp | Demo MCP server, reached through `/mcp/demo`     |
 | `ledger-postgresql` | localhost:5433            | PostgreSQL, user, password and database `ledger` |
 
+<p style="text-align: justify;">
+
+The MCP addresses have no web page. `/mcp/demo` on the ledger and `/mcp` on `demo-mcp` accept only MCP JSON-RPC
+`POST` requests, and the gateway also needs an agent API key, so opening them in a browser shows nothing. Run the
+demo script below to see calls go through the gateway.
+
+</p>
+
 ### Demo
 
 ```shell
