@@ -237,7 +237,7 @@ Maven module with the package `com.nexusphere.<module>`. A module is reached by 
 | `core/agreement`      | Versioned agreements between accountable parties, with acting principal and delegation                   |
 | `core/transaction`    | Transactions under agreements: request, authorize or reject, execute, complete, fail, cancel             |
 | `core/audit`          | Append-only audit events, search and the accountability trail of a transaction                           |
-| `core/integration`    | Adapters: a JSON-RPC 2.0 agent gateway and a task gateway for machines executing authorized transactions |
+| `core/integration`    | Adapters: a JSON-RPC 2.0 agent gateway, a task gateway for machines, and the link to the ledger          |
 | `core/bootstrap`      | Application, persistence wiring, error handling, architecture tests                                      |
 | `core/core-e2e-tests` | End-to-end tests against the application and PostgreSQL                                                  |
 
@@ -272,12 +272,19 @@ APP_CREDENTIAL_TTL: 90d
 APP_CREDENTIAL_MAX_TTL: 365d
 APP_HTTP_THREADS: 20
 APP_DATABASE_POOL_SIZE: 21
+APP_LEDGER_URL: http://localhost:8090
+APP_LEDGER_API_KEY: nexusphere-ledger-development-key-change-me
+APP_LEDGER_FORWARD_INTERVAL: 5s
+APP_LEDGER_BATCH_SIZE: 100
 ```
 
 `APP_TOKEN_SECRET` and `APP_OPERATOR_SECRET` have no default outside the `dev` profile, and the application refuses to
 start with the published development secrets unless `dev` is active. A request can hold two database connections, one
 for its work and one for its authorization decision, so the application refuses to start unless
 `APP_DATABASE_POOL_SIZE` is greater than `APP_HTTP_THREADS`.
+
+The `APP_LEDGER_*` variables connect the core to a [Nexusphere Ledger](ledger/README.md); without `APP_LEDGER_URL` the
+core runs on its own.
 
 ### API
 
@@ -339,6 +346,7 @@ for its work and one for its authorization decision, so the application refuses 
 | GET    | `/api/v1/networks/{networkId}/delegations`                               | List delegations, by `delegatePrincipalId`, `delegatorPrincipalId`, `effective` (bearer token)                                                                                    |
 | GET    | `/api/v1/networks/{networkId}/delegations/{delegationId}`                | Get a delegation with its derived status (bearer token)                                                                                                                           |
 | POST   | `/api/v1/networks/{networkId}/delegations/{delegationId}/{action}`       | `revoke`, `suspend` or `resume` (delegator or administrator)                                                                                                                      |
+| POST   | `/api/v1/networks/{networkId}/delegations/{delegationId}/mandates`       | Issue a ledger mandate for the delegation, by `audience` and `expiresAt` (delegator or delegate; needs the ledger)                                                                |
 | GET    | `/api/v1/networks/{networkId}/discovery/capabilities`                    | Search by `typeCode`, `ownerType`, `organizationId`, `originNetworkId`, `scope` (bearer token)                                                                                    |
 | GET    | `/api/v1/networks/{networkId}/discovery/capabilities/{capabilityId}`     | Get a discoverable capability, local or federated (bearer token)                                                                                                                  |
 | GET    | `/api/v1/networks/{networkId}/discovery/networks`                        | Other active networks with their federation state (bearer token)                                                                                                                  |
@@ -432,6 +440,15 @@ Every response carries an `X-Correlation-Id` header. Errors use one model:
 of AI agents, with a hash chain, append-only storage and Ed25519-signed checkpoints that anyone can verify offline, and
 signed mandates an agent carries to other organizations. It is a standalone service and does not depend on the core.
 Its configuration and API are in [Nexusphere Ledger](ledger/README.md).
+
+</p>
+
+<p style="text-align: justify;">
+
+The core can feed a ledger. With `APP_LEDGER_URL` set, every authorization decision, delegation change and other
+domain event with an actor is written to an outbox in the same database transaction and forwarded to the ledger as
+evidence. A delegation becomes a ledger grant from the delegator to the delegate, suspend and revoke revoke it, and
+resume grants it again, so the delegate can ask the core for a signed mandate to carry to other organizations.
 
 </p>
 

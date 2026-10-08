@@ -17,6 +17,7 @@
 * [MCP Gateway](#mcp-gateway)
 * [Mandates](#mandates)
 * [A2A Gateway](#a2a-gateway)
+* [Nexusphere Core](#nexusphere-core)
 * [API](#api)
 * [End-to-End Tests](ledger-e2e-tests/README.md)
 
@@ -596,6 +597,19 @@ agent sees only the events of the task.
 ```shell
 curl -X POST http://localhost:8090/a2a/out/supplier -H "Authorization: Bearer {agentApiKey}" -H "X-Ledger-Principal: alice" -H "Content-Type: application/json" -d '{"jsonrpc":"2.0","id":"1","method":"message/send","params":{"message":{"role":"user","messageId":"1","parts":[{"kind":"text","text":"Order 40 pallets"}]}}}'
 ```
+
+## Nexusphere Core
+
+<p style="text-align: justify;">
+
+The Nexusphere core can feed this ledger. With `APP_LEDGER_URL` and `APP_LEDGER_API_KEY` (the operator key) set on
+the core, its authorization decisions, delegation changes and other domain events arrive as evidence through an
+outbox, each delegation becomes a grant from the delegator to the delegate, and suspending or revoking the delegation
+revokes the grant. The delegate asks the core, not the ledger, for a mandate. Agent and principal ids are the core's
+principal ids. When this ledger runs with principal sign-in, grants created by the core wait for the principal's
+approval, and `LEDGER_OIDC_PRINCIPAL_CLAIM` must name a claim that holds the core principal id. Details are in [Nexusphere Core Integration](../core/integration/README.md).
+
+</p>
 
 ## API
 
