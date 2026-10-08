@@ -25,7 +25,9 @@ First release of the Nexusphere Ledger, a self-hosted evidence ledger for AI age
   grants from the operator or an agent wait for that consent, and every consent is evidence tied to the sign-in
 * Web UI (React and TypeScript) for operators and principals: evidence, agents, grants, mandates, packages, A2A
   exchanges, ledger verification, and principal sign-in with PKCE to approve, deny and revoke grants
-* Dockerfiles, compose file with Adminer, Keycloak and the web UI, demo MCP server and demo script
+* Evidence batches: up to 500 entries recorded in order in one call, all or none
+* Dockerfiles, compose file with Adminer, Keycloak and the web UI, Kubernetes manifest, demo MCP server and demo
+  script
 
 ##
 

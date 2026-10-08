@@ -22,7 +22,8 @@ record.
 
 ## Responsibilities
 
-* Evidence API on an append-only SHA-256 hash chain in PostgreSQL, with signed checkpoints and full verification
+* Evidence API on an append-only SHA-256 hash chain in PostgreSQL, single or in batches, with signed checkpoints
+  and full verification
 * Agents with their own API keys, grants from principals to agents, and ALLOW or DENY decisions with outcomes
 * MCP gateway that decides and records every tool call
 * Evidence packages with selective disclosure for auditors

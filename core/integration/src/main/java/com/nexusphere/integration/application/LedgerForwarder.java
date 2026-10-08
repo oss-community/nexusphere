@@ -1,6 +1,7 @@
 package com.nexusphere.integration.application;
 
 import com.nexusphere.integration.domain.model.LedgerGrant;
+import com.nexusphere.integration.domain.model.OutboxKind;
 import com.nexusphere.integration.domain.model.OutboxMessage;
 import com.nexusphere.integration.domain.repository.LedgerOutbox;
 import com.nexusphere.shared.time.TimeProvider;
@@ -15,6 +16,7 @@ import tools.jackson.databind.json.JsonMapper;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
@@ -59,36 +61,95 @@ public class LedgerForwarder {
         if (!properties.enabled()) {
             return 0;
         }
-        Integer sent = transactions.execute(status -> outbox.lock() ? deliverBatch() : 0);
-        return sent == null ? 0 : sent;
-    }
-
-    private int deliverBatch() {
-        int sent = 0;
-        for (OutboxMessage message : outbox.pending(properties.batch())) {
-            try {
-                deliver(message);
-                outbox.markSent(message.id(), time.now());
-                sent++;
-            } catch (LedgerGateway.Unavailable e) {
-                if (retriable(e.status())) {
-                    log.warn("The ledger did not accept outbox message {}: {}", message.id(), e.getMessage());
-                    outbox.markFailed(message.id(), e.getMessage());
-                    break;
-                }
-                log.error("The ledger rejected outbox message {}: {}", message.id(), e.getMessage());
-                outbox.markRejected(message.id(), e.getMessage(), time.now());
-            } catch (RuntimeException e) {
-                log.error("Outbox message {} could not be delivered", message.id(), e);
-                outbox.markFailed(message.id(), String.valueOf(e.getMessage()));
-                break;
+        int total = 0;
+        while (true) {
+            Run run = transactions.execute(status -> outbox.lock() ? deliverBatch() : new Run(0, true));
+            if (run == null) {
+                return total;
+            }
+            total += run.sent();
+            if (run.done()) {
+                return total;
             }
         }
-        return sent;
+    }
+
+    private record Run(int sent, boolean done) {
+    }
+
+    private Run deliverBatch() {
+        List<OutboxMessage> messages = outbox.pending(properties.batch());
+        int sent = 0;
+        int i = 0;
+        while (i < messages.size()) {
+            int end = i;
+            while (end < messages.size() && messages.get(end).kind() == OutboxKind.EVIDENCE) {
+                end++;
+            }
+            boolean ok = end > i ? deliverEvidence(messages.subList(i, end)) : deliverOne(messages.get(i));
+            if (!ok) {
+                return new Run(sent, true);
+            }
+            sent += Math.max(end - i, 1);
+            i = Math.max(end, i + 1);
+        }
+        return new Run(sent, messages.size() < properties.batch());
+    }
+
+    private boolean deliverEvidence(List<OutboxMessage> messages) {
+        if (messages.size() > 1) {
+            try {
+                ledger.recordEvidence(messages.stream().map(this::payload).toList());
+                Instant now = time.now();
+                messages.forEach(message -> outbox.markSent(message.id(), now));
+                return true;
+            } catch (LedgerGateway.Unavailable e) {
+                if (retriable(e.status())) {
+                    log.warn("The ledger did not accept outbox message {}: {}", messages.getFirst().id(),
+                            e.getMessage());
+                    outbox.markFailed(messages.getFirst().id(), e.getMessage());
+                    return false;
+                }
+            } catch (RuntimeException e) {
+                log.error("Outbox message {} could not be delivered", messages.getFirst().id(), e);
+                outbox.markFailed(messages.getFirst().id(), String.valueOf(e.getMessage()));
+                return false;
+            }
+        }
+        for (OutboxMessage message : messages) {
+            if (!deliverOne(message)) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private boolean deliverOne(OutboxMessage message) {
+        try {
+            deliver(message);
+            outbox.markSent(message.id(), time.now());
+        } catch (LedgerGateway.Unavailable e) {
+            if (retriable(e.status())) {
+                log.warn("The ledger did not accept outbox message {}: {}", message.id(), e.getMessage());
+                outbox.markFailed(message.id(), e.getMessage());
+                return false;
+            }
+            log.error("The ledger rejected outbox message {}: {}", message.id(), e.getMessage());
+            outbox.markRejected(message.id(), e.getMessage(), time.now());
+        } catch (RuntimeException e) {
+            log.error("Outbox message {} could not be delivered", message.id(), e);
+            outbox.markFailed(message.id(), String.valueOf(e.getMessage()));
+            return false;
+        }
+        return true;
+    }
+
+    private Map<String, Object> payload(OutboxMessage message) {
+        return json.readValue(message.payload(), MAP);
     }
 
     private void deliver(OutboxMessage message) {
-        Map<String, Object> payload = json.readValue(message.payload(), MAP);
+        Map<String, Object> payload = payload(message);
         switch (message.kind()) {
             case EVIDENCE -> ledger.recordEvidence(payload);
             case GRANT -> grant(payload);

@@ -13,6 +13,7 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.time.Duration;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 
 @Component
@@ -35,6 +36,11 @@ class HttpLedgerGateway implements LedgerGateway {
     @Override
     public void recordEvidence(Map<String, Object> evidence) {
         post("/api/v1/evidence", evidence);
+    }
+
+    @Override
+    public void recordEvidence(List<Map<String, Object>> evidence) {
+        post("/api/v1/evidence/batch", Map.of("items", evidence));
     }
 
     @Override

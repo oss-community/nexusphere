@@ -13,6 +13,6 @@ public record LedgerProperties(URI url, String apiKey, Duration forwardInterval,
     }
 
     public int batch() {
-        return batchSize == null || batchSize < 1 ? 100 : batchSize;
+        return batchSize == null || batchSize < 1 ? 100 : Math.min(batchSize, 500);
     }
 }

@@ -53,8 +53,9 @@ The link is off until `nexusphere.ledger.url` (`APP_LEDGER_URL`) is set. The cor
 operator key in `nexusphere.ledger.api-key` (`APP_LEDGER_API_KEY`). A listener writes each domain event to
 `integration.ledger_outbox` inside the transaction that produced it, so an event is forwarded only if its change was
 committed. A scheduled forwarder, one at a time across instances through a PostgreSQL advisory lock, sends the outbox
-in order every `forward-interval` (`APP_LEDGER_FORWARD_INTERVAL`, default 5s), up to `batch-size`
-(`APP_LEDGER_BATCH_SIZE`, default 100) messages a run.
+in order every `forward-interval` (`APP_LEDGER_FORWARD_INTERVAL`, default 5s) until it is empty, reading
+`batch-size` (`APP_LEDGER_BATCH_SIZE`, default 100, at most 500) messages at a time. Consecutive evidence goes to the
+ledger's `POST /api/v1/evidence/batch` in one call.
 
 </p>
 
@@ -78,7 +79,8 @@ delegate is registered as a ledger agent first when it is not one yet.
 
 When the ledger cannot be reached or answers 401, 403, 408, 425, 429 or 5xx, forwarding stops and retries the same
 message on the next run, so nothing is skipped. Any other 4xx means the ledger refused the message for good: it is
-marked rejected with its error and the rest goes on. Delivery is at least once, so a crash between the ledger's answer
+marked rejected with its error and the rest goes on; a refused batch is retried one entry at a time, so only the
+refused entries are rejected. Delivery is at least once, so a crash between the ledger's answer
 and the commit can send an entry twice.
 
 </p>

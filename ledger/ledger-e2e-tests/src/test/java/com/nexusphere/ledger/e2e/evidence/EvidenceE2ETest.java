@@ -5,6 +5,7 @@ import com.nexusphere.ledger.e2e.support.LedgerE2ETestBase;
 import org.junit.jupiter.api.Test;
 import tools.jackson.databind.JsonNode;
 
+import java.util.List;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -113,5 +114,63 @@ class EvidenceE2ETest extends LedgerE2ETestBase {
         assertThat(badEnum.json().path("code").asString()).isEqualTo("MALFORMED_REQUEST");
         assertThat(unknown.status()).isEqualTo(404);
         assertThat(badLimit.status()).isEqualTo(400);
+    }
+
+    @Test
+    void aBatchIsRecordedInOrderAsOneLinkedRun() {
+        LedgerClient ledger = ledger();
+        String agent = unique("agent");
+
+        LedgerClient.Response response = ledger.post("/api/v1/evidence/batch", LedgerClient.json(Map.of("items",
+                List.of(toolCall(agent, "erin", "one"), toolCall(agent, "erin", "two"),
+                        toolCall(agent, "erin", "three")))));
+        JsonNode items = response.json().path("items");
+
+        assertThat(response.status()).isEqualTo(201);
+        assertThat(items.size()).isEqualTo(3);
+        assertThat(items.get(0).path("target").asString()).isEqualTo("one");
+        assertThat(items.get(2).path("target").asString()).isEqualTo("three");
+        for (int i = 1; i < 3; i++) {
+            assertThat(items.get(i).path("sequence").asLong()).isEqualTo(items.get(i - 1).path("sequence").asLong() + 1);
+            assertThat(items.get(i).path("previousHash").asString()).isEqualTo(items.get(i - 1).path("hash").asString());
+            assertThat(LedgerClient.toEntry(items.get(i)).computeHash()).isEqualTo(items.get(i).path("hash").asString());
+        }
+        assertThat(ledger.get("/api/v1/verification").json().path("valid").asBoolean()).isTrue();
+    }
+
+    @Test
+    void aBatchWithOneInvalidItemRecordsNothing() {
+        LedgerClient ledger = ledger();
+        String agent = unique("agent");
+        Map<String, Object> invalid = toolCall(agent, "frank", "two");
+        invalid.remove("action");
+
+        LedgerClient.Response response = ledger.post("/api/v1/evidence/batch", LedgerClient.json(Map.of("items",
+                List.of(toolCall(agent, "frank", "one"), invalid))));
+        LedgerClient.Response empty = ledger.post("/api/v1/evidence/batch", LedgerClient.json(Map.of("items",
+                List.of())));
+
+        assertThat(response.status()).isEqualTo(400);
+        assertThat(response.json().path("details").path("index").asInt()).isEqualTo(1);
+        assertThat(response.json().path("details").path("item").path("fields").has("action")).isTrue();
+        assertThat(ledger.get("/api/v1/evidence?agentId=" + agent).json().path("items").size()).isZero();
+        assertThat(empty.status()).isEqualTo(400);
+    }
+
+    @Test
+    void anAgentMayOnlyBatchItsOwnEvidence() {
+        LedgerClient ledger = ledger();
+        String agent = unique("agent");
+        String apiKey = ledger.post("/api/v1/agents", LedgerClient.json(Map.of("agentId", agent, "name", "Agent",
+                "ownerId", "acme"))).json().path("apiKey").asString();
+        LedgerClient asAgent = ledger.withApiKey(apiKey);
+
+        LedgerClient.Response own = asAgent.post("/api/v1/evidence/batch", LedgerClient.json(Map.of("items",
+                List.of(toolCall(agent, "gina", "one")))));
+        LedgerClient.Response other = asAgent.post("/api/v1/evidence/batch", LedgerClient.json(Map.of("items",
+                List.of(toolCall(agent, "gina", "one"), toolCall(unique("agent"), "gina", "two")))));
+
+        assertThat(own.status()).isEqualTo(201);
+        assertThat(other.status()).isEqualTo(403);
     }
 }

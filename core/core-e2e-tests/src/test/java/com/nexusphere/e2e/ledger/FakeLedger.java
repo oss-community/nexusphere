@@ -9,6 +9,7 @@ import java.io.IOException;
 import java.io.OutputStream;
 import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.CopyOnWriteArrayList;
@@ -48,6 +49,18 @@ final class FakeLedger {
         return calls.stream().filter(call -> call.path().equals(path)).toList();
     }
 
+    List<JsonNode> evidence() {
+        List<JsonNode> items = new ArrayList<>();
+        for (Call call : calls) {
+            if (call.path().equals("/api/v1/evidence")) {
+                items.add(call.body());
+            } else if (call.path().equals("/api/v1/evidence/batch")) {
+                call.body().path("items").forEach(items::add);
+            }
+        }
+        return items;
+    }
+
     List<Call> callsEndingWith(String suffix) {
         return calls.stream().filter(call -> call.path().endsWith(suffix)).toList();
     }
@@ -60,7 +73,7 @@ final class FakeLedger {
             respond(exchange, 401, "{\"code\":\"UNAUTHENTICATED\"}");
             return;
         }
-        if (path.equals("/api/v1/evidence") && evidenceStatus != 201) {
+        if (path.startsWith("/api/v1/evidence") && evidenceStatus != 201) {
             respond(exchange, evidenceStatus, "{\"code\":\"REFUSED\"}");
             return;
         }

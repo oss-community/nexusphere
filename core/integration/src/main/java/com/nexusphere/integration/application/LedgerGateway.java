@@ -1,10 +1,13 @@
 package com.nexusphere.integration.application;
 
+import java.util.List;
 import java.util.Map;
 
 public interface LedgerGateway {
 
     void recordEvidence(Map<String, Object> evidence);
+
+    void recordEvidence(List<Map<String, Object>> evidence);
 
     void ensureAgent(String agentId, String name, String ownerId);
 
