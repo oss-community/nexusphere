@@ -6,6 +6,7 @@ import com.nexusphere.ledger.evidence.domain.model.EvidenceSubmission;
 import com.nexusphere.ledger.evidence.domain.model.LedgerHead;
 import com.nexusphere.ledger.evidence.domain.repository.EvidenceRepository;
 import com.nexusphere.ledger.server.web.LedgerException;
+import com.nexusphere.ledger.transparency.application.TransparencyLog;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -25,11 +26,13 @@ public class EvidenceService {
 
     private final EvidenceRepository evidence;
     private final EvidenceMetrics metrics;
+    private final TransparencyLog log;
     private final Clock clock;
 
-    EvidenceService(EvidenceRepository evidence, EvidenceMetrics metrics, Clock clock) {
+    EvidenceService(EvidenceRepository evidence, EvidenceMetrics metrics, TransparencyLog log, Clock clock) {
         this.evidence = evidence;
         this.metrics = metrics;
+        this.log = log;
         this.clock = clock;
     }
 
@@ -67,6 +70,7 @@ public class EvidenceService {
         for (EvidenceSubmission submission : submissions) {
             EvidenceEntry entry = entry(submission, ++sequence, previousHash, now);
             evidence.append(entry);
+            log.append(entry);
             metrics.recorded(entry);
             entries.add(entry);
             previousHash = entry.hash();

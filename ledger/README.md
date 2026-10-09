@@ -10,6 +10,7 @@
 * [Environment Variables](#environment-variables)
 * [Evidence Format](#evidence-format)
 * [Verification](#verification)
+* [Transparency Log and Witnesses](#transparency-log-and-witnesses)
 * [Evidence Packages](#evidence-packages)
 * [Key Rotation](#key-rotation)
 * [Agents, Grants and Decisions](#agents-grants-and-decisions)
@@ -192,6 +193,11 @@ LEDGER_SIGNING_PUBLIC_KEY:
 LEDGER_SIGNING_PREVIOUS_PRIVATE_KEY:
 LEDGER_SIGNING_UNENDORSED_ROTATION: false
 LEDGER_CHECKPOINT_INTERVAL: 1m
+LEDGER_LOG_ORIGIN:
+LEDGER_LOG_WITNESS_TIMEOUT: 10s
+LEDGER_LOG_WITNESSES_{NAME}_URL:
+LEDGER_LOG_WITNESSES_{NAME}_KEY:
+LEDGER_LOG_WATCHED_{NAME}_KEY:
 LEDGER_MCP_TIMEOUT: 60s
 LEDGER_MCP_SERVERS_{NAME}_URL:
 LEDGER_MCP_SERVERS_{NAME}_AUTHORIZATION:
@@ -282,6 +288,55 @@ the key it names from `GET /api/v1/keys`.
 
 </p>
 
+## Transparency Log and Witnesses
+
+<p style="text-align: justify;">
+
+Besides the hash chain, every entry is a leaf of an RFC 9162 Merkle tree: the leaf is the 32-byte entry hash, so leaf
+`n - 1` is the entry with sequence `n`. Whenever the ledger signs a checkpoint it also signs a log checkpoint in the
+C2SP signed-note format (`origin`, tree size and base64 root hash, then an Ed25519 signature line). The origin is
+`LEDGER_LOG_ORIGIN`, or the mandate issuer without its scheme, for example `localhost:8090`. With the tree, anyone can
+prove that one entry is in the log with about `log2(n)` hashes, and that a later checkpoint extends an earlier one
+without rewriting it.
+
+</p>
+
+<p style="text-align: justify;">
+
+A ledger alone can still show different histories to different people. Witnesses close that gap: each witness keeps
+the last checkpoint it saw for a log and cosigns a new one only with a valid consistency proof from it. Witnesses follow
+the C2SP `tlog-witness` protocol and sign `tlog-cosignature/v1` lines, so any compatible witness works, and every ledger
+is one: set `LEDGER_LOG_WATCHED_{NAME}_KEY` to the verifier key of each log it should witness, with `{NAME}` equal to
+the log's origin. To ask witnesses for cosignatures, set `LEDGER_LOG_WITNESSES_{NAME}_URL` to the witness's base URL
+(the ledger appends `/add-checkpoint`) and `LEDGER_LOG_WITNESSES_{NAME}_KEY` to its verifier key. The ledger asks every
+witness after each checkpoint and keeps each cosignature it gets; a witness that is down is asked again next time.
+
+</p>
+
+```shell
+curl http://localhost:8090/public/v1/log/key
+curl http://localhost:8090/public/v1/witness/key
+curl http://localhost:8090/public/v1/log/checkpoint
+curl "http://localhost:8090/api/v1/log/proofs/inclusion?sequence=7" -H "Authorization: Bearer nexusphere-ledger-development-key-change-me"
+curl "http://localhost:8090/api/v1/log/proofs/consistency?firstSize=7&secondSize=42" -H "Authorization: Bearer nexusphere-ledger-development-key-change-me"
+```
+
+```text
+localhost:8090
+42
+0dpbGc4h7JcvSy6dXq0XpLM4pN0iA0p9cX0XQ4nHqEo=
+
+— localhost:8090 b4Ex7xF0kZ0G1Xo9ZfPu0eQyD3l8Q3mJ2tV9...
+— partner.example b8Gk2wAAAABnBl0w0Tq9m3Q1...
+```
+
+<p style="text-align: justify;">
+
+`GET /api/v1/verification` also rebuilds the tree from the chain and checks every log checkpoint against it, so a log
+checkpoint that does not match the evidence is reported like a broken link.
+
+</p>
+
 ## Evidence Packages
 
 <p style="text-align: justify;">
@@ -291,7 +346,9 @@ evidence by `agentId`, `principalId`, `fromSequence` and `toSequence`. The packa
 holds the public keys with their rotation records, an anchor checkpoint (the last checkpoint before the first selected
 entry, or genesis), an end checkpoint (the first checkpoint at or after the last selected entry, created at the head
 when none exists yet) and every link between them. Only selected links carry their full entry; all others carry only
-their link, so nothing outside the selection is disclosed. A package holds at most 200,000 links.
+their link, so nothing outside the selection is disclosed. A package holds at most 200,000 links. Its `log` field
+carries the log checkpoint at the end checkpoint's sequence with every cosignature the ledger holds, and an inclusion
+proof for each disclosed entry.
 
 </p>
 
@@ -301,7 +358,10 @@ The verifier needs no server and no database. It checks the signatures of both c
 the anchor to the end checkpoint, checks every disclosed entry against its content hash and the scope of the package,
 and exits with `0` for a valid package, `1` for an invalid one and `2` for a usage error. Pass the ledger's public key
 from `GET /api/v1/keys` (or a key published elsewhere) with `--public-key` so the verifier does not trust the key inside
-the package.
+the package. When the package has a `log`, the verifier also checks that the log checkpoint is signed by the ledger,
+covers the end checkpoint and proves every disclosed entry. Pass each witness's verifier key with `--witness` and the
+number of cosignatures needed with `--witnesses-required` (all given witnesses by default) to require that independent
+witnesses saw the same log.
 
 </p>
 
@@ -318,6 +378,8 @@ Nexusphere Ledger evidence package
   Anchor      : checkpoint 40
   Chain       : 2 links from sequence 41
   Disclosed   : 1 entries, agent invoice-agent
+  Log         : localhost:8090, 42 entries, 1 disclosed entries proven
+  Witnesses   : partner.example
 Result: VALID
 ```
 
@@ -669,6 +731,8 @@ API key, except `/api/v1/principal/**`, which requires a principal token from th
 | POST   | `/api/v1/checkpoints`                   | Sign the current head now; `409 LEDGER_EMPTY` when nothing is recorded (operator)                      |
 | GET    | `/api/v1/checkpoints/latest`            | Latest checkpoint                                                                                      |
 | GET    | `/api/v1/checkpoints`                   | List checkpoints by `after` and `limit`                                                                |
+| GET    | `/api/v1/log/proofs/inclusion`          | Inclusion proof for a `sequence` in the log at `treeSize`, by default the latest log checkpoint        |
+| GET    | `/api/v1/log/proofs/consistency`        | Consistency proof from `firstSize` to `secondSize`, by default the latest log checkpoint               |
 | GET    | `/api/v1/keys`                          | Signing keys with their status and rotation records                                                    |
 | POST   | `/api/v1/packages`                      | Export an evidence package by `agentId`, `principalId`, `fromSequence` and `toSequence` (operator)     |
 | POST   | `/api/v1/packages/verify`               | Verify a package with the verifier library, pinned to `publicKey` when given (operator)                |
@@ -699,6 +763,10 @@ API key, except `/api/v1/principal/**`, which requires a principal token from th
 | POST   | `/api/v1/mandates/{id}/revoke`          | Revoke a mandate with an optional `reason` (operator)                                                  |
 | GET    | `/public/v1/keys`                       | Active and retired signing keys as a JWK set, no API key                                               |
 | GET    | `/public/v1/mandates/status`            | Signed mandate status list, no API key                                                                 |
+| GET    | `/public/v1/log/checkpoint`             | Latest log checkpoint as a signed note with its cosignatures, no API key                               |
+| GET    | `/public/v1/log/key`                    | Verifier key of the log, no API key                                                                    |
+| GET    | `/public/v1/witness/key`                | Verifier key this ledger cosigns with as a witness, no API key                                         |
+| POST   | `/public/v1/witness/add-checkpoint`     | C2SP witness endpoint: cosign a watched log's checkpoint, `404` when it watches none, no API key       |
 | GET    | `/public/v1/oidc`                       | The OIDC issuer and client for principal sign-in, `404` without OIDC                                   |
 | POST   | `/mcp/{server}`                         | MCP gateway: decide, forward and record a `tools/call`; forward other messages                         |
 | GET    | `/mcp/{server}`                         | Relay the MCP server-to-client stream                                                                  |

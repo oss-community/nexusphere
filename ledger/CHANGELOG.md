@@ -30,6 +30,10 @@ First release of the Nexusphere Ledger, a self-hosted evidence ledger for AI age
   backup and restore procedure
 * Rate limit per caller with 429 and `Retry-After`, and alert delivery by email, Slack, Telegram or webhook, each
   turned on by setting its address
+* Transparency log: every entry is a leaf of an RFC 9162 Merkle tree, log checkpoints are C2SP signed notes, and
+  inclusion and consistency proofs are served by the API and carried in evidence packages
+* Witness cosigning with the C2SP `tlog-witness` protocol: the ledger asks configured witnesses to cosign each log
+  checkpoint, any ledger can witness other logs, and the verifier can require cosignatures from given witnesses
 * Dockerfiles, compose file with Adminer, Keycloak, Prometheus, Alertmanager and the web UI, Kubernetes manifest, demo MCP server
   and demo script
 

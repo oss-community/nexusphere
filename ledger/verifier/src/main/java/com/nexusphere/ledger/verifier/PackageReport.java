@@ -14,5 +14,9 @@ public record PackageReport(
         long disclosedEntries,
         String agentId,
         String principalId,
+        String logOrigin,
+        Long logTreeSize,
+        long provenEntries,
+        List<String> witnesses,
         List<String> problems) {
 }

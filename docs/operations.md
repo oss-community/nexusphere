@@ -122,6 +122,7 @@ The details of the rotation record are in [Key Rotation](../ledger/README.md#key
 | Ledger signing private key                                          | Secret manager                                        | The secret manager's own backup, plus one offline copy |
 | Core data and unsent evidence                                       | PostgreSQL, every core schema including `integration` | Database backup                                        |
 | Signed checkpoints                                                  | Outside the ledger, with auditors                     | Copy `/api/v1/checkpoints/latest` regularly            |
+| Log checkpoints                                                     | With independent witnesses                            | `LEDGER_LOG_WITNESSES_{NAME}_URL` and `_KEY`           |
 
 ### Logical Backup
 
@@ -163,6 +164,9 @@ A nightly dump loses what was recorded after it. For evidence, run PostgreSQL wi
 point-in-time recovery (for example pgBackRest, or a managed PostgreSQL with PITR) and keep the dump as a second line.
 A restore can never hide a loss: a signed checkpoint held outside the ledger with a higher sequence than the restored
 head shows that entries are missing, and any entry that differs fails verification against that checkpoint.
+Witnesses give the same guarantee without anyone copying checkpoints by hand: each keeps the last log checkpoint it
+cosigned and refuses a smaller or forked one, so a restored ledger that lost entries cannot get new cosignatures until
+it is back on the history the witnesses saw.
 
 </p>
 
@@ -314,7 +318,7 @@ to the internet, since it can also stop floods before they reach Java.
 * TLS at a reverse proxy or ingress in front of both applications; they speak plain HTTP
 * Management port reachable only inside the cluster
 * WAL archiving with point-in-time recovery, plus a regular logical dump, and a restore tested once
-* Signed checkpoints copied outside the ledger
+* Signed checkpoints copied outside the ledger, and at least one independent witness cosigning the log
 * Prometheus scraping both applications, and at least one alert channel on
 * Rate limits sized for the expected traffic, plus a limit at the reverse proxy for internet-facing deployments
 * `LEDGER_OIDC_*` set so principals approve grants with their own sign-in

@@ -28,6 +28,9 @@ ledger:
     unendorsed-rotation: ${LEDGER_SIGNING_UNENDORSED_ROTATION:false}
   checkpoint:
     interval: ${LEDGER_CHECKPOINT_INTERVAL:1m}
+  log:
+    origin: ${LEDGER_LOG_ORIGIN:}
+    witness-timeout: ${LEDGER_LOG_WITNESS_TIMEOUT:10s}
   mcp:
     timeout: ${LEDGER_MCP_TIMEOUT:60s}
   mandate:

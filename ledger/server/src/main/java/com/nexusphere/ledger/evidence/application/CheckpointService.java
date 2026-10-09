@@ -6,6 +6,7 @@ import com.nexusphere.ledger.evidence.domain.repository.CheckpointRepository;
 import com.nexusphere.ledger.evidence.domain.repository.EvidenceRepository;
 import com.nexusphere.ledger.server.signing.LedgerSigner;
 import com.nexusphere.ledger.server.web.LedgerException;
+import com.nexusphere.ledger.transparency.application.TransparencyLog;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -23,13 +24,15 @@ public class CheckpointService {
     private final EvidenceRepository evidence;
     private final CheckpointRepository checkpoints;
     private final LedgerSigner signer;
+    private final TransparencyLog log;
     private final Clock clock;
 
     CheckpointService(EvidenceRepository evidence, CheckpointRepository checkpoints, LedgerSigner signer,
-                      Clock clock) {
+                      TransparencyLog log, Clock clock) {
         this.evidence = evidence;
         this.checkpoints = checkpoints;
         this.signer = signer;
+        this.log = log;
         this.clock = clock;
     }
 
@@ -39,6 +42,7 @@ public class CheckpointService {
         if (head.sequence() == 0) {
             return Optional.empty();
         }
+        log.checkpoint(head.sequence(), clock.instant());
         Optional<SignedCheckpoint> existing = checkpoints.findBySequence(head.sequence());
         if (existing.isPresent()) {
             return existing;

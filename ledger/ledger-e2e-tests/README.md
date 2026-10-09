@@ -42,6 +42,8 @@ request proofs and receipts cross between two ledgers over HTTP.
 on a random port that signs RS256 tokens for any principal.
 `KeyRotationE2ETest` restarts a `StandaloneLedger` against one PostgreSQL container with a new signing key, so the
 rotation happens at startup as it does in production.
+`WitnessE2ETest` starts two `StandaloneLedger`s with their own PostgreSQL containers: one is the log and asks the
+other, which watches it, to cosign its log checkpoints over the C2SP witness protocol.
 
 </p>
 
@@ -117,6 +119,14 @@ rotation happens at startup as it does in production.
 | `KeyRotationE2ETest`      | An endorsed rotation keeps earlier checkpoints and mandates valid             |
 |                           | A new key without the previous key is refused unless the operator allows it   |
 |                           | A retired key cannot sign again                                               |
+| `TransparencyLogE2ETest`  | The log checkpoint is a signed note over the Merkle root                      |
+|                           | An entry is proven in the signed tree                                         |
+|                           | A later tree is proven to extend an earlier one                               |
+|                           | A package proves its entries in the log                                       |
+|                           | Verification checks the Merkle tree and log checkpoints                       |
+|                           | This ledger witnesses no log unless configured                                |
+| `WitnessE2ETest`          | A witness cosigns every checkpoint that extends what it saw                   |
+|                           | A witness refuses a forked or stale checkpoint                                |
 
 ##
 

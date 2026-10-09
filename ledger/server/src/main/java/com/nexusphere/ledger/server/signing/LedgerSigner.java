@@ -2,6 +2,8 @@ package com.nexusphere.ledger.server.signing;
 
 import com.nexusphere.ledger.chain.Checkpoint;
 import com.nexusphere.ledger.chain.KeyRotation;
+import com.nexusphere.ledger.chain.LogCheckpoint;
+import com.nexusphere.ledger.chain.NoteKey;
 import com.nexusphere.ledger.chain.SignedCheckpoint;
 import com.nexusphere.ledger.chain.SigningKeys;
 import com.nexusphere.ledger.mandate.Jws;
@@ -77,6 +79,15 @@ public class LedgerSigner {
     public SignedCheckpoint sign(long sequence, String headHash, Instant createdAt) {
         Checkpoint checkpoint = new Checkpoint(sequence, headHash, createdAt, publicKey.keyId());
         return new SignedCheckpoint(checkpoint, SigningKeys.sign(privateKey, checkpoint.signedBytes()));
+    }
+
+    public LogCheckpoint.Note sign(LogCheckpoint checkpoint) {
+        return checkpoint.sign(new NoteKey(checkpoint.origin(), NoteKey.ED25519, publicKey.publicKey()), privateKey);
+    }
+
+    public LogCheckpoint.Signature cosign(String name, String body, long time) {
+        return LogCheckpoint.cosign(body, new NoteKey(name, NoteKey.COSIGNATURE, publicKey.publicKey()), privateKey,
+                time);
     }
 
     public String signMandate(MandateClaims claims) {

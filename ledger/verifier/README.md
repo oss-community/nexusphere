@@ -20,6 +20,8 @@ database, so an auditor, a court or a counterparty can verify what a ledger hand
 ## Responsibilities
 
 * Verify an evidence package: checkpoint signatures, every hash link, and that each disclosed entry belongs to the chain
+* Check the package's log checkpoint and the inclusion proof of every disclosed entry, and require witness
+  cosignatures with `--witness` and `--witnesses-required`
 * Verify a mandate with the `mandate` command: issuer, key, signature, time, audience, coverage and revocation
 * Pin the ledger's public key with `--public-key`, print JSON with `--json`, and exit with 0 (valid), 1 (invalid) or 2
   (usage error)
