@@ -46,8 +46,8 @@ class SecurityConfiguration {
                         .requestMatchers(HttpMethod.POST, "/api/v1/auth/token", "/api/v1/auth/operator-token")
                         .permitAll()
                         .requestMatchers("/api/v1/platform", "/actuator/health", "/actuator/health/**",
-                                "/actuator/info", "/v3/api-docs", "/v3/api-docs/**", "/swagger-ui.html",
-                                "/swagger-ui/**", "/error").permitAll()
+                                "/actuator/info", "/actuator/prometheus", "/v3/api-docs", "/v3/api-docs/**",
+                                "/swagger-ui.html", "/swagger-ui/**", "/error").permitAll()
                         .anyRequest().authenticated())
                 .oauth2ResourceServer(resourceServer -> resourceServer
                         .jwt(jwt -> jwt.decoder(decoder))

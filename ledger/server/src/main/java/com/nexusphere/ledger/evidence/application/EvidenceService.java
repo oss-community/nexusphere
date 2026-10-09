@@ -24,10 +24,12 @@ public class EvidenceService {
     public static final int MAX_BATCH_SIZE = 500;
 
     private final EvidenceRepository evidence;
+    private final EvidenceMetrics metrics;
     private final Clock clock;
 
-    EvidenceService(EvidenceRepository evidence, Clock clock) {
+    EvidenceService(EvidenceRepository evidence, EvidenceMetrics metrics, Clock clock) {
         this.evidence = evidence;
+        this.metrics = metrics;
         this.clock = clock;
     }
 
@@ -65,6 +67,7 @@ public class EvidenceService {
         for (EvidenceSubmission submission : submissions) {
             EvidenceEntry entry = entry(submission, ++sequence, previousHash, now);
             evidence.append(entry);
+            metrics.recorded(entry);
             entries.add(entry);
             previousHash = entry.hash();
         }

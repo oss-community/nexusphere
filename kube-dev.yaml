@@ -148,6 +148,10 @@ spec:
     metadata:
       labels:
         app: application
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/path: /actuator/prometheus
+        prometheus.io/port: "8080"
     spec:
       containers:
         - name: application

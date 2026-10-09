@@ -1,6 +1,8 @@
 spring:
   application:
     name: nexusphere-ledger
+  config:
+    import: optional:configtree:${LEDGER_SECRETS_DIR:/run/secrets/}
   profiles:
     active: ${LEDGER_PROFILES:postgresql}
   mvc:
@@ -40,10 +42,15 @@ ledger:
     principal-claim: ${LEDGER_OIDC_PRINCIPAL_CLAIM:sub}
     client-id: ${LEDGER_OIDC_CLIENT_ID:}
 management:
+  server:
+    port: ${LEDGER_MANAGEMENT_PORT:}
   endpoints:
     web:
       exposure:
-        include: health, info
+        include: health, info, prometheus
+  metrics:
+    tags:
+      application: nexusphere-ledger
   endpoint:
     health:
       probes:

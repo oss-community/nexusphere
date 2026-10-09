@@ -36,15 +36,17 @@ public class LedgerForwarder {
     private final TransactionTemplate transactions;
     private final JsonMapper json;
     private final TimeProvider time;
+    private final LedgerMetrics metrics;
 
     LedgerForwarder(LedgerProperties properties, LedgerOutbox outbox, LedgerGateway ledger,
-                    TransactionTemplate transactions, JsonMapper json, TimeProvider time) {
+                    TransactionTemplate transactions, JsonMapper json, TimeProvider time, LedgerMetrics metrics) {
         this.properties = properties;
         this.outbox = outbox;
         this.ledger = ledger;
         this.transactions = transactions;
         this.json = json;
         this.time = time;
+        this.metrics = metrics;
     }
 
     @Scheduled(initialDelayString = "${nexusphere.ledger.forward-interval:5s}",
@@ -102,17 +104,20 @@ public class LedgerForwarder {
                 ledger.recordEvidence(messages.stream().map(this::payload).toList());
                 Instant now = time.now();
                 messages.forEach(message -> outbox.markSent(message.id(), now));
+                metrics.delivered("sent", messages.size());
                 return true;
             } catch (LedgerGateway.Unavailable e) {
                 if (retriable(e.status())) {
                     log.warn("The ledger did not accept outbox message {}: {}", messages.getFirst().id(),
                             e.getMessage());
                     outbox.markFailed(messages.getFirst().id(), e.getMessage());
+                    metrics.delivered("failed", 1);
                     return false;
                 }
             } catch (RuntimeException e) {
                 log.error("Outbox message {} could not be delivered", messages.getFirst().id(), e);
                 outbox.markFailed(messages.getFirst().id(), String.valueOf(e.getMessage()));
+                metrics.delivered("failed", 1);
                 return false;
             }
         }
@@ -128,17 +133,21 @@ public class LedgerForwarder {
         try {
             deliver(message);
             outbox.markSent(message.id(), time.now());
+            metrics.delivered("sent", 1);
         } catch (LedgerGateway.Unavailable e) {
             if (retriable(e.status())) {
                 log.warn("The ledger did not accept outbox message {}: {}", message.id(), e.getMessage());
                 outbox.markFailed(message.id(), e.getMessage());
+                metrics.delivered("failed", 1);
                 return false;
             }
             log.error("The ledger rejected outbox message {}: {}", message.id(), e.getMessage());
             outbox.markRejected(message.id(), e.getMessage(), time.now());
+            metrics.delivered("rejected", 1);
         } catch (RuntimeException e) {
             log.error("Outbox message {} could not be delivered", message.id(), e);
             outbox.markFailed(message.id(), String.valueOf(e.getMessage()));
+            metrics.delivered("failed", 1);
             return false;
         }
         return true;

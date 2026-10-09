@@ -1,0 +1,53 @@
+groups:
+  - name: nexusphere-ledger
+    rules:
+      - alert: LedgerDown
+        expr: up{job="nexusphere-ledger"} == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: The ledger does not answer its metrics endpoint
+      - alert: LedgerCheckpointStale
+        expr: ledger_checkpoint_lag > 0 and ledger_checkpoint_age_seconds > 600
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: New evidence has waited more than 10 minutes for a signed checkpoint
+      - alert: LedgerHighErrorRate
+        expr: sum(rate(http_server_requests_seconds_count{job="nexusphere-ledger",status=~"5.."}[5m])) > 0.1
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: The ledger answers more than one 5xx every ten seconds
+  - name: nexusphere-core
+    rules:
+      - alert: CoreDown
+        expr: up{job="nexusphere-core"} == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: The core does not answer its metrics endpoint
+      - alert: LedgerOutboxBacklog
+        expr: nexusphere_ledger_outbox_pending > 1000
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: More than 1000 core events have waited 10 minutes for the ledger
+      - alert: LedgerOutboxFailing
+        expr: increase(nexusphere_ledger_outbox_delivered_total{result="failed"}[10m]) > 0 and nexusphere_ledger_outbox_pending > 0
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: The core cannot deliver evidence to the ledger
+      - alert: LedgerOutboxRejected
+        expr: increase(nexusphere_ledger_outbox_delivered_total{result="rejected"}[1h]) > 0
+        labels:
+          severity: warning
+        annotations:
+          summary: The ledger refused core evidence; check integration.ledger_outbox.last_error
