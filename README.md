@@ -35,7 +35,8 @@ rest are references to open when they are needed. All of them are also in one bo
 | 8    | [DevOps Step by Step](docs/devops-guide.md)                  | The build pipelines with mvn-devops                                 |
 | 9    | [Ledger End-to-End Tests](ledger/ledger-e2e-tests/README.md) | What the end-to-end tests cover                                     |
 | 10   | [Conformance Vectors](ledger/conformance/README.md)          | Test data for another implementation of the formats                 |
-| 11   | [Changelog](ledger/CHANGELOG.md)                             | What each release contains                                          |
+| 11   | [Python SDK](ledger/sdk/python/README.md)                    | Record evidence from Python and verify packages and mandates        |
+| 12   | [Changelog](ledger/CHANGELOG.md)                             | What each release contains                                          |
 
 ## Nexusphere Ledger
 
@@ -212,7 +213,7 @@ name.
 
 | Folder       | Content                                                                                      |
 |--------------|----------------------------------------------------------------------------------------------|
-| `ledger`     | The ledger: chain, mandate, server, verifier, demo MCP server, end-to-end tests, conformance |
+| `ledger`     | The ledger: chain, mandate, server, verifier, demo MCP server, tests, conformance, SDKs      |
 | `frontend`   | The web UI in React and TypeScript                                                           |
 | `docs`       | The documents above and the PDF guide                                                        |
 | `mvn-devops` | The build and delivery toolkit                                                               |

@@ -27,6 +27,9 @@ agent platforms and gateways.
 * Web UI (React and TypeScript) for operators and principals: evidence, agents, grants, mandates, packages, A2A
   exchanges, ledger verification, and principal sign-in with PKCE to approve, deny and revoke grants
 * Evidence batches: up to 500 entries recorded in order in one call, all or none
+* Python SDK (`nexusphere-ledger`): a client for evidence, decisions, grants, mandates and packages, and an offline
+  verifier for packages, statements, receipts and mandates that passes every conformance vector, with the
+  `nexusphere-ledger-verify` command
 * Secrets and signing keys from files written by a secret manager, Prometheus metrics with alert rules, and a tested
   backup and restore procedure
 * Rate limit per caller with 429 and `Retry-After`, and alert delivery by email, Slack, Telegram or webhook, each

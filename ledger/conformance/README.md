@@ -56,7 +56,8 @@ claims must verify.
 The vectors were also checked with other implementations: the Merkle roots, canonical JSON, content hashes and
 checkpoint signature with Python's `hashlib` and `cryptography`; the signed note with Go's
 `golang.org/x/mod/sumdb/note`; the cosignature, COSE signatures and SD-JWT digests with Python's `cryptography` and
-`cbor2`.
+`cbor2`. The [Python SDK](../sdk/python/README.md) rebuilds every vector except the mandate in its own test suite
+and checks the mandate.
 
 </p>
 
