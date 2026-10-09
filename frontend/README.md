@@ -41,16 +41,32 @@ same origin, so it needs no CORS on the ledger.
 
 ### Development
 
+Step 1. Start the ledger, for example with the [Quick Start](../README.md#quick-start), and stop its `ledger-ui`
+container so port 5173 is free:
+
+```shell
+docker stop ledger-ui
+```
+
+Step 2. Install the dependencies:
+
 ```shell
 cd frontend
 npm install
+```
+
+Step 3. Start the development server:
+
+```shell
 npm run dev
 ```
 
+Step 4. Open http://localhost:5173 and sign in with the operator key `nexusphere-ledger-development-key-change-me`.
+
 <p style="text-align: justify;">
 
-The development server runs on http://localhost:5173 and forwards `/api` and `/public` to the ledger at
-http://localhost:8090, or to `LEDGER_URL` when it is set.
+The development server forwards `/api` and `/public` to the ledger at http://localhost:8090, or to `LEDGER_URL` when
+it is set.
 
 </p>
 

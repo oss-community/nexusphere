@@ -142,9 +142,9 @@ git commit -m "Add the jenkins-complete pipeline"
 
 `devops.sh stages` shows what a pipeline will run before anything starts. For `jenkins-complete` two stages assume a
 single-module project and have not been run against this multi-module one yet: `migrate` points Flyway at
-`src/main/resources/db/migration` in the root, while the migrations of this repository live in each module (for
-example `core/identity/...` and `ledger/server/...`), and `image` runs Jib from the root, where both the core and the
-ledger build an executable jar. Expect to adjust these two stages on the first run.
+`src/main/resources/db/migration` in the root, while the migrations of this repository live in
+`ledger/server/src/main/resources/db/migration/ledger`, and `image` runs Jib from the root, but the executable jar is
+built by `ledger/server`. Expect to adjust these two stages on the first run.
 
 </p>
 

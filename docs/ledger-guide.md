@@ -9,8 +9,8 @@
 * [Agents](#agents)
 * [Real Agents and MCP Servers](#real-agents-and-mcp-servers)
 * [Beside an Existing Gateway](#beside-an-existing-gateway)
-* [Connect the Core](#connect-the-core)
 * [Present It](#present-it)
+* [Stop](#stop)
 * [Next Steps](#next-steps)
 
 ## What It Does
@@ -48,9 +48,23 @@ a package of evidence and a verifier that runs offline.
 
 ### Start
 
+Every command runs in the root of the repository.
+
+Step 1. Build the server, the verifier and the demo MCP server:
+
 ```shell
 mvn -pl ledger/server,ledger/verifier,ledger/demo-mcp -am package -DskipTests=true
+```
+
+Step 2. Start the services:
+
+```shell
 docker compose --file ledger/compose.yaml --project-name ledger up -d --build
+```
+
+Step 3. Check the ledger; the answer must be `{"status":"UP"}`:
+
+```shell
 curl http://localhost:8090/actuator/health
 ```
 
@@ -73,6 +87,8 @@ production keys and secrets are described in [Operations](operations.md).
 
 ### Run the Demo
 
+Step 4. Run the demo; it must end with `Result: VALID` for the package and `Result: INVALID` for the changed copy:
+
 ```shell
 ledger/demo-mcp/demo.sh
 ```
@@ -85,16 +101,18 @@ that a changed entry fails verification.
 
 </p>
 
-### Stop
-
-```shell
-docker compose --file ledger/compose.yaml --project-name ledger down
-docker volume prune -f
-```
-
 ## Agents
 
+<p style="text-align: justify;">
+
+These steps use the stack started above. Keep one terminal open for them, since step 1 sets a variable the later steps
+use.
+
+</p>
+
 ### Register Agents
+
+Step 1. Keep the operator key in a variable and register two agents:
 
 ```shell
 OP="Authorization: Bearer nexusphere-ledger-development-key-change-me"
@@ -111,6 +129,8 @@ Each answer carries the agent's `apiKey` once. Keep it; a lost key is replaced w
 
 ### Grant Permissions
 
+Step 2. Create a grant for each agent:
+
 ```shell
 curl -s -X POST http://localhost:8090/api/v1/grants -H "$OP" -H "Content-Type: application/json" -d '{"principalId":"alice","agentId":"invoice-agent","actions":["tools/call"],"targets":["demo/read_file","demo/send_email"],"expiresAt":"2026-12-31T00:00:00Z","maxUses":20}'
 curl -s -X POST http://localhost:8090/api/v1/grants -H "$OP" -H "Content-Type: application/json" -d '{"principalId":"alice","agentId":"support-agent","actions":["tools/call"],"targets":["demo/read_file"],"expiresAt":"2026-12-31T00:00:00Z"}'
@@ -119,11 +139,13 @@ curl -s -X POST http://localhost:8090/api/v1/grants -H "$OP" -H "Content-Type: a
 <p style="text-align: justify;">
 
 The compose ledger asks principals for consent, so both grants start `PENDING`. Sign in to the web UI as `alice` and
-approve them. Targets are `{server}/{tool}`; a trailing `*` matches a prefix, such as `demo/*`.
+approve them; both must then show `ACTIVE`. Targets are `{server}/{tool}`; a trailing `*` matches a prefix, such as `demo/*`.
 
 </p>
 
 ### Call Tools
+
+Step 3. Call one granted and one not granted tool with the `apiKey` of `invoice-agent`:
 
 ```shell
 curl -s http://localhost:8090/mcp/demo -H "Authorization: Bearer {apiKey}" -H "X-Ledger-Principal: alice" -H "Content-Type: application/json" -d '{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"read_file","arguments":{"path":"/invoices/2026-10.txt"}}}'
@@ -140,8 +162,15 @@ that principal gave the agent a matching grant.
 
 ### See the Evidence
 
+Step 4. List the evidence of `invoice-agent`; the denied call is there too:
+
 ```shell
 curl -s "http://localhost:8090/api/v1/evidence?agentId=invoice-agent" -H "$OP" | jq '.items[] | {sequence, action, target, decision, outcome}'
+```
+
+Step 5. Export a package and verify it offline; the verifier must print `Result: VALID`:
+
+```shell
 curl -s -X POST http://localhost:8090/api/v1/packages -H "$OP" -H "Content-Type: application/json" -d '{"agentId":"invoice-agent"}' -o package.json
 java -jar ledger/verifier/target/verifier-1.0.0-SNAPSHOT-exec.jar --public-key "$(curl -s http://localhost:8090/api/v1/keys -H "$OP" | jq -r '.[] | select(.status == "ACTIVE") | .publicKey')" package.json
 ```
@@ -203,21 +232,6 @@ pass through the ledger's own gateway.
 curl -X POST http://localhost:8090/api/v1/evidence -H "Authorization: Bearer {agentApiKey}" -H "Content-Type: application/json" -d '{"agentId":"invoice-agent","principalId":"alice","action":"tools/call","target":"send_email","decision":"ALLOW","reason":"agentcore-policy","outcome":"SUCCEEDED","correlationId":"session-42","attributes":{"gateway":"agentcore"}}'
 ```
 
-## Connect the Core
-
-<p style="text-align: justify;">
-
-The Nexusphere core, an optional reference integration, can feed the ledger: its authorization decisions and delegations become evidence and grants, and a
-delegate asks the core for a mandate. Start the core with the ledger's address and operator key; the details are in
-[Nexusphere Core Integration](../core/integration/README.md#ledger).
-
-</p>
-
-```yaml
-APP_LEDGER_URL: http://localhost:8090
-APP_LEDGER_API_KEY: nexusphere-ledger-development-key-change-me
-```
-
 ## Present It
 
 | Step | Show                                                                  | Point                                               |
@@ -235,6 +249,15 @@ Start the stack before the talk and run `demo.sh` once, so images and Keycloak a
 second window signed in as `alice`.
 
 </p>
+
+## Stop
+
+Step 1. Stop the services and remove the data:
+
+```shell
+docker compose --file ledger/compose.yaml --project-name ledger down
+docker volume prune -f
+```
 
 ## Next Steps
 

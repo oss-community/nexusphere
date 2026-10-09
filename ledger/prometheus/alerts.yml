@@ -22,32 +22,3 @@ groups:
           severity: warning
         annotations:
           summary: The ledger answers more than one 5xx every ten seconds
-  - name: nexusphere-core
-    rules:
-      - alert: CoreDown
-        expr: up{job="nexusphere-core"} == 0
-        for: 1m
-        labels:
-          severity: critical
-        annotations:
-          summary: The core does not answer its metrics endpoint
-      - alert: LedgerOutboxBacklog
-        expr: nexusphere_ledger_outbox_pending > 1000
-        for: 10m
-        labels:
-          severity: warning
-        annotations:
-          summary: More than 1000 core events have waited 10 minutes for the ledger
-      - alert: LedgerOutboxFailing
-        expr: increase(nexusphere_ledger_outbox_delivered_total{result="failed"}[10m]) > 0 and nexusphere_ledger_outbox_pending > 0
-        for: 10m
-        labels:
-          severity: warning
-        annotations:
-          summary: The core cannot deliver evidence to the ledger
-      - alert: LedgerOutboxRejected
-        expr: increase(nexusphere_ledger_outbox_delivered_total{result="rejected"}[1h]) > 0
-        labels:
-          severity: warning
-        annotations:
-          summary: The ledger refused core evidence; check integration.ledger_outbox.last_error

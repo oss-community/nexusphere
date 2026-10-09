@@ -10,7 +10,6 @@
     <name>Nexusphere</name>
 
     <modules>
-        <module>core</module>
         <module>ledger</module>
     </modules>
 

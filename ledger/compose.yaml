@@ -110,8 +110,6 @@ services:
       - "9090:9090"
     volumes:
       - "./prometheus:/etc/prometheus:ro"
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
     depends_on:
       - ledger
       - alertmanager
