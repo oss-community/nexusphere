@@ -4,18 +4,27 @@
 
 ## <p align="center">Table of Content</p>
 
-* [Project Description](docs/README.md)
-* [End-to-End Tests](core/core-e2e-tests/README.md)
-* [Local Environment Setup](docs/local-setup.md)
-* [Ledger Guide](docs/ledger-guide.md)
-* [Operations](docs/operations.md)
+* [Documentation](#documentation)
 * [Getting Started](#getting-started)
 * [Dockerized](#dockerized)
 * [Kubernetes](#kubernetes)
 * [DevOps](#devops)
-* [UI](#ui)
+* [Service URLs](#service-urls)
 * [Nexusphere Core](#nexusphere-core)
-* [Nexusphere Ledger](ledger/README.md)
+* [Nexusphere Ledger](#nexusphere-ledger)
+
+## Documentation
+
+| Part                       | Documents                                                                                                            |
+|----------------------------|----------------------------------------------------------------------------------------------------------------------|
+| Introduction               | This page, [Project Description](docs/README.md)                                                                     |
+| Getting Started            | [Local Environment Setup](docs/local-setup.md), [Ledger Guide](docs/ledger-guide.md)                                 |
+| Nexusphere Core            | [Modules](docs/README.md#modules), one README per module                                                             |
+| Nexusphere Ledger          | [Nexusphere Ledger](ledger/README.md), its [Modules](ledger/README.md#modules) and [Changelog](ledger/CHANGELOG.md)  |
+| Web UI                     | [Nexusphere Frontend](frontend/README.md)                                                                            |
+| Operations                 | [Operations](docs/operations.md), [DevOps Step by Step](docs/devops-guide.md)                                        |
+| Testing                    | [Core End-to-End Tests](core/core-e2e-tests/README.md), [Ledger End-to-End Tests](ledger/ledger-e2e-tests/README.md) |
+| Build and Delivery Toolkit | [mvn-devops](mvn-devops/README.md)                                                                                   |
 
 ## Getting Started
 
@@ -190,7 +199,7 @@ Upgrade with `mvn-devops/devops.sh upgrade`, which replaces the folder with the 
 `SHA256SUMS`, or by deleting the `mvn-devops` folder and extracting the new release zip in its place under the same
 name.
 
-## UI
+## Service URLs
 
 * Application: [http://localhost:8080](http://localhost:8080)
 * Swagger UI: [http://localhost:8080/swagger-ui.html](http://localhost:8080/swagger-ui.html)
@@ -205,8 +214,6 @@ Username: nexusphere
 Password: nexusphere
 Database: nexusphere
 ```
-
----
 
 ## Nexusphere Core
 
@@ -226,25 +233,25 @@ Maven module with the package `com.nexusphere.<module>`. A module is reached by 
 
 ### Modules
 
-| Module                | Responsibility                                                                                           |
-|-----------------------|----------------------------------------------------------------------------------------------------------|
-| `core/shared`         | Identifiers, execution context, correlation ID, domain event envelope, error model                       |
-| `core/network`        | Network lifecycle: PENDING, ACTIVE, SUSPENDED, ARCHIVED                                                  |
-| `core/organization`   | Organizations registered inside a network                                                                |
-| `core/identity`       | Human, service, application, agent and machine identities and credentials                                |
-| `core/membership`     | Memberships, principal context and member listing                                                        |
-| `core/capability`     | Capability types with versioned schemas, capabilities, visibility and withdrawal                         |
-| `core/trust`          | Scoped, directional, revocable trust between networks, organizations and identities                      |
-| `core/federation`     | Federation lifecycle between two sovereign networks with scope and optimistic locking                    |
-| `core/authorization`  | Roles, role assignments, central ALLOW/DENY decisions recorded as evidence                               |
-| `core/delegation`     | Constrained, time-bounded, revocable delegations between principals of one network                       |
-| `core/discovery`      | Governed local and federated capability discovery behind a port                                          |
-| `core/agreement`      | Versioned agreements between accountable parties, with acting principal and delegation                   |
-| `core/transaction`    | Transactions under agreements: request, authorize or reject, execute, complete, fail, cancel             |
-| `core/audit`          | Append-only audit events, search and the accountability trail of a transaction                           |
-| `core/integration`    | Adapters: a JSON-RPC 2.0 agent gateway, a task gateway for machines, and the link to the ledger          |
-| `core/bootstrap`      | Application, persistence wiring, error handling, architecture tests                                      |
-| `core/core-e2e-tests` | End-to-end tests against the application and PostgreSQL                                                  |
+| Module                | Responsibility                                                                                  |
+|-----------------------|-------------------------------------------------------------------------------------------------|
+| `core/shared`         | Identifiers, execution context, correlation ID, domain event envelope, error model              |
+| `core/network`        | Network lifecycle: PENDING, ACTIVE, SUSPENDED, ARCHIVED                                         |
+| `core/organization`   | Organizations registered inside a network                                                       |
+| `core/identity`       | Human, service, application, agent and machine identities and credentials                       |
+| `core/membership`     | Memberships, principal context and member listing                                               |
+| `core/authorization`  | Roles, role assignments, central ALLOW/DENY decisions recorded as evidence                      |
+| `core/trust`          | Scoped, directional, revocable trust between networks, organizations and identities             |
+| `core/federation`     | Federation lifecycle between two sovereign networks with scope and optimistic locking           |
+| `core/delegation`     | Constrained, time-bounded, revocable delegations between principals of one network              |
+| `core/capability`     | Capability types with versioned schemas, capabilities, visibility and withdrawal                |
+| `core/discovery`      | Governed local and federated capability discovery behind a port                                 |
+| `core/agreement`      | Versioned agreements between accountable parties, with acting principal and delegation          |
+| `core/transaction`    | Transactions under agreements: request, authorize or reject, execute, complete, fail, cancel    |
+| `core/audit`          | Append-only audit events, search and the accountability trail of a transaction                  |
+| `core/integration`    | Adapters: a JSON-RPC 2.0 agent gateway, a task gateway for machines, and the link to the ledger |
+| `core/bootstrap`      | Application, persistence wiring, error handling, architecture tests                             |
+| `core/core-e2e-tests` | End-to-end tests against the application and PostgreSQL                                         |
 
 ### Profiles
 

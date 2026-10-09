@@ -36,14 +36,14 @@ interval. Anyone holding the published public key can check the chain and the ch
 
 ## Modules
 
-| Module                    | Responsibility                                                                                               |
-|---------------------------|--------------------------------------------------------------------------------------------------------------|
-| `ledger/chain`            | Canonical JSON, evidence entry, hash chain verifier, Ed25519 keys and checkpoints. No framework dependencies |
-| `ledger/server`           | Spring Boot service: evidence API, PostgreSQL storage, checkpoint scheduler, verification                    |
-| `ledger/mandate`          | Mandate tokens, status lists, JWK keys and the mandate verifier SDK for other organizations                  |
-| `ledger/verifier`         | Command-line verifier for evidence packages and mandates, with no server dependency                          |
-| `ledger/demo-mcp`         | Demo MCP server with file and mail tools, and the demo script                                                |
-| `ledger/ledger-e2e-tests` | End-to-end tests against the server and PostgreSQL                                                           |
+| Module                                                  | Responsibility                                                                                               |
+|---------------------------------------------------------|--------------------------------------------------------------------------------------------------------------|
+| [`ledger/chain`](chain/README.md)                       | Canonical JSON, evidence entry, hash chain verifier, Ed25519 keys and checkpoints. No framework dependencies |
+| [`ledger/mandate`](mandate/README.md)                   | Mandate tokens, status lists, JWK keys and the mandate verifier SDK for other organizations                  |
+| [`ledger/server`](server/README.md)                     | Spring Boot service: evidence API, PostgreSQL storage, checkpoint scheduler, verification                    |
+| [`ledger/verifier`](verifier/README.md)                 | Command-line verifier for evidence packages and mandates, with no server dependency                          |
+| [`ledger/demo-mcp`](demo-mcp/README.md)                 | Demo MCP server with file and mail tools, and the demo script                                                |
+| [`ledger/ledger-e2e-tests`](ledger-e2e-tests/README.md) | End-to-end tests against the server and PostgreSQL                                                           |
 
 ## Getting Started
 
