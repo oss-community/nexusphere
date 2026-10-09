@@ -37,7 +37,8 @@ rest are references to open when they are needed. All of them are also in one bo
 | 10   | [Conformance Vectors](ledger/conformance/README.md)          | Test data for another implementation of the formats                 |
 | 11   | [Python SDK](ledger/sdk/python/README.md)                    | Record evidence from Python and verify packages and mandates        |
 | 12   | [TypeScript SDK](ledger/sdk/typescript/README.md)            | The same for Node and browsers                                      |
-| 13   | [Changelog](ledger/CHANGELOG.md)                             | What each release contains                                          |
+| 13   | [OpenTelemetry Exporter](ledger/otel-exporter/README.md)     | Evidence from the agent spans an OpenTelemetry Collector receives   |
+| 14   | [Changelog](ledger/CHANGELOG.md)                             | What each release contains                                          |
 
 ## Nexusphere Ledger
 
@@ -158,8 +159,8 @@ mvn package -DskipTests=true
 <p style="text-align: justify;">
 
 The web UI is built and tested with npm, as described in [Nexusphere Frontend](frontend/README.md), and the SDKs
-with their own tools, as described in [Python SDK](ledger/sdk/python/README.md#test) and
-[TypeScript SDK](ledger/sdk/typescript/README.md#test).
+and the exporter with their own tools, as described in [Python SDK](ledger/sdk/python/README.md#test),
+[TypeScript SDK](ledger/sdk/typescript/README.md#test) and [OpenTelemetry Exporter](ledger/otel-exporter/README.md#test).
 
 </p>
 
@@ -211,12 +212,13 @@ name.
 | Adminer      | [http://localhost:8092](http://localhost:8092)                                 | Server `ledger-postgresql`, user and password `ledger` |
 | Prometheus   | [http://localhost:9090](http://localhost:9090)                                 | None                                                   |
 | Alertmanager | [http://localhost:9093](http://localhost:9093)                                 | None                                                   |
+| OTLP         | localhost:4317 (gRPC), http://localhost:4318 (HTTP)                            | None, the Collector sends with the operator key        |
 
 ## Repository Layout
 
 | Folder       | Content                                                                                      |
 |--------------|----------------------------------------------------------------------------------------------|
-| `ledger`     | The ledger: chain, mandate, server, verifier, demo MCP server, tests, conformance, SDKs      |
+| `ledger`     | The ledger: chain, mandate, server, verifier, demo MCP, tests, conformance, SDKs, OTel       |
 | `frontend`   | The web UI in React and TypeScript                                                           |
 | `docs`       | The documents above and the PDF guide                                                        |
 | `mvn-devops` | The build and delivery toolkit                                                               |

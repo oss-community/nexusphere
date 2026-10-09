@@ -87,6 +87,22 @@ services:
         condition: service_started
       keycloak:
         condition: service_started
+  otel-collector:
+    image: samanalishiri/nexusphere-otelcol:latest
+    build:
+      context: ./otel-exporter
+      dockerfile: Dockerfile
+    container_name: otel-collector
+    hostname: otel-collector
+    restart: always
+    ports:
+      - "4317:4317"
+      - "4318:4318"
+    environment:
+      NEXUSPHERE_LEDGER_URL: http://ledger:8090
+      NEXUSPHERE_LEDGER_API_KEY: nexusphere-ledger-development-key-change-me
+    depends_on:
+      - ledger
   ledger-ui:
     image: samanalishiri/nexusphere-frontend:latest
     build:

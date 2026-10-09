@@ -60,6 +60,7 @@ check, and receipts both sides of an exchange hold.
 | [`ledger/ledger-e2e-tests`](ledger-e2e-tests/README.md) | End-to-end tests against the server and PostgreSQL                                                          |
 | [`ledger/sdk/python`](sdk/python/README.md)             | Python client and offline verifier for packages, statements, receipts and mandates                          |
 | [`ledger/sdk/typescript`](sdk/typescript/README.md)     | TypeScript client and offline verifier for Node and browsers, with no runtime dependencies                  |
+| [`ledger/otel-exporter`](otel-exporter/README.md)       | OpenTelemetry Collector exporter that turns agent tool call spans into evidence, and a ready Collector      |
 
 ## Getting Started
 
@@ -107,6 +108,7 @@ curl -X GET http://localhost:8090/actuator/health
 | `ledger-adminer`    | http://localhost:8092     | Adminer for `ledger-postgresql`                  |
 | `keycloak`          | http://localhost:8180     | Keycloak, admin `admin`/`admin`                  |
 | `ledger-ui`         | http://localhost:5173     | The web UI, built from `frontend`                |
+| `otel-collector`    | localhost:4317, 4318      | OpenTelemetry Collector, OTLP gRPC and HTTP      |
 | `prometheus`        | http://localhost:9090     | Prometheus with the ledger alerts                |
 | `alertmanager`      | http://localhost:9093     | Alertmanager, no channel until one is set        |
 
@@ -186,6 +188,7 @@ kubectl port-forward service/ledger 8090:8090 -n dev
 kubectl port-forward service/keycloak 8180:8080 -n dev
 kubectl port-forward service/ledger-ui 5173:80 -n dev
 kubectl port-forward service/ledger-adminer 8092:8080 -n dev
+kubectl port-forward service/otel-collector 4318:4318 -n dev
 ```
 
 Step 5. Check the ledger and run the demo as in [Dockerized](#dockerized):

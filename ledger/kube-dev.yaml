@@ -16,6 +16,7 @@ data:
   LEDGER_DATABASE_PASSWORD: bGVkZ2Vy
   KC_BOOTSTRAP_ADMIN_USERNAME: YWRtaW4=
   KC_BOOTSTRAP_ADMIN_PASSWORD: YWRtaW4=
+  NEXUSPHERE_LEDGER_API_KEY: bmV4dXNwaGVyZS1sZWRnZXItZGV2ZWxvcG1lbnQta2V5LWNoYW5nZS1tZQ==
 ---
 apiVersion: v1
 kind: ConfigMap
@@ -393,3 +394,54 @@ spec:
     - protocol: TCP
       port: 80
       targetPort: 80
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: otel-collector
+  namespace: dev
+  labels:
+    app: otel-collector
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: otel-collector
+  template:
+    metadata:
+      labels:
+        app: otel-collector
+    spec:
+      containers:
+        - name: otel-collector
+          image: samanalishiri/nexusphere-otelcol:latest
+          imagePullPolicy: "IfNotPresent"
+          ports:
+            - containerPort: 4317
+            - containerPort: 4318
+          env:
+            - name: NEXUSPHERE_LEDGER_URL
+              value: http://ledger:8090
+            - name: NEXUSPHERE_LEDGER_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: ledger-credentials
+                  key: NEXUSPHERE_LEDGER_API_KEY
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: otel-collector
+  namespace: dev
+spec:
+  selector:
+    app: otel-collector
+  ports:
+    - name: otlp-grpc
+      protocol: TCP
+      port: 4317
+      targetPort: 4317
+    - name: otlp-http
+      protocol: TCP
+      port: 4318
+      targetPort: 4318

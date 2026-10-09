@@ -1,0 +1,7 @@
+endpoint: http://localhost:8090
+api_key: secret
+timeout: 5s
+operations: [execute_tool]
+default_principal: acme
+hash_content: false
+batch_size: 100

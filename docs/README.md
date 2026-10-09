@@ -112,6 +112,7 @@ server's API.
 | [`ledger/conformance`](../ledger/conformance/README.md)           | Conformance vectors for every format                                                |
 | [`ledger/sdk/python`](../ledger/sdk/python/README.md)             | Python client and offline verifier, on the same conformance vectors                 |
 | [`ledger/sdk/typescript`](../ledger/sdk/typescript/README.md)     | TypeScript client and offline verifier for Node and browsers                        |
+| [`ledger/otel-exporter`](../ledger/otel-exporter/README.md)       | OpenTelemetry Collector exporter from agent spans to evidence                       |
 | [`frontend`](../frontend/README.md)                               | Web UI for operators and principals                                                 |
 
 ### Stack
@@ -121,6 +122,7 @@ server's API.
 * Spring JDBC, Spring Security OAuth2 JOSE for principal tokens, Micrometer with Prometheus
 * React and TypeScript for the web UI
 * Python and TypeScript SDKs that implement every format independently
+* Go for the OpenTelemetry Collector exporter
 * JUnit 5, AssertJ and Testcontainers for tests; Vitest for the web UI
 
 ### Server Packages
@@ -150,6 +152,7 @@ com.nexusphere.ledger
 | RFC 8037, RFC 8032                  | Ed25519 keys and signatures                      |
 | OpenID Connect, OAuth 2.0 PKCE      | Principal sign-in                                |
 | MCP, A2A                            | Gateways for tool calls and agent-to-agent calls |
+| OpenTelemetry GenAI conventions     | Evidence from agent spans                        |
 | AP2, Verifiable Intent              | Mapping of mandates to payment intents           |
 
 ## Out of Scope
