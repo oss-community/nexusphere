@@ -283,6 +283,8 @@ APP_LEDGER_FORWARD_INTERVAL: 5s
 APP_LEDGER_BATCH_SIZE: 100
 APP_SECRETS_DIR: /run/secrets/
 APP_MANAGEMENT_PORT:
+APP_RATE_LIMIT_PER_MINUTE: 1200
+APP_RATE_LIMIT_BURST: 200
 ```
 
 `APP_TOKEN_SECRET` and `APP_OPERATOR_SECRET` have no default outside the `dev` profile, and the application refuses to
@@ -292,7 +294,9 @@ for its work and one for its authorization decision, so the application refuses 
 
 The `APP_LEDGER_*` variables connect the core to a [Nexusphere Ledger](ledger/README.md); without `APP_LEDGER_URL` the
 core runs on its own. Secrets can also come from files in `APP_SECRETS_DIR`, and metrics are on
-`/actuator/prometheus`; both are described in [Operations](docs/operations.md).
+`/actuator/prometheus`; both are described in [Operations](docs/operations.md). Each caller, by token or by address
+when it has none, gets `APP_RATE_LIMIT_PER_MINUTE` requests a minute with bursts up to `APP_RATE_LIMIT_BURST`, and
+answers over it are 429 `RATE_LIMIT_EXCEEDED` with `Retry-After`; `0` turns the limit off.
 
 ### API
 

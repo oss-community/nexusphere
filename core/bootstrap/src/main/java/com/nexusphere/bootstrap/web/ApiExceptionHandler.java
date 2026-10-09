@@ -34,6 +34,7 @@ class ApiExceptionHandler {
             case CONFLICT -> HttpStatus.CONFLICT;
             case BUSINESS_RULE_VIOLATION, FEDERATION_ERROR, DELEGATION_ERROR, AGREEMENT_ERROR, TRANSACTION_ERROR ->
                     HttpStatus.UNPROCESSABLE_CONTENT;
+            case RATE_LIMIT_EXCEEDED -> HttpStatus.TOO_MANY_REQUESTS;
             case INFRASTRUCTURE_ERROR -> HttpStatus.INTERNAL_SERVER_ERROR;
         };
     }

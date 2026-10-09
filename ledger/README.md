@@ -71,6 +71,7 @@ curl -X GET http://localhost:8090/actuator/health
 | `keycloak`          | http://localhost:8180     | Keycloak, admin `admin`/`admin`                  |
 | `ledger-ui`         | http://localhost:5173     | The web UI, built from `frontend`                |
 | `prometheus`        | http://localhost:9090     | Prometheus with the ledger and core alerts       |
+| `alertmanager`      | http://localhost:9093     | Alertmanager, no channel until one is set        |
 
 <p style="text-align: justify;">
 
@@ -212,6 +213,8 @@ LEDGER_OIDC_PRINCIPAL_CLAIM: sub
 LEDGER_OIDC_CLIENT_ID:
 LEDGER_SECRETS_DIR: /run/secrets/
 LEDGER_MANAGEMENT_PORT:
+LEDGER_RATE_LIMIT_PER_MINUTE: 1200
+LEDGER_RATE_LIMIT_BURST: 200
 ```
 
 <p style="text-align: justify;">
@@ -221,7 +224,9 @@ the published development secrets unless `dev` is active. The private key is a b
 key is its base64 X.509 encoding; the ledger refuses to start when they do not match. The tables live in the `ledger`
 schema, so the ledger can share a database with the core. Any setting can also come from a file of the same name in
 `LEDGER_SECRETS_DIR`, which is how a secret manager hands over keys; backups, keys and metrics are described in
-[Operations](../docs/operations.md).
+[Operations](../docs/operations.md). Each caller, by key or by address when it has none, gets
+`LEDGER_RATE_LIMIT_PER_MINUTE` requests a minute with bursts up to `LEDGER_RATE_LIMIT_BURST`; over it the answer is 429
+`RATE_LIMIT_EXCEEDED` with `Retry-After`, and `0` turns the limit off.
 
 </p>
 

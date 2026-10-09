@@ -53,14 +53,15 @@ docker compose --file ledger/compose.yaml --project-name ledger up -d --build
 curl http://localhost:8090/actuator/health
 ```
 
-| Service    | URL                       | Sign in                                                |
-|------------|---------------------------|--------------------------------------------------------|
-| Web UI     | http://localhost:5173     | Operator key, or `alice`/`alice` and `bob`/`bob`       |
-| Ledger API | http://localhost:8090     | `Authorization: Bearer {key}`                          |
-| Demo MCP   | http://localhost:8091/mcp | None, reached through the ledger at `/mcp/demo`        |
-| Keycloak   | http://localhost:8180     | `admin`/`admin`                                        |
-| Adminer    | http://localhost:8092     | Server `ledger-postgresql`, user and password `ledger` |
-| Prometheus | http://localhost:9090     | None                                                   |
+| Service      | URL                       | Sign in                                                |
+|--------------|---------------------------|--------------------------------------------------------|
+| Web UI       | http://localhost:5173     | Operator key, or `alice`/`alice` and `bob`/`bob`       |
+| Ledger API   | http://localhost:8090     | `Authorization: Bearer {key}`                          |
+| Demo MCP     | http://localhost:8091/mcp | None, reached through the ledger at `/mcp/demo`        |
+| Keycloak     | http://localhost:8180     | `admin`/`admin`                                        |
+| Adminer      | http://localhost:8092     | Server `ledger-postgresql`, user and password `ledger` |
+| Prometheus   | http://localhost:9090     | None                                                   |
+| Alertmanager | http://localhost:9093     | None                                                   |
 
 <p style="text-align: justify;">
 

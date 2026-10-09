@@ -16,6 +16,9 @@ spring:
     create-schemas: true
     locations: classpath:db/migration/ledger
 ledger:
+  rate-limit:
+    per-minute: ${LEDGER_RATE_LIMIT_PER_MINUTE:1200}
+    burst: ${LEDGER_RATE_LIMIT_BURST:200}
   security:
     api-key: ${LEDGER_API_KEY:}
   signing:

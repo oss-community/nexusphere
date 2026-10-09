@@ -11,7 +11,8 @@ import org.springframework.context.annotation.Import;
 import org.testcontainers.postgresql.PostgreSQLContainer;
 import org.testcontainers.utility.DockerImageName;
 
-@SpringBootTest(classes = NexusphereApplication.class, webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
+@SpringBootTest(classes = NexusphereApplication.class, webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
+        properties = "nexusphere.rate-limit.per-minute=0")
 @ActiveProfiles({"postgresql", "dev"})
 @Import(E2ETestBase.Containers.class)
 public abstract class E2ETestBase {
