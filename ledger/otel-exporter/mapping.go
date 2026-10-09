@@ -20,7 +20,7 @@ var (
 	attributeName = regexp.MustCompile(`^[A-Za-z0-9._-]{1,64}$`)
 	sha256Hex     = regexp.MustCompile(`^[0-9a-f]{64}$`)
 	copied        = []string{"gen_ai.provider.name", "gen_ai.request.model", "gen_ai.tool.call.id", "gen_ai.tool.type",
-		"gen_ai.agent.name", "mcp.session.id", "service.name"}
+		"gen_ai.agent.name", "mcp.session.id", "mcp.target", "service.name"}
 )
 
 type evidence struct {
@@ -105,6 +105,9 @@ func toEvidence(cfg *Config, resource pcommon.Resource, span ptrace.Span) (evide
 	case span.Status().Code() == ptrace.StatusCodeError:
 		e.Outcome = "FAILED"
 		e.Reason = text(firstNonEmpty(attrs.get("error.type"), span.Status().Message()), 500)
+	case attrs.get("mcp.error.code") != "":
+		e.Outcome = "FAILED"
+		e.Reason = text(strings.TrimSpace("JSON-RPC "+attrs.get("mcp.error.code")+" "+attrs.get("mcp.error.message")), 500)
 	default:
 		e.Outcome = "SUCCEEDED"
 	}

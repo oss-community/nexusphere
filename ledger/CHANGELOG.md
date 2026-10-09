@@ -33,7 +33,11 @@ agent platforms and gateways.
 * TypeScript SDK (`@nexusphere/ledger`): the same client and offline verifier for Node 20 and browsers on Web
   Crypto, with no runtime dependencies and the same `nexusphere-ledger-verify` command
 * OpenTelemetry Collector exporter `nexusphere`: agent tool call and agent invocation spans that follow the GenAI
-  semantic conventions become evidence in batches, with retries and a sending queue, plus a ready Collector image
+  semantic conventions become evidence in batches, with retries and a sending queue, plus a ready Collector image;
+  MCP spans with a JSON-RPC error are recorded as `FAILED`
+* Adapters that record or decide tool calls: a LangGraph callback handler and `govern` wrapper, OpenAI Agents SDK run
+  hooks with a tool input guardrail, an Amazon Bedrock AgentCore Gateway interceptor for Lambda, and an agentgateway
+  tracing configuration with an end-to-end check
 * Secrets and signing keys from files written by a secret manager, Prometheus metrics with alert rules, and a tested
   backup and restore procedure
 * Rate limit per caller with 429 and `Retry-After`, and alert delivery by email, Slack, Telegram or webhook, each

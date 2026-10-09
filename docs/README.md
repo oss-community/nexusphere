@@ -113,6 +113,7 @@ server's API.
 | [`ledger/sdk/python`](../ledger/sdk/python/README.md)             | Python client and offline verifier, on the same conformance vectors                 |
 | [`ledger/sdk/typescript`](../ledger/sdk/typescript/README.md)     | TypeScript client and offline verifier for Node and browsers                        |
 | [`ledger/otel-exporter`](../ledger/otel-exporter/README.md)       | OpenTelemetry Collector exporter from agent spans to evidence                       |
+| [`ledger/adapters`](../ledger/adapters/README.md)                 | Adapters for LangGraph, OpenAI Agents SDK, AgentCore and agentgateway               |
 | [`frontend`](../frontend/README.md)                               | Web UI for operators and principals                                                 |
 
 ### Stack

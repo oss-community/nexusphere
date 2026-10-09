@@ -61,6 +61,7 @@ check, and receipts both sides of an exchange hold.
 | [`ledger/sdk/python`](sdk/python/README.md)             | Python client and offline verifier for packages, statements, receipts and mandates                          |
 | [`ledger/sdk/typescript`](sdk/typescript/README.md)     | TypeScript client and offline verifier for Node and browsers, with no runtime dependencies                  |
 | [`ledger/otel-exporter`](otel-exporter/README.md)       | OpenTelemetry Collector exporter that turns agent tool call spans into evidence, and a ready Collector      |
+| [`ledger/adapters`](adapters/README.md)                 | Adapters for LangGraph, the OpenAI Agents SDK, Amazon Bedrock AgentCore and agentgateway                   |
 
 ## Getting Started
 
