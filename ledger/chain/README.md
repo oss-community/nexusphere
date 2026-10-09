@@ -28,6 +28,8 @@ to verify evidence on their own.
 * `GrantTerms`, the hashed terms of a grant
 * `MerkleTree`, the RFC 9162 tree hash with inclusion and consistency proofs and their verification
 * `LogCheckpoint` and `NoteKey`, C2SP signed-note checkpoints, `tlog-cosignature/v1` cosignatures and verifier keys
+* `Cbor` and `CoseSign1`, deterministic CBOR and COSE_Sign1 with EdDSA, and `EvidenceStatement` and `LogReceipt`,
+  the SCITT signed statement of an entry and its RFC 9942 inclusion receipt
 
 ## Dependencies
 

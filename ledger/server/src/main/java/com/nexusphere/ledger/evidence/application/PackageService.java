@@ -85,12 +85,23 @@ public class PackageService {
         if (items == null || items.isEmpty() || !Objects.equals(items.getFirst().link().previousHash(), expected)) {
             throw new IllegalStateException("The evidence package does not start at its anchor");
         }
-        List<Long> disclosed = items.stream().filter(item -> item.entry() != null)
-                .map(item -> item.link().sequence()).toList();
-        EvidencePackage.Log proofs = snapshot.execute(status -> new EvidencePackage.Log(
-                log.cosignedNote(logCheckpoint), log.inclusionProofs(disclosed, last)));
+        List<EvidenceEntry> disclosed = items.stream().map(EvidencePackage.Item::entry).filter(Objects::nonNull)
+                .toList();
+        EvidencePackage.Log proofs = snapshot.execute(status -> logOf(logCheckpoint, disclosed));
         return new EvidencePackage(clock.instant(), request.agentId(), request.principalId(), from, to, anchor, end,
                 items, proofs);
+    }
+
+    private EvidencePackage.Log logOf(StoredCheckpoint checkpoint, List<EvidenceEntry> disclosed) {
+        Map<Long, List<byte[]>> proofs = log.inclusionProofs(
+                disclosed.stream().map(EvidenceEntry::sequence).toList(), checkpoint.size());
+        Map<Long, byte[]> statements = new LinkedHashMap<>();
+        Map<Long, byte[]> receipts = new LinkedHashMap<>();
+        for (EvidenceEntry entry : disclosed) {
+            statements.put(entry.sequence(), log.statement(entry));
+            receipts.put(entry.sequence(), log.receipt(entry.sequence(), checkpoint, proofs.get(entry.sequence())));
+        }
+        return new EvidencePackage.Log(log.cosignedNote(checkpoint), proofs, statements, receipts);
     }
 
     private List<EvidencePackage.Item> collect(PackageRequest request, long from, long to, long after, long last) {

@@ -24,7 +24,8 @@ public record EvidencePackage(
     public record Item(EvidenceLink link, EvidenceEntry entry) {
     }
 
-    public record Log(String checkpoint, Map<Long, List<byte[]>> proofs) {
+    public record Log(String checkpoint, Map<Long, List<byte[]>> proofs, Map<Long, byte[]> statements,
+                      Map<Long, byte[]> receipts) {
     }
 
     public long disclosed() {

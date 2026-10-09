@@ -11,6 +11,7 @@
 * [Evidence Format](#evidence-format)
 * [Verification](#verification)
 * [Transparency Log and Witnesses](#transparency-log-and-witnesses)
+* [SCITT Statements and Receipts](#scitt-statements-and-receipts)
 * [Evidence Packages](#evidence-packages)
 * [Key Rotation](#key-rotation)
 * [Agents, Grants and Decisions](#agents-grants-and-decisions)
@@ -337,6 +338,50 @@ checkpoint that does not match the evidence is reported like a broken link.
 
 </p>
 
+## SCITT Statements and Receipts
+
+<p style="text-align: justify;">
+
+Every entry is also available as an IETF SCITT signed statement and a log receipt, both COSE_Sign1 (`application/cose`)
+signed with EdDSA by the ledger key. The statement is a COSE hash envelope: its payload is the 32-byte content hash
+(`payload_hash_alg` SHA-256, preimage content type `application/vnd.nexusphere.evidence+json`), its CWT claims name
+the mandate issuer as `iss` and `urn:uuid:{id}` as `sub`, and the protected headers `nexusphere-sequence` and
+`nexusphere-previous-hash` place it in the chain, so the Merkle leaf can be computed from the statement alone. The
+receipt follows RFC 9942 with the RFC 9162 tree algorithm: the inclusion proof is in the unprotected header (396) and
+the signed payload is the tree root, which is left out of the message. A receipt is issued for a log checkpoint, the
+latest by default or the one named by `treeSize`, and the ledger signs a new checkpoint first when the entry is not in
+the latest one yet.
+
+</p>
+
+<p style="text-align: justify;">
+
+Only the content hash leaves the ledger in a statement, so a statement can be shared without the entry. Whoever has
+the entry checks it against the statement's payload. The formats are standard COSE and any COSE library can read them,
+but the evidence fields are Nexusphere's own; they are not an IETF agent-action profile. A2A receipts stay JWS and
+name the evidence sequence and hash of the exchange, whose statement and receipt the receiving ledger serves like
+any other.
+
+</p>
+
+```shell
+curl http://localhost:8090/api/v1/evidence/{id}/statement -H "Authorization: Bearer nexusphere-ledger-development-key-change-me" -o statement.cose
+curl http://localhost:8090/api/v1/evidence/{id}/receipt -H "Authorization: Bearer nexusphere-ledger-development-key-change-me" -o receipt.cose
+java -jar ledger/verifier/target/verifier-1.0.0-SNAPSHOT-exec.jar statement --public-key "$(curl -s http://localhost:8090/api/v1/keys -H 'Authorization: Bearer nexusphere-ledger-development-key-change-me' | jq -r '.[] | select(.status == "ACTIVE") | .publicKey')" --receipt receipt.cose statement.cose
+```
+
+```text
+Nexusphere Ledger evidence statement
+  Issuer      : http://localhost:8090
+  Subject     : urn:uuid:7c0e5a52-8f0b-4d1e-9a51-3c1f0b8e2d44
+  Sequence    : 7
+  Content hash: 5e1c...
+  Entry hash  : 9a40...
+  Signature   : valid, key 3f2a9c0d41b7e865
+  Receipt     : valid, log localhost:8090 at 42 entries, root 0dpbGc4h7JcvSy6dXq0XpLM4pN0iA0p9cX0XQ4nHqEo=
+Result: VALID
+```
+
 ## Evidence Packages
 
 <p style="text-align: justify;">
@@ -347,8 +392,8 @@ holds the public keys with their rotation records, an anchor checkpoint (the las
 entry, or genesis), an end checkpoint (the first checkpoint at or after the last selected entry, created at the head
 when none exists yet) and every link between them. Only selected links carry their full entry; all others carry only
 their link, so nothing outside the selection is disclosed. A package holds at most 200,000 links. Its `log` field
-carries the log checkpoint at the end checkpoint's sequence with every cosignature the ledger holds, and an inclusion
-proof for each disclosed entry.
+carries the log checkpoint at the end checkpoint's sequence with every cosignature the ledger holds, and for each
+disclosed entry an inclusion proof, its SCITT statement and its receipt for that checkpoint.
 
 </p>
 
@@ -359,7 +404,8 @@ the anchor to the end checkpoint, checks every disclosed entry against its conte
 and exits with `0` for a valid package, `1` for an invalid one and `2` for a usage error. Pass the ledger's public key
 from `GET /api/v1/keys` (or a key published elsewhere) with `--public-key` so the verifier does not trust the key inside
 the package. When the package has a `log`, the verifier also checks that the log checkpoint is signed by the ledger,
-covers the end checkpoint and proves every disclosed entry. Pass each witness's verifier key with `--witness` and the
+covers the end checkpoint and proves every disclosed entry, and that each statement and receipt is signed by a trusted
+key, describes its entry and proves it in the same log checkpoint. Pass each witness's verifier key with `--witness` and the
 number of cosignatures needed with `--witnesses-required` (all given witnesses by default) to require that independent
 witnesses saw the same log.
 
@@ -379,6 +425,7 @@ Nexusphere Ledger evidence package
   Chain       : 2 links from sequence 41
   Disclosed   : 1 entries, agent invoice-agent
   Log         : localhost:8090, 42 entries, 1 disclosed entries proven
+  Receipts    : 1 SCITT statements with receipts
   Witnesses   : partner.example
 Result: VALID
 ```
@@ -726,6 +773,8 @@ API key, except `/api/v1/principal/**`, which requires a principal token from th
 | POST   | `/api/v1/evidence`                      | Record an evidence entry; returns `201` with `Location`                                                |
 | POST   | `/api/v1/evidence/batch`                | Record up to 500 entries in order as one run, all or none; an item error names its `index`             |
 | GET    | `/api/v1/evidence/{id}`                 | Get an evidence entry                                                                                  |
+| GET    | `/api/v1/evidence/{id}/statement`       | The entry as a SCITT signed statement (`application/cose`)                                             |
+| GET    | `/api/v1/evidence/{id}/receipt`         | RFC 9942 receipt for the entry at `treeSize`, by default the latest log checkpoint                     |
 | GET    | `/api/v1/evidence`                      | List entries by `agentId`, `principalId`, `after` and `limit` (max 500)                                |
 | GET    | `/api/v1/ledger/head`                   | Current sequence and hash                                                                              |
 | POST   | `/api/v1/checkpoints`                   | Sign the current head now; `409 LEDGER_EMPTY` when nothing is recorded (operator)                      |
