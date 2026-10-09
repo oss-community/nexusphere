@@ -30,6 +30,8 @@ agent platforms and gateways.
 * Python SDK (`nexusphere-ledger`): a client for evidence, decisions, grants, mandates and packages, and an offline
   verifier for packages, statements, receipts and mandates that passes every conformance vector, with the
   `nexusphere-ledger-verify` command
+* TypeScript SDK (`@nexusphere/ledger`): the same client and offline verifier for Node 20 and browsers on Web
+  Crypto, with no runtime dependencies and the same `nexusphere-ledger-verify` command
 * Secrets and signing keys from files written by a secret manager, Prometheus metrics with alert rules, and a tested
   backup and restore procedure
 * Rate limit per caller with 429 and `Retry-After`, and alert delivery by email, Slack, Telegram or webhook, each

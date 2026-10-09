@@ -111,6 +111,7 @@ server's API.
 | [`ledger/ledger-e2e-tests`](../ledger/ledger-e2e-tests/README.md) | End-to-end tests against the server and PostgreSQL                                  |
 | [`ledger/conformance`](../ledger/conformance/README.md)           | Conformance vectors for every format                                                |
 | [`ledger/sdk/python`](../ledger/sdk/python/README.md)             | Python client and offline verifier, on the same conformance vectors                 |
+| [`ledger/sdk/typescript`](../ledger/sdk/typescript/README.md)     | TypeScript client and offline verifier for Node and browsers                        |
 | [`frontend`](../frontend/README.md)                               | Web UI for operators and principals                                                 |
 
 ### Stack
@@ -119,6 +120,7 @@ server's API.
 * PostgreSQL 18 with the `ledger` schema and Flyway migrations
 * Spring JDBC, Spring Security OAuth2 JOSE for principal tokens, Micrometer with Prometheus
 * React and TypeScript for the web UI
+* Python and TypeScript SDKs that implement every format independently
 * JUnit 5, AssertJ and Testcontainers for tests; Vitest for the web UI
 
 ### Server Packages
