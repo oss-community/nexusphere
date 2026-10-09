@@ -20,7 +20,6 @@
 * [Mandates](#mandates)
 * [A2A Gateway](#a2a-gateway)
 * [Conformance Vectors](#conformance-vectors)
-* [Nexusphere Core](#nexusphere-core)
 * [API](#api)
 * [End-to-End Tests](ledger-e2e-tests/README.md)
 * [Ledger Guide](../docs/ledger-guide.md)
@@ -51,29 +50,50 @@ check, and receipts both sides of an exchange hold.
 
 ## Modules
 
-| Module                                                  | Responsibility                                                                                               |
-|---------------------------------------------------------|--------------------------------------------------------------------------------------------------------------|
-| [`ledger/chain`](chain/README.md)                       | Evidence format, hash chain, Merkle log, signed notes, COSE statements, receipts. No framework dependencies  |
-| [`ledger/mandate`](mandate/README.md)                   | SD-JWT VC mandates, status lists, JWK keys and the mandate verifier SDK for other organizations              |
-| [`ledger/server`](server/README.md)                     | Spring Boot service: evidence API, PostgreSQL storage, checkpoint scheduler, verification                    |
-| [`ledger/verifier`](verifier/README.md)                 | Command-line verifier for evidence packages and mandates, with no server dependency                          |
-| [`ledger/demo-mcp`](demo-mcp/README.md)                 | Demo MCP server with file and mail tools, and the demo script                                                |
-| [`ledger/ledger-e2e-tests`](ledger-e2e-tests/README.md) | End-to-end tests against the server and PostgreSQL                                                           |
+| Module                                                  | Responsibility                                                                                              |
+|---------------------------------------------------------|-------------------------------------------------------------------------------------------------------------|
+| [`ledger/chain`](chain/README.md)                       | Evidence format, hash chain, Merkle log, signed notes, COSE statements, receipts. No framework dependencies |
+| [`ledger/mandate`](mandate/README.md)                   | SD-JWT VC mandates, status lists, JWK keys and the mandate verifier SDK for other organizations             |
+| [`ledger/server`](server/README.md)                     | Spring Boot service: evidence API, PostgreSQL storage, checkpoint scheduler, verification                   |
+| [`ledger/verifier`](verifier/README.md)                 | Command-line verifier for evidence packages and mandates, with no server dependency                         |
+| [`ledger/demo-mcp`](demo-mcp/README.md)                 | Demo MCP server with file and mail tools, and the demo script                                               |
+| [`ledger/ledger-e2e-tests`](ledger-e2e-tests/README.md) | End-to-end tests against the server and PostgreSQL                                                          |
 
 ## Getting Started
 
+<p style="text-align: justify;">
+
+Every command runs in the root of the repository. Each path below is a list of steps; do them in order and check the
+result of each step before the next one.
+
+</p>
+
 ### Prerequisites
 
-* [Java 21](https://www.oracle.com/java/technologies/downloads)
-* [Maven 3](https://maven.apache.org/index.html)
-* [Docker](https://www.docker.com)
-* [jq](https://jqlang.org) for the demo script
+| Tool   | Version | Check                    |
+|--------|---------|--------------------------|
+| Java   | 21      | `java -version`          |
+| Maven  | 3.9     | `mvn -version`           |
+| Docker | any     | `docker compose version` |
+| jq     | any     | `jq --version`           |
 
 ### Dockerized
 
+Step 1. Build the server, the verifier and the demo MCP server:
+
 ```shell
 mvn -pl ledger/server,ledger/verifier,ledger/demo-mcp -am package -DskipTests=true
+```
+
+Step 2. Start every service:
+
+```shell
 docker compose --file ledger/compose.yaml --project-name ledger up -d --build
+```
+
+Step 3. Check that the ledger is up; the answer must be `{"status":"UP"}`:
+
+```shell
 curl -X GET http://localhost:8090/actuator/health
 ```
 
@@ -85,7 +105,7 @@ curl -X GET http://localhost:8090/actuator/health
 | `ledger-adminer`    | http://localhost:8092     | Adminer for `ledger-postgresql`                  |
 | `keycloak`          | http://localhost:8180     | Keycloak, admin `admin`/`admin`                  |
 | `ledger-ui`         | http://localhost:5173     | The web UI, built from `frontend`                |
-| `prometheus`        | http://localhost:9090     | Prometheus with the ledger and core alerts       |
+| `prometheus`        | http://localhost:9090     | Prometheus with the ledger alerts                |
 | `alertmanager`      | http://localhost:9093     | Alertmanager, no channel until one is set        |
 
 <p style="text-align: justify;">
@@ -99,13 +119,13 @@ file trusts this realm, so grants created by the operator wait for the principal
 <p style="text-align: justify;">
 
 The web UI on http://localhost:5173 opens with the operator key or a Keycloak sign-in; it is described in
-[Nexusphere Frontend](../frontend/README.md). The MCP addresses have no web page. `/mcp/demo` on the ledger and `/mcp` on `demo-mcp` accept only MCP JSON-RPC
-`POST` requests, and the gateway also needs an agent API key, so opening them in a browser shows nothing. Run the
-demo script below to see calls go through the gateway.
+[Nexusphere Frontend](../frontend/README.md). The MCP addresses have no web page. `/mcp/demo` on the ledger and `/mcp`
+on `demo-mcp` accept only MCP JSON-RPC `POST` requests, and the gateway also needs an agent API key, so opening them in
+a browser shows nothing. Run the demo below to see calls go through the gateway.
 
 </p>
 
-### Demo
+Step 4. Run the demo; it must end with `Result: VALID` for the package and `Result: INVALID` for the changed copy:
 
 ```shell
 ledger/demo-mcp/demo.sh
@@ -114,12 +134,14 @@ ledger/demo-mcp/demo.sh
 <p style="text-align: justify;">
 
 The script registers an agent, asks `alice` to grant it `read_file` and `send_email` on the demo server, signs `alice`
-in with Keycloak to approve the grant when the ledger asks for consent, calls both
-through the gateway, has `delete_file` denied, lists the recorded evidence, exports an evidence package, verifies it
-offline with the ledger's published key and shows that a changed entry fails verification. `LEDGER_URL`,
-`LEDGER_API_KEY`, `KEYCLOAK_URL`, `VERIFIER_JAR` and `WORK_DIR` override its defaults.
+in with Keycloak to approve the grant when the ledger asks for consent, calls both through the gateway, has
+`delete_file` denied, lists the recorded evidence, exports an evidence package, verifies it offline with the ledger's
+published key and shows that a changed entry fails verification. `LEDGER_URL`, `LEDGER_API_KEY`, `KEYCLOAK_URL`,
+`VERIFIER_JAR` and `WORK_DIR` override its defaults.
 
 </p>
+
+Step 5. Stop everything and remove the data:
 
 ```shell
 docker compose --file ledger/compose.yaml --project-name ledger down
@@ -130,27 +152,48 @@ docker volume prune -f
 
 <p style="text-align: justify;">
 
-`ledger/kube-dev.yaml` runs the same services as the compose file in the `dev` namespace, next to the core from the
-root `kube-dev.yaml`. The Keycloak realm comes from the `keycloak-realm` ConfigMap. Keycloak and the UI are reached
-on the same local ports as with compose, so the sign-in redirect and the token issuer stay
-`http://localhost:8180` and `http://localhost:5173`.
+`ledger/kube-dev.yaml` runs the same services as the compose file in the `dev` namespace. The Keycloak realm comes from
+the `keycloak-realm` ConfigMap. Keycloak and the UI are reached on the same local ports as with compose, so the
+sign-in redirect and the token issuer stay `http://localhost:8180` and `http://localhost:5173`.
 
 </p>
+
+Step 1. Build the jars and the images:
 
 ```shell
 mvn -pl ledger/server,ledger/verifier,ledger/demo-mcp -am package -DskipTests=true
 docker compose --file ledger/compose.yaml --project-name ledger build
+```
+
+Step 2. Apply the manifest:
+
+```shell
 kubectl apply -f ledger/kube-dev.yaml
+```
+
+Step 3. Wait until every pod is `Running`:
+
+```shell
 kubectl get all -n dev
+```
+
+Step 4. Forward the ports, each in its own terminal:
+
+```shell
 kubectl port-forward service/ledger 8090:8090 -n dev
 kubectl port-forward service/keycloak 8180:8080 -n dev
 kubectl port-forward service/ledger-ui 5173:80 -n dev
 kubectl port-forward service/ledger-adminer 8092:8080 -n dev
 ```
 
+Step 5. Check the ledger and run the demo as in [Dockerized](#dockerized):
+
 ```shell
-kubectl set env deployment/application -n dev APP_LEDGER_URL=http://ledger:8090 APP_LEDGER_API_KEY=nexusphere-ledger-development-key-change-me
+curl -X GET http://localhost:8090/actuator/health
+ledger/demo-mcp/demo.sh
 ```
+
+Step 6. Remove everything:
 
 ```shell
 kubectl delete -f ledger/kube-dev.yaml
@@ -158,11 +201,26 @@ kubectl delete -f ledger/kube-dev.yaml
 
 ### Run
 
+<p style="text-align: justify;">
+
+This path runs the server from Maven against the PostgreSQL of the compose file, for development.
+
+</p>
+
+Step 1. Start PostgreSQL only:
+
 ```shell
-docker compose --file compose.yaml --project-name dev up -d postgresql
-mvn install -DskipTests=true
-LEDGER_PROFILES=postgresql,dev LEDGER_DATABASE_DB=nexusphere LEDGER_DATABASE_USERNAME=nexusphere LEDGER_DATABASE_PASSWORD=nexusphere mvn -pl ledger/server spring-boot:start
+docker compose --file ledger/compose.yaml --project-name ledger up -d ledger-postgresql
 ```
+
+Step 2. Build and start the server:
+
+```shell
+mvn install -DskipTests=true
+LEDGER_PROFILES=postgresql,dev LEDGER_DATABASE_PORT=5433 mvn -pl ledger/server spring-boot:start
+```
+
+Step 3. Record an entry, sign a checkpoint and verify the chain; the last answer must hold `"valid": true`:
 
 ```shell
 curl -X POST http://localhost:8090/api/v1/evidence -H "Authorization: Bearer nexusphere-ledger-development-key-change-me" -H "Content-Type: application/json" -d '{"agentId":"invoice-agent","principalId":"alice","action":"tools/call","target":"send_email","decision":"ALLOW","outcome":"SUCCEEDED","attributes":{"server":"mail"}}'
@@ -170,11 +228,16 @@ curl -X POST http://localhost:8090/api/v1/checkpoints -H "Authorization: Bearer 
 curl -X GET http://localhost:8090/api/v1/verification -H "Authorization: Bearer nexusphere-ledger-development-key-change-me"
 ```
 
+Step 4. Stop the server and PostgreSQL:
+
 ```shell
 mvn -pl ledger/server spring-boot:stop
+docker compose --file ledger/compose.yaml --project-name ledger down
 ```
 
 ### Verify
+
+Step 1. Run the unit, integration and end-to-end tests; Docker must be running for Testcontainers:
 
 ```shell
 mvn -pl ledger/ledger-e2e-tests -am verify
@@ -242,7 +305,7 @@ LEDGER_RATE_LIMIT_BURST: 200
 `LEDGER_API_KEY` and the signing keys have no default outside the `dev` profile, and the ledger refuses to start with
 the published development secrets unless `dev` is active. The private key is a base64 PKCS#8 Ed25519 key and the public
 key is its base64 X.509 encoding; the ledger refuses to start when they do not match. The tables live in the `ledger`
-schema, so the ledger can share a database with the core. Any setting can also come from a file of the same name in
+schema, so the ledger can share a database with other applications. Any setting can also come from a file of the same name in
 `LEDGER_SECRETS_DIR`, which is how a secret manager hands over keys; backups, keys and metrics are described in
 [Operations](../docs/operations.md). Each caller, by key or by address when it has none, gets
 `LEDGER_RATE_LIMIT_PER_MINUTE` requests a minute with bursts up to `LEDGER_RATE_LIMIT_BURST`; over it the answer is 429
@@ -808,19 +871,6 @@ curl -X POST http://localhost:8090/a2a/out/supplier -H "Authorization: Bearer {a
 with the published RFC 8032 test keys: canonical JSON, the evidence chain and checkpoints, Merkle roots and proofs,
 signed notes and cosignatures, SCITT statements and receipts, and an SD-JWT VC mandate. Another implementation checks
 itself against them, and `ConformanceVectorsTest` in `ledger/verifier` fails when the ledger's own output changes.
-
-</p>
-
-## Nexusphere Core
-
-<p style="text-align: justify;">
-
-The Nexusphere core is an optional reference integration that shows a multi-party platform feeding this ledger. With `APP_LEDGER_URL` and `APP_LEDGER_API_KEY` (the operator key) set on
-the core, its authorization decisions, delegation changes and other domain events arrive as evidence through an
-outbox, each delegation becomes a grant from the delegator to the delegate, and suspending or revoking the delegation
-revokes the grant. The delegate asks the core, not the ledger, for a mandate. Agent and principal ids are the core's
-principal ids. When this ledger runs with principal sign-in, grants created by the core wait for the principal's
-approval, and `LEDGER_OIDC_PRINCIPAL_CLAIM` must name a claim that holds the core principal id. Details are in [Nexusphere Core Integration](../core/integration/README.md).
 
 </p>
 

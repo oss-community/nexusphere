@@ -6,36 +6,46 @@
 
 * [Documentation](#documentation)
 * [Nexusphere Ledger](#nexusphere-ledger)
-* [Getting Started](#getting-started)
-* [Dockerized](#dockerized)
+* [Quick Start](#quick-start)
+* [Build and Test](#build-and-test)
 * [Kubernetes](#kubernetes)
 * [DevOps](#devops)
 * [Service URLs](#service-urls)
-* [Nexusphere Core](#nexusphere-core)
+* [Repository Layout](#repository-layout)
 
 ## Documentation
 
-| Part                       | Documents                                                                                                                                                                |
-|----------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| Introduction               | This page, [Project Description](docs/README.md)                                                                                                                         |
-| Getting Started            | [Ledger Guide](docs/ledger-guide.md), [Local Environment Setup](docs/local-setup.md)                                                                                     |
-| Nexusphere Ledger          | [Nexusphere Ledger](ledger/README.md), its [Modules](ledger/README.md#modules), [Conformance Vectors](ledger/conformance/README.md) and [Changelog](ledger/CHANGELOG.md) |
-| Web UI                     | [Nexusphere Frontend](frontend/README.md)                                                                                                                                |
-| Operations                 | [Operations](docs/operations.md), [DevOps Step by Step](docs/devops-guide.md)                                                                                            |
-| Testing                    | [Ledger End-to-End Tests](ledger/ledger-e2e-tests/README.md), [Core End-to-End Tests](core/core-e2e-tests/README.md)                                                     |
-| Nexusphere Core            | Optional reference integration: [Modules](docs/README.md#modules), one README per module                                                                                 |
-| Build and Delivery Toolkit | [mvn-devops](mvn-devops/README.md)                                                                                                                                       |
+<p style="text-align: justify;">
+
+Read the documents in this order. The first three take a newcomer from nothing to a verified evidence package; the
+rest are references to open when they are needed. All of them are also in one book,
+[Nexusphere Guide (PDF)](docs/nexusphere-guide.pdf).
+
+</p>
+
+| Step | Document                                                     | What it gives                                                       |
+|------|--------------------------------------------------------------|---------------------------------------------------------------------|
+| 1    | This page                                                    | What the ledger is and the quick start                              |
+| 2    | [Project Description](docs/README.md)                        | The problem, the concepts, the architecture and the standards       |
+| 3    | [Ledger Guide](docs/ledger-guide.md)                         | Install, register agents, grant, call tools and verify step by step |
+| 4    | [Nexusphere Ledger](ledger/README.md)                        | Every setting, format and endpoint, and one README per module       |
+| 5    | [Nexusphere Frontend](frontend/README.md)                    | The web UI for operators and principals                             |
+| 6    | [Operations](docs/operations.md)                             | Secrets, signing keys, backup, monitoring, alerts and rate limits   |
+| 7    | [Local Environment Setup](docs/local-setup.md)               | Developer machine settings for Windows, shells and the IDE          |
+| 8    | [DevOps Step by Step](docs/devops-guide.md)                  | The build pipelines with mvn-devops                                 |
+| 9    | [Ledger End-to-End Tests](ledger/ledger-e2e-tests/README.md) | What the end-to-end tests cover                                     |
+| 10   | [Conformance Vectors](ledger/conformance/README.md)          | Test data for another implementation of the formats                 |
+| 11   | [Changelog](ledger/CHANGELOG.md)                             | What each release contains                                          |
 
 ## Nexusphere Ledger
 
 <p style="text-align: justify;">
 
-The Nexusphere Ledger is the product. It is a self-hosted evidence layer for AI agents: every action an agent takes
-for a person or an organization becomes an entry that a third party can verify offline, without trusting the operator.
-It does not replace the agent platforms and gateways that already decide what an agent may do; it sits beside them and
-keeps the proof. A gateway or agent platform sends its decisions and outcomes to `POST /api/v1/evidence`, and where no
-gateway exists the ledger's own MCP and A2A gateways decide and record. Its configuration and API are in
-[Nexusphere Ledger](ledger/README.md), and a walkthrough is in the [Ledger Guide](docs/ledger-guide.md).
+The Nexusphere Ledger is a self-hosted evidence layer for AI agents: every action an agent takes for a person or an
+organization becomes an entry that a third party can verify offline, without trusting the operator. It does not
+replace the agent platforms and gateways that already decide what an agent may do; it sits beside them and keeps the
+proof. A gateway or agent platform sends its decisions and outcomes to `POST /api/v1/evidence`, and where no gateway
+exists the ledger's own MCP and A2A gateways decide and record.
 
 </p>
 
@@ -54,164 +64,109 @@ List. [Conformance Vectors](ledger/conformance/README.md) let another implementa
 
 </p>
 
-```shell
-mvn -pl ledger/server,ledger/verifier,ledger/demo-mcp -am package -DskipTests=true
-docker compose --file ledger/compose.yaml --project-name ledger up -d --build
-ledger/demo-mcp/demo.sh
-docker compose --file ledger/compose.yaml --project-name ledger down
-```
-
-
-## Getting Started
+## Quick Start
 
 <p style="text-align: justify;">
 
-Build, test and verify cover the whole repository. Run, Dockerized and Kubernetes start the Nexusphere Core reference
-integration; the ledger's own quick start is in [Nexusphere Ledger](#nexusphere-ledger).
+These steps start the ledger with its database, Keycloak, the web UI and a demo MCP server, run the demo and stop
+everything again. Every command runs in the root of the repository.
 
 </p>
 
-### Prerequisites
+Step 1. Check the tools; each command must print a version:
 
-* [Java 21](https://www.oracle.com/java/technologies/downloads)
-* [Maven 3](https://maven.apache.org/index.html)
-* [Docker](https://www.docker.com)
-* [Kubernetes](https://kubernetes.io)
+| Tool   | Version | Check                    |
+|--------|---------|--------------------------|
+| Java   | 21      | `java -version`          |
+| Maven  | 3.9     | `mvn -version`           |
+| Docker | any     | `docker compose version` |
+| jq     | any     | `jq --version`           |
 
 Windows, shell and IDE settings are in [Local Environment Setup](docs/local-setup.md).
 
-### Build
+Step 2. Build the server, the verifier and the demo MCP server:
+
+```shell
+mvn -pl ledger/server,ledger/verifier,ledger/demo-mcp -am package -DskipTests=true
+```
+
+Step 3. Start the services:
+
+```shell
+docker compose --file ledger/compose.yaml --project-name ledger up -d --build
+```
+
+Step 4. Check that the ledger is up; the answer must be `{"status":"UP"}`:
+
+```shell
+curl -X GET http://localhost:8090/actuator/health
+```
+
+Step 5. Run the demo; it must end with `Result: VALID` for the package and `Result: INVALID` for the changed copy:
+
+```shell
+ledger/demo-mcp/demo.sh
+```
+
+Step 6. Open the web UI on http://localhost:5173, sign in with the operator key
+`nexusphere-ledger-development-key-change-me`, and look at the evidence the demo recorded. Sign out and sign in again
+as `alice` with the password `alice` to see her grants.
+
+Step 7. Stop everything and remove the data:
+
+```shell
+docker compose --file ledger/compose.yaml --project-name ledger down
+docker volume prune -f
+```
+
+<p style="text-align: justify;">
+
+Next, the [Ledger Guide](docs/ledger-guide.md) registers your own agents, grants them tools and connects real agents
+such as Claude Code.
+
+</p>
+
+## Build and Test
+
+Step 1. Compile every module:
 
 ```shell
 mvn validate clean compile
 ```
 
-### Test
+Step 2. Run the unit tests:
 
 ```shell
 mvn test
 ```
 
-### Package
-
-```shell
-mvn package -DskipTests=true
-```
-
-### Run
-
-```shell
-docker compose --file compose.yaml --project-name dev up -d postgresql adminer
-mvn install -DskipTests=true
-mvn -pl core/bootstrap spring-boot:start
-```
-
-### E2eTest
-
-```shell
-curl -X GET http://localhost:8080/actuator/health
-curl -X GET http://localhost:8080/api/v1/platform
-```
-
-```shell
-curl -X POST http://localhost:8080/api/v1/auth/operator-token -H "Content-Type: application/json" -d '{"secret":"nexusphere-development-operator-secret-change-me"}'
-curl -X POST http://localhost:8080/api/v1/networks -H "Authorization: Bearer {operatorToken}" -H "Content-Type: application/json" -d '{"name":"Network A"}'
-curl -X POST http://localhost:8080/api/v1/networks/{networkId}/activate -H "Authorization: Bearer {operatorToken}"
-curl -X POST http://localhost:8080/api/v1/networks/{networkId}/organizations -H "Authorization: Bearer {operatorToken}" -H "Content-Type: application/json" -d '{"name":"Acme"}'
-curl -X GET http://localhost:8080/api/v1/networks/{networkId}/organizations -H "Authorization: Bearer {operatorToken}"
-```
-
-### Stop
-
-```shell
-mvn -pl core/bootstrap spring-boot:stop
-docker compose --file compose.yaml --project-name dev down
-```
-
-### Verify
+Step 3. Run every test, including the integration and end-to-end tests; Docker must be running for Testcontainers:
 
 ```shell
 mvn verify
 docker volume prune -f
 ```
 
-## Dockerized
-
-### Deploy
+Step 4. Build the jars without tests:
 
 ```shell
-mvn clean package verify -DskipTests=true
-docker compose --file compose.yaml --project-name dev up --build -d
+mvn package -DskipTests=true
 ```
 
-### E2eTest
+<p style="text-align: justify;">
 
-```shell
-curl -X GET http://localhost:8080/actuator/health
-curl -X GET http://localhost:8080/api/v1/platform
-```
+The web UI is built and tested with npm, as described in [Nexusphere Frontend](frontend/README.md).
 
-### Down
-
-```shell
-docker compose --file compose.yaml --project-name dev down
-docker image rm samanalishiri/nexusphere:latest
-docker volume prune -f
-```
+</p>
 
 ## Kubernetes
 
-### Deploy
+<p style="text-align: justify;">
 
-```shell
-mvn clean package verify -DskipTests=true
-docker build -t samanalishiri/nexusphere:latest . --no-cache
-kubectl apply -f kube-dev.yaml
-```
+`ledger/kube-dev.yaml` runs the ledger, PostgreSQL, Adminer, Keycloak, the web UI and the demo MCP server in the `dev`
+namespace. The steps are in [Nexusphere Ledger](ledger/README.md#kubernetes).
 
-### Check Status
-
-```shell
-kubectl get all -n dev
-```
-
-### Port Forwarding
-
-```shell
-# PostgreSQL
-kubectl port-forward service/postgresql 5432:5432 -n dev
-```
-
-```shell
-# Adminer
-kubectl port-forward service/adminer 8082:8080 -n dev
-```
-
-```shell
-# Application
-kubectl port-forward service/application 8080:8080 -n dev
-```
-
-### E2eTest
-
-```shell
-curl -X GET http://localhost:8080/actuator/health
-curl -X GET http://localhost:8080/api/v1/platform
-```
-
-The ledger, its Keycloak and its UI have their own manifest in the same namespace, described in
-[Nexusphere Ledger](ledger/README.md#kubernetes).
-
-### Down
-
-```shell
-kubectl delete all --all -n dev
-kubectl delete secrets dev-credentials -n dev
-kubectl delete configMap dev-config -n dev
-kubectl delete persistentvolumeclaim postgres-pvc -n dev
-docker image rm samanalishiri/nexusphere:latest
-docker volume prune -f
-```
+</p>
 
 ## DevOps
 
@@ -219,9 +174,7 @@ The project ships [mvn-devops](https://github.com/oss-community/mvn-devops) 1.0.
 starts the chosen tools in Docker, configures them and runs the pipeline stages against this Maven project, either from
 the menu or from one of its 16 ready-made pipelines. Step-by-step use for this project, from `maven-sonarqube-nexus` up
 to `jenkins-complete`, is in [DevOps Step by Step](docs/devops-guide.md); its own guide is
-[mvn-devops/README.md](mvn-devops/README.md). Values and
-tokens are kept in `.devops/`, which is never committed. Shell, IntelliJ IDEA terminal and line-ending settings are in
-[Local Environment Setup](docs/local-setup.md).
+[mvn-devops/README.md](mvn-devops/README.md). Values and tokens are kept in `.devops/`, which is never committed.
 
 ```shell
 mvn-devops/devops.sh doctor
@@ -244,265 +197,25 @@ name.
 
 ## Service URLs
 
-* Application: [http://localhost:8080](http://localhost:8080)
-* Swagger UI: [http://localhost:8080/swagger-ui.html](http://localhost:8080/swagger-ui.html)
-* OpenAPI: [http://localhost:8080/v3/api-docs](http://localhost:8080/v3/api-docs)
-* Health: [http://localhost:8080/actuator/health](http://localhost:8080/actuator/health)
-* Adminer: [http://localhost:8082](http://localhost:8082)
+| Service      | URL                                                                            | Sign in                                                |
+|--------------|--------------------------------------------------------------------------------|--------------------------------------------------------|
+| Web UI       | [http://localhost:5173](http://localhost:5173)                                 | Operator key, or `alice`/`alice` and `bob`/`bob`       |
+| Ledger API   | [http://localhost:8090](http://localhost:8090)                                 | `Authorization: Bearer {key}`                          |
+| Health       | [http://localhost:8090/actuator/health](http://localhost:8090/actuator/health) | None                                                   |
+| Demo MCP     | http://localhost:8091/mcp                                                      | None, reached through the ledger at `/mcp/demo`        |
+| Keycloak     | [http://localhost:8180](http://localhost:8180)                                 | `admin`/`admin`                                        |
+| Adminer      | [http://localhost:8092](http://localhost:8092)                                 | Server `ledger-postgresql`, user and password `ledger` |
+| Prometheus   | [http://localhost:9090](http://localhost:9090)                                 | None                                                   |
+| Alertmanager | [http://localhost:9093](http://localhost:9093)                                 | None                                                   |
 
-```yaml
-System: PostgreSQL
-Server: postgresql:5432
-Username: nexusphere
-Password: nexusphere
-Database: nexusphere
-```
+## Repository Layout
 
-## Nexusphere Core
-
-<p style="text-align: justify;">
-
-The core is an optional reference integration, not a separate product. It shows how a multi-party platform feeds the
-ledger: with `APP_LEDGER_URL` set, every authorization decision, delegation change and other domain event with an
-actor is written to an outbox in the same database transaction and forwarded to the ledger as evidence. A delegation
-becomes a ledger grant from the delegator to the delegate, suspend and revoke revoke it, and resume grants it again, so
-the delegate can ask the core for a signed mandate to carry to other organizations. The ledger does not depend on it.
-
-</p>
-
-The vision, concepts, invariants, architecture, use cases, scenarios and roadmap are described in the
-[Project Description](docs/README.md). The end-to-end test scenarios are listed in
-[End-to-End Tests](core/core-e2e-tests/README.md).
-
-
-<p style="text-align: justify;">
-
-The core is a Spring Boot modular monolith. `core/bootstrap` is the only application and every bounded context is a
-Maven module with the package `com.nexusphere.<module>`. A module is reached by other modules only through its
-`contract` package, and it owns its PostgreSQL schema and its Flyway migrations under
-`src/main/resources/db/migration/<module>`.
-
-</p>
-
-### Modules
-
-| Module                | Responsibility                                                                                  |
-|-----------------------|-------------------------------------------------------------------------------------------------|
-| `core/shared`         | Identifiers, execution context, correlation ID, domain event envelope, error model              |
-| `core/network`        | Network lifecycle: PENDING, ACTIVE, SUSPENDED, ARCHIVED                                         |
-| `core/organization`   | Organizations registered inside a network                                                       |
-| `core/identity`       | Human, service, application, agent and machine identities and credentials                       |
-| `core/membership`     | Memberships, principal context and member listing                                               |
-| `core/authorization`  | Roles, role assignments, central ALLOW/DENY decisions recorded as evidence                      |
-| `core/trust`          | Scoped, directional, revocable trust between networks, organizations and identities             |
-| `core/federation`     | Federation lifecycle between two sovereign networks with scope and optimistic locking           |
-| `core/delegation`     | Constrained, time-bounded, revocable delegations between principals of one network              |
-| `core/capability`     | Capability types with versioned schemas, capabilities, visibility and withdrawal                |
-| `core/discovery`      | Governed local and federated capability discovery behind a port                                 |
-| `core/agreement`      | Versioned agreements between accountable parties, with acting principal and delegation          |
-| `core/transaction`    | Transactions under agreements: request, authorize or reject, execute, complete, fail, cancel    |
-| `core/audit`          | Append-only audit events, search and the accountability trail of a transaction                  |
-| `core/integration`    | Adapters: a JSON-RPC 2.0 agent gateway, a task gateway for machines, and the link to the ledger |
-| `core/bootstrap`      | Application, persistence wiring, error handling, architecture tests                             |
-| `core/core-e2e-tests` | End-to-end tests against the application and PostgreSQL                                         |
-
-### Profiles
-
-| Profile      | Description                     |
-|--------------|---------------------------------|
-| `postgresql` | PostgreSQL datasource (default) |
-| `json`       | Structured (ECS) console logs   |
-| `dev`        | Published development secrets   |
-
-```shell
-APP_PROFILES=postgresql,dev,json mvn -pl core/bootstrap spring-boot:start
-```
-
-### Environment Variables
-
-```yaml
-APP_HOST: 0.0.0.0
-APP_PORT: 8080
-APP_PROFILES: postgresql,dev
-APP_DATABASE_HOST: localhost
-APP_DATABASE_PORT: 5432
-APP_DATABASE_DB: nexusphere
-APP_DATABASE_USERNAME: nexusphere
-APP_DATABASE_PASSWORD: nexusphere
-APP_TOKEN_ISSUER: nexusphere
-APP_TOKEN_SECRET: nexusphere-development-token-secret-change-me
-APP_TOKEN_TTL: 15m
-APP_OPERATOR_SECRET: nexusphere-development-operator-secret-change-me
-APP_CREDENTIAL_TTL: 90d
-APP_CREDENTIAL_MAX_TTL: 365d
-APP_HTTP_THREADS: 20
-APP_DATABASE_POOL_SIZE: 21
-APP_LEDGER_URL: http://localhost:8090
-APP_LEDGER_API_KEY: nexusphere-ledger-development-key-change-me
-APP_LEDGER_FORWARD_INTERVAL: 5s
-APP_LEDGER_BATCH_SIZE: 100
-APP_SECRETS_DIR: /run/secrets/
-APP_MANAGEMENT_PORT:
-APP_RATE_LIMIT_PER_MINUTE: 1200
-APP_RATE_LIMIT_BURST: 200
-```
-
-`APP_TOKEN_SECRET` and `APP_OPERATOR_SECRET` have no default outside the `dev` profile, and the application refuses to
-start with the published development secrets unless `dev` is active. A request can hold two database connections, one
-for its work and one for its authorization decision, so the application refuses to start unless
-`APP_DATABASE_POOL_SIZE` is greater than `APP_HTTP_THREADS`.
-
-The `APP_LEDGER_*` variables connect the core to a [Nexusphere Ledger](ledger/README.md); without `APP_LEDGER_URL` the
-core runs on its own. Secrets can also come from files in `APP_SECRETS_DIR`, and metrics are on
-`/actuator/prometheus`; both are described in [Operations](docs/operations.md). Each caller, by token or by address
-when it has none, gets `APP_RATE_LIMIT_PER_MINUTE` requests a minute with bursts up to `APP_RATE_LIMIT_BURST`, and
-answers over it are 429 `RATE_LIMIT_EXCEEDED` with `Retry-After`; `0` turns the limit off.
-
-### API
-
-| Method | Path                                                                     | Description                                                                                                                                                                       |
-|--------|--------------------------------------------------------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| GET    | `/api/v1/platform`                                                       | Platform information                                                                                                                                                              |
-| POST   | `/api/v1/networks`                                                       | Create a network (operator)                                                                                                                                                       |
-| GET    | `/api/v1/networks`                                                       | List networks                                                                                                                                                                     |
-| GET    | `/api/v1/networks/{networkId}`                                           | Get a network                                                                                                                                                                     |
-| POST   | `/api/v1/networks/{networkId}/activate`                                  | Activate a network (operator)                                                                                                                                                     |
-| POST   | `/api/v1/networks/{networkId}/suspend`                                   | Suspend a network (operator)                                                                                                                                                      |
-| POST   | `/api/v1/networks/{networkId}/archive`                                   | Archive a network (operator)                                                                                                                                                      |
-| POST   | `/api/v1/networks/{networkId}/organizations`                             | Register an organization (network administrator)                                                                                                                                  |
-| GET    | `/api/v1/networks/{networkId}/organizations`                             | List organizations (member)                                                                                                                                                       |
-| GET    | `/api/v1/networks/{networkId}/organizations/{organizationId}`            | Get an organization (member)                                                                                                                                                      |
-| PUT    | `/api/v1/networks/{networkId}/organizations/{organizationId}`            | Rename an organization (network administrator)                                                                                                                                    |
-| POST   | `/api/v1/networks/{networkId}/organizations/{organizationId}/deactivate` | Deactivate an organization (network administrator)                                                                                                                                |
-| POST   | `/api/v1/identities`                                                     | Create an identity: HUMAN by the operator, owned identities by an administrator of the owning network                                                                             |
-| POST   | `/api/v1/identities/{identityId}/suspend`                                | Suspend an identity (operator, or administrator of the owning network)                                                                                                            |
-| POST   | `/api/v1/identities/{identityId}/activate`                               | Activate an identity (operator, or administrator of the owning network)                                                                                                           |
-| POST   | `/api/v1/identities/{identityId}/credentials`                            | Issue a credential secret with an optional `expiresAt` (operator, administrator of the owning network, or the identity itself)                                                    |
-| POST   | `/api/v1/identities/{identityId}/credentials/rotate`                     | Issue a new credential and revoke every other one, which also invalidates their tokens (same callers)                                                                             |
-| POST   | `/api/v1/identities/{identityId}/credentials/{credentialId}/revoke`      | Revoke a credential and the tokens issued from it (same callers)                                                                                                                  |
-| GET    | `/api/v1/identities/{identityId}/credentials`                            | List credentials with status ACTIVE, EXPIRED or REVOKED, never the secret (same callers)                                                                                          |
-| POST   | `/api/v1/auth/token`                                                     | Exchange a credential for a bearer token                                                                                                                                          |
-| POST   | `/api/v1/auth/operator-token`                                            | Exchange the platform operator secret (`APP_OPERATOR_SECRET`) for an operator bearer token                                                                                        |
-| POST   | `/api/v1/networks/{networkId}/memberships`                               | Activate a membership, optionally as `ADMINISTRATOR` (network administrator)                                                                                                      |
-| GET    | `/api/v1/networks/{networkId}/memberships`                               | List memberships (member)                                                                                                                                                         |
-| GET    | `/api/v1/networks/{networkId}/memberships/{membershipId}`                | Get a membership (member)                                                                                                                                                         |
-| POST   | `/api/v1/networks/{networkId}/memberships/{membershipId}/terminate`      | Terminate a membership (network administrator)                                                                                                                                    |
-| GET    | `/api/v1/networks/{networkId}/identities`                                | List member identities (bearer token)                                                                                                                                             |
-| GET    | `/api/v1/networks/{networkId}/identities/{identityId}`                   | Get a member identity (bearer token)                                                                                                                                              |
-| GET    | `/api/v1/principal`                                                      | Principal context for `X-Network-Id` (bearer token)                                                                                                                               |
-| POST   | `/api/v1/capability-types`                                               | Register a capability type or its next version (operator)                                                                                                                         |
-| GET    | `/api/v1/capability-types`                                               | List capability types, optionally by `code`                                                                                                                                       |
-| GET    | `/api/v1/capability-types/{typeId}`                                      | Get a capability type                                                                                                                                                             |
-| POST   | `/api/v1/networks/{networkId}/capabilities`                              | Register a capability (bearer token)                                                                                                                                              |
-| GET    | `/api/v1/networks/{networkId}/capabilities`                              | List visible capabilities (bearer token)                                                                                                                                          |
-| GET    | `/api/v1/networks/{networkId}/capabilities/{capabilityId}`               | Get a visible capability (bearer token)                                                                                                                                           |
-| POST   | `/api/v1/networks/{networkId}/capabilities/{capabilityId}/publish`       | Publish a capability (bearer token)                                                                                                                                               |
-| PUT    | `/api/v1/networks/{networkId}/capabilities/{capabilityId}/visibility`    | Change the visibility (bearer token)                                                                                                                                              |
-| POST   | `/api/v1/networks/{networkId}/capabilities/{capabilityId}/withdraw`      | Withdraw a capability (bearer token)                                                                                                                                              |
-| POST   | `/api/v1/networks/{networkId}/trust-relationships`                       | Establish trust from the network or an organization (bearer token)                                                                                                                |
-| GET    | `/api/v1/networks/{networkId}/trust-relationships`                       | List trust relationships, optionally by `direction` (bearer token)                                                                                                                |
-| GET    | `/api/v1/networks/{networkId}/trust-relationships/{trustId}`             | Get a trust relationship (bearer token)                                                                                                                                           |
-| POST   | `/api/v1/networks/{networkId}/trust-relationships/{trustId}/revoke`      | Revoke a trust relationship (bearer token)                                                                                                                                        |
-| GET    | `/api/v1/networks/{networkId}/trust-relationships/evaluation`            | Check whether a source trusts a target for a scope (bearer token)                                                                                                                 |
-| POST   | `/api/v1/networks/{networkId}/federations`                               | Propose a federation (administrator)                                                                                                                                              |
-| GET    | `/api/v1/networks/{networkId}/federations`                               | List federations of the network (bearer token)                                                                                                                                    |
-| GET    | `/api/v1/networks/{networkId}/federations/{federationId}`                | Get a federation (bearer token)                                                                                                                                                   |
-| POST   | `/api/v1/networks/{networkId}/federations/{federationId}/{action}`       | `submit`, `accept`, `reject`, `suspend`, `resume` or `terminate` (administrator)                                                                                                  |
-| GET    | `/api/v1/authorization/roles`                                            | Role catalog with the actions of each role                                                                                                                                        |
-| POST   | `/api/v1/authorization/evaluate`                                         | Evaluate an action and record the decision (bearer token)                                                                                                                         |
-| GET    | `/api/v1/authorization/decisions/{decisionId}`                           | Read a recorded decision (bearer token)                                                                                                                                           |
-| POST   | `/api/v1/networks/{networkId}/role-assignments`                          | Assign a role to a principal (`role:assign`)                                                                                                                                      |
-| GET    | `/api/v1/networks/{networkId}/role-assignments`                          | List role assignments, optionally by `principalId` (bearer token)                                                                                                                 |
-| POST   | `/api/v1/networks/{networkId}/role-assignments/{assignmentId}/revoke`    | Revoke a role assignment (`role:assign`)                                                                                                                                          |
-| POST   | `/api/v1/networks/{networkId}/delegations`                               | Grant a delegation with actions, constraints and validity (`delegation:grant`)                                                                                                    |
-| GET    | `/api/v1/networks/{networkId}/delegations`                               | List delegations, by `delegatePrincipalId`, `delegatorPrincipalId`, `effective` (bearer token)                                                                                    |
-| GET    | `/api/v1/networks/{networkId}/delegations/{delegationId}`                | Get a delegation with its derived status (bearer token)                                                                                                                           |
-| POST   | `/api/v1/networks/{networkId}/delegations/{delegationId}/{action}`       | `revoke`, `suspend` or `resume` (delegator or administrator)                                                                                                                      |
-| POST   | `/api/v1/networks/{networkId}/delegations/{delegationId}/mandates`       | Issue a ledger mandate for the delegation, by `audience` and `expiresAt` (delegator or delegate; needs the ledger)                                                                |
-| GET    | `/api/v1/networks/{networkId}/discovery/capabilities`                    | Search by `typeCode`, `ownerType`, `organizationId`, `originNetworkId`, `scope` (bearer token)                                                                                    |
-| GET    | `/api/v1/networks/{networkId}/discovery/capabilities/{capabilityId}`     | Get a discoverable capability, local or federated (bearer token)                                                                                                                  |
-| GET    | `/api/v1/networks/{networkId}/discovery/networks`                        | Other active networks with their federation state (bearer token)                                                                                                                  |
-| POST   | `/api/v1/networks/{networkId}/agreements`                                | Draft an agreement for a discovered capability (`agreement:propose`)                                                                                                              |
-| GET    | `/api/v1/networks/{networkId}/agreements`                                | List agreements the principal is party to (bearer token)                                                                                                                          |
-| GET    | `/api/v1/networks/{networkId}/agreements/{agreementId}`                  | Get an agreement with its current version (bearer token)                                                                                                                          |
-| GET    | `/api/v1/networks/{networkId}/agreements/{agreementId}/versions`         | All versions, also `/versions/{number}` (bearer token)                                                                                                                            |
-| POST   | `/api/v1/networks/{networkId}/agreements/{agreementId}/propose`          | Propose the draft (`agreement:propose`)                                                                                                                                           |
-| POST   | `/api/v1/networks/{networkId}/agreements/{agreementId}/revisions`        | Revise with `expectedVersion`, creating the next version (`agreement:propose`)                                                                                                    |
-| POST   | `/api/v1/networks/{networkId}/agreements/{agreementId}/{decision}`       | `accept` or `reject` a version (`agreement:accept`)                                                                                                                               |
-| POST   | `/api/v1/networks/{networkId}/agreements/{agreementId}/{action}`         | `activate`, `complete` or `terminate` (`agreement:manage`)                                                                                                                        |
-| POST   | `/api/v1/networks/{networkId}/transactions`                              | Request a transaction under an agreement (`transaction:initiate`)                                                                                                                 |
-| GET    | `/api/v1/networks/{networkId}/transactions`                              | List by `status`, `agreementId`, `capabilityId` (bearer token)                                                                                                                    |
-| GET    | `/api/v1/networks/{networkId}/transactions/{transactionId}`              | Get a transaction (bearer token)                                                                                                                                                  |
-| POST   | `/api/v1/networks/{networkId}/transactions/{transactionId}/{action}`     | `execute`, `complete` or `fail` by the provider (`transaction:execute`), `cancel` by the requester                                                                                |
-| GET    | `/api/v1/audit-events`                                                   | Search the network's audit by `transactionId`, `agreementId`, `delegationId`, `decisionId`, `principalId`, `correlationId`, `result`, `resourceType`, `resourceId` (`audit:read`) |
-| GET    | `/api/v1/audit-events/{auditEventId}`                                    | Get an audit event (`audit:read`)                                                                                                                                                 |
-| GET    | `/api/v1/audit-events/trail`                                             | Accountability chain and related events of a `transactionId` (`audit:read`)                                                                                                       |
-| GET    | `/api/v1/audit-events/platform`                                          | Platform audit stream of identity and credential changes, by `correlationId`, `resourceType`, `resourceId` (operator)                                                             |
-| GET    | `/api/v1/networks/{networkId}/agent/card`                                | Agent gateway card: protocol, endpoint, methods and the calling principal (bearer token)                                                                                          |
-| POST   | `/api/v1/networks/{networkId}/agent/rpc`                                 | JSON-RPC 2.0 agent gateway, single or batch (bearer token of the agent)                                                                                                           |
-| GET    | `/api/v1/networks/{networkId}/machine/tasks`                             | AUTHORIZED and EXECUTING transactions for capabilities the calling machine owns (machine token)                                                                                   |
-| POST   | `/api/v1/networks/{networkId}/machine/tasks/{taskId}/{action}`           | `start`, `complete` with a result, or `fail` with a reason (machine token, `transaction:execute`)                                                                                 |
-
-The platform operator creates networks, human identities and capability types and bootstraps the first network
-administrator; after that each network administrator manages its own organizations, memberships and owned identities.
-Every active member holds the MEMBER role; an `ADMINISTRATOR` membership holds NETWORK_ADMINISTRATOR. Requests that name an
-action in parentheses are checked by the central authorizer, which records an ALLOW or DENY decision. Every endpoint
-except `/api/v1/auth/*`, `/api/v1/platform`, health and the API docs needs a bearer token. While a network is
-suspended its members can still read, but every other authorized action is 409 `NETWORK_NOT_ACTIVE`. Requests marked with bearer token need `Authorization: Bearer <token>` and a network context, taken from the path
-or the `X-Network-Id` header. The identity must be active and hold an active membership in that network.
-
-```shell
-curl -X POST http://localhost:8080/api/v1/identities -H "Authorization: Bearer {operatorToken}" -H "Content-Type: application/json" -d '{"type":"HUMAN","displayName":"Alice"}'
-curl -X POST http://localhost:8080/api/v1/networks/{networkId}/memberships -H "Authorization: Bearer {operatorToken}" -H "Content-Type: application/json" -d '{"identityId":"{identityId}"}'
-curl -X POST http://localhost:8080/api/v1/identities/{identityId}/credentials -H "Authorization: Bearer {operatorToken}"
-curl -X POST http://localhost:8080/api/v1/auth/token -H "Content-Type: application/json" -d '{"identityId":"{identityId}","secret":"{secret}"}'
-curl -X GET http://localhost:8080/api/v1/principal -H "Authorization: Bearer {accessToken}" -H "X-Network-Id: {networkId}"
-```
-
-```shell
-curl -X POST http://localhost:8080/api/v1/capability-types -H "Authorization: Bearer {operatorToken}" -H "Content-Type: application/json" -d '{"code":"manufacturing.cnc","name":"CNC machining","schema":{"type":"object","required":["material"],"properties":{"material":{"type":"string"}}}}'
-curl -X POST http://localhost:8080/api/v1/networks/{networkId}/capabilities -H "Authorization: Bearer {accessToken}" -H "Content-Type: application/json" -d '{"name":"Precision CNC","typeCode":"manufacturing.cnc","specification":{"material":"steel"}}'
-curl -X POST http://localhost:8080/api/v1/networks/{networkId}/capabilities/{capabilityId}/publish -H "Authorization: Bearer {accessToken}" -H "Content-Type: application/json" -d '{"visibility":"NETWORK"}'
-curl -X GET http://localhost:8080/api/v1/networks/{networkId}/capabilities -H "Authorization: Bearer {accessToken}"
-```
-
-```shell
-curl -X POST http://localhost:8080/api/v1/networks/{networkA}/memberships -H "Authorization: Bearer {operatorToken}" -H "Content-Type: application/json" -d '{"identityId":"{identityId}","role":"ADMINISTRATOR"}'
-curl -X POST http://localhost:8080/api/v1/networks/{networkA}/trust-relationships -H "Authorization: Bearer {adminA}" -H "Content-Type: application/json" -d '{"target":{"type":"NETWORK","id":"{networkB}"},"scopes":["capability:discover"]}'
-curl -X POST http://localhost:8080/api/v1/networks/{networkA}/federations -H "Authorization: Bearer {adminA}" -H "Content-Type: application/json" -d '{"partnerNetworkId":"{networkB}","scopes":["CAPABILITY_DISCOVERY","AGREEMENT_CREATION"]}'
-curl -X POST http://localhost:8080/api/v1/networks/{networkA}/federations/{federationId}/submit -H "Authorization: Bearer {adminA}"
-curl -X POST http://localhost:8080/api/v1/networks/{networkB}/federations/{federationId}/accept -H "Authorization: Bearer {adminB}" -H "Content-Type: application/json" -d '{"version":1}'
-```
-
-An external agent uses its own token against the agent gateway. Methods: `capabilities/discover`, `capabilities/get`,
-`agreements/propose`, `agreements/get`, `transactions/request`, `transactions/get`. Core errors come back as JSON-RPC
-errors with the core code in `data.code`: -32602 validation, -32003 authorization, -32004 not found, -32009 conflict,
--32022 business rule.
-
-```shell
-curl -X POST http://localhost:8080/api/v1/networks/{networkA}/agent/rpc -H "Authorization: Bearer {agentToken}" -H "Content-Type: application/json" -d '{"jsonrpc":"2.0","id":1,"method":"capabilities/discover","params":{"typeCode":"manufacturing.cnc"}}'
-curl -X POST http://localhost:8080/api/v1/networks/{networkA}/agent/rpc -H "Authorization: Bearer {agentToken}" -H "Content-Type: application/json" -d '{"jsonrpc":"2.0","id":2,"method":"agreements/propose","params":{"capabilityId":"{capabilityId}","title":"CNC parts","terms":{"quantity":100}}}'
-```
-
-A machine that owns a capability uses its own token to pick up authorized transactions and report the outcome. It
-never sees a transaction that was rejected or that belongs to another owner.
-
-```shell
-curl -X GET http://localhost:8080/api/v1/networks/{networkB}/machine/tasks -H "Authorization: Bearer {machineToken}"
-curl -X POST http://localhost:8080/api/v1/networks/{networkB}/machine/tasks/{taskId}/start -H "Authorization: Bearer {machineToken}"
-curl -X POST http://localhost:8080/api/v1/networks/{networkB}/machine/tasks/{taskId}/complete -H "Authorization: Bearer {machineToken}" -H "Content-Type: application/json" -d '{"result":{"delivered":true}}'
-```
-
-Every response carries an `X-Correlation-Id` header. Errors use one model:
-
-```json
-{
-  "code": "NETWORK_NOT_ACTIVE",
-  "category": "CONFLICT",
-  "message": "Network 7c1e… is not active",
-  "correlationId": "4f0b…"
-}
-```
+| Folder       | Content                                                                                      |
+|--------------|----------------------------------------------------------------------------------------------|
+| `ledger`     | The ledger: chain, mandate, server, verifier, demo MCP server, end-to-end tests, conformance |
+| `frontend`   | The web UI in React and TypeScript                                                           |
+| `docs`       | The documents above and the PDF guide                                                        |
+| `mvn-devops` | The build and delivery toolkit                                                               |
 
 ##
 

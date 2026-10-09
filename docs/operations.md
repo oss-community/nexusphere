@@ -1,6 +1,6 @@
 # <p align="center">Operations</p>
 
-<p align="center">Secrets, signing keys, backup and restore, monitoring, alerts and rate limits for the core and the ledger.</p>
+<p align="center">Secrets, signing keys, backup and restore, monitoring, alerts and rate limits for the ledger.</p>
 
 ## <p align="center">Table of Content</p>
 
@@ -16,18 +16,20 @@
 
 <p style="text-align: justify;">
 
-Both applications read secrets from environment variables or from files. Every file in `LEDGER_SECRETS_DIR` (ledger)
-or `APP_SECRETS_DIR` (core), both `/run/secrets/` by default, becomes a setting named like the file, so a file
+The ledger reads secrets from environment variables or from files. Every file in `LEDGER_SECRETS_DIR`,
+`/run/secrets/` by default, becomes a setting named like the file, so a file
 `LEDGER_API_KEY` holding the key works exactly like the environment variable. A missing directory is ignored. This is
 how a secret manager hands secrets over without putting them in the environment: Docker secrets, Kubernetes secrets
 mounted as a volume, the Vault agent, the External Secrets Operator or the Secrets Store CSI driver all write files.
 
 </p>
 
-| Application | Secret files                                                                                            |
-|-------------|---------------------------------------------------------------------------------------------------------|
-| Ledger      | `LEDGER_API_KEY`, `LEDGER_SIGNING_PRIVATE_KEY`, `LEDGER_SIGNING_PUBLIC_KEY`, `LEDGER_DATABASE_PASSWORD` |
-| Core        | `APP_TOKEN_SECRET`, `APP_OPERATOR_SECRET`, `APP_DATABASE_PASSWORD`, `APP_LEDGER_API_KEY`                |
+| Secret file                  | Holds                                 |
+|------------------------------|---------------------------------------|
+| `LEDGER_API_KEY`             | The operator key                      |
+| `LEDGER_SIGNING_PRIVATE_KEY` | The base64 PKCS#8 Ed25519 signing key |
+| `LEDGER_SIGNING_PUBLIC_KEY`  | The base64 X.509 public key           |
+| `LEDGER_DATABASE_PASSWORD`   | The PostgreSQL password               |
 
 ### Docker Compose
 
@@ -94,11 +96,23 @@ and keep a second copy offline; a backup of the database without the key cannot 
 
 </p>
 
+Step 1. Generate an Ed25519 key:
+
 ```shell
 openssl genpkey -algorithm ed25519 -outform DER -out ledger-signing.der
+```
+
+Step 2. Write the private and the public key in the form the ledger reads:
+
+```shell
 base64 -w0 ledger-signing.der > ledger-signing-private-key
 openssl pkey -inform DER -in ledger-signing.der -pubout -outform DER | base64 -w0 > ledger-signing-public-key
 ```
+
+Step 3. Put both files in the secret manager as `LEDGER_SIGNING_PRIVATE_KEY` and `LEDGER_SIGNING_PUBLIC_KEY`, as in
+[Secrets](#secrets), keep one copy offline, and delete `ledger-signing.der`.
+
+Step 4. Start the ledger and check that `/api/v1/keys` shows the new key as `ACTIVE`.
 
 | Situation          | What to do                                                                                                                          |
 |--------------------|-------------------------------------------------------------------------------------------------------------------------------------|
@@ -116,15 +130,16 @@ The details of the rotation record are in [Key Rotation](../ledger/README.md#key
 
 ### What to Back Up
 
-| Data                                                                | Where                                                 | How                                                    |
-|---------------------------------------------------------------------|-------------------------------------------------------|--------------------------------------------------------|
-| Ledger evidence, checkpoints, grants, mandates, agents, key history | PostgreSQL schema `ledger`                            | Database backup                                        |
-| Ledger signing private key                                          | Secret manager                                        | The secret manager's own backup, plus one offline copy |
-| Core data and unsent evidence                                       | PostgreSQL, every core schema including `integration` | Database backup                                        |
-| Signed checkpoints                                                  | Outside the ledger, with auditors                     | Copy `/api/v1/checkpoints/latest` regularly            |
-| Log checkpoints                                                     | With independent witnesses                            | `LEDGER_LOG_WITNESSES_{NAME}_URL` and `_KEY`           |
+| Data                                                                | Where                             | How                                                    |
+|---------------------------------------------------------------------|-----------------------------------|--------------------------------------------------------|
+| Ledger evidence, checkpoints, grants, mandates, agents, key history | PostgreSQL schema `ledger`        | Database backup                                        |
+| Ledger signing private key                                          | Secret manager                    | The secret manager's own backup, plus one offline copy |
+| Signed checkpoints                                                  | Outside the ledger, with auditors | Copy `/api/v1/checkpoints/latest` regularly            |
+| Log checkpoints                                                     | With independent witnesses        | `LEDGER_LOG_WITNESSES_{NAME}_URL` and `_KEY`           |
 
 ### Logical Backup
+
+Step 1. Dump the `ledger` schema:
 
 ```shell
 docker exec ledger-postgresql pg_dump -U ledger -d ledger --schema=ledger --format=custom > ledger-$(date +%F).dump
@@ -132,17 +147,17 @@ docker exec ledger-postgresql pg_dump -U ledger -d ledger --schema=ledger --form
 
 ### Restore
 
+Step 1. Restore the dump into a new database:
+
 ```shell
 docker exec ledger-postgresql createdb -U ledger ledger_restored
 docker exec -i ledger-postgresql pg_restore -U ledger -d ledger_restored --no-owner < ledger-2026-10-09.dump
 ```
 
-<p style="text-align: justify;">
+Step 2. Start the ledger on the restored database (`LEDGER_DATABASE_DB=ledger_restored`) with the same signing key.
+The restore keeps the triggers that make evidence append-only.
 
-Point the ledger at the restored database (`LEDGER_DATABASE_DB=ledger_restored`) with the same signing key, start it
-and check the whole chain. The restore keeps the triggers that make evidence append-only.
-
-</p>
+Step 3. Check the whole chain:
 
 ```shell
 curl -s http://localhost:8090/api/v1/verification -H "Authorization: Bearer {operator key}"
@@ -170,70 +185,48 @@ it is back on the history the witnesses saw.
 
 </p>
 
-### The Core
-
-```shell
-docker exec postgresql pg_dump -U nexusphere -d nexusphere --format=custom > nexusphere-$(date +%F).dump
-```
-
-<p style="text-align: justify;">
-
-Back up the whole core database. Evidence the core has not yet delivered waits in `integration.ledger_outbox` and is
-sent after a restore; delivery is at least once, so an entry near the backup point can reach the ledger twice.
-
-</p>
-
 ## Monitoring
 
 ### Endpoints
 
-| Application | Health                                                                        | Metrics                |
-|-------------|-------------------------------------------------------------------------------|------------------------|
-| Ledger      | `/actuator/health`, `/actuator/health/liveness`, `/actuator/health/readiness` | `/actuator/prometheus` |
-| Core        | `/actuator/health`, `/actuator/health/liveness`, `/actuator/health/readiness` | `/actuator/prometheus` |
+| Health                                                                        | Metrics                |
+|-------------------------------------------------------------------------------|------------------------|
+| `/actuator/health`, `/actuator/health/liveness`, `/actuator/health/readiness` | `/actuator/prometheus` |
 
 <p style="text-align: justify;">
 
-By default these share the application port. Set `LEDGER_MANAGEMENT_PORT` or `APP_MANAGEMENT_PORT` to serve them on a
-separate port that only the cluster can reach, and point probes and Prometheus at it.
+By default these share the application port. Set `LEDGER_MANAGEMENT_PORT` to serve them on a separate port that only the cluster can reach, and point probes and Prometheus at it.
 
 </p>
 
 ### Metrics
 
-| Metric                                     | Meaning                                                   |
-|--------------------------------------------|-----------------------------------------------------------|
-| `ledger_head_sequence`                     | Sequence of the last evidence entry                       |
-| `ledger_checkpoint_sequence`               | Sequence covered by the latest signed checkpoint          |
-| `ledger_checkpoint_lag`                    | Entries not yet covered by a signed checkpoint            |
-| `ledger_checkpoint_age_seconds`            | Seconds since the latest signed checkpoint                |
-| `ledger_evidence_recorded_total`           | Entries appended, by `decision` and `outcome`             |
-| `nexusphere_ledger_outbox_pending`         | Core events not yet delivered to the ledger               |
-| `nexusphere_ledger_outbox_delivered_total` | Outbox messages by `result`: `sent`, `failed`, `rejected` |
-| `http_server_requests_seconds`             | Requests, latency and status for both applications        |
-| `jvm_*`, `hikaricp_*`                      | Memory, threads and database connection pools             |
+| Metric                           | Meaning                                          |
+|----------------------------------|--------------------------------------------------|
+| `ledger_head_sequence`           | Sequence of the last evidence entry              |
+| `ledger_checkpoint_sequence`     | Sequence covered by the latest signed checkpoint |
+| `ledger_checkpoint_lag`          | Entries not yet covered by a signed checkpoint   |
+| `ledger_checkpoint_age_seconds`  | Seconds since the latest signed checkpoint       |
+| `ledger_evidence_recorded_total` | Entries appended, by `decision` and `outcome`    |
+| `http_server_requests_seconds`   | Requests, latency and status                     |
+| `jvm_*`, `hikaricp_*`            | Memory, threads and database connection pools    |
 
 ### Prometheus
 
 <p style="text-align: justify;">
 
-The ledger compose file runs Prometheus on http://localhost:9090. It scrapes the ledger and a core running on the host
-at port 8080, with the configuration in `ledger/prometheus/prometheus.yml`. In Kubernetes the core and ledger pods
-carry the `prometheus.io/scrape`, `prometheus.io/path` and `prometheus.io/port` annotations.
+The ledger compose file runs Prometheus on http://localhost:9090. It scrapes the ledger with the configuration in
+`ledger/prometheus/prometheus.yml`. In Kubernetes the ledger pod carries the `prometheus.io/scrape`, `prometheus.io/path` and `prometheus.io/port` annotations.
 
 </p>
 
 ### Alerts
 
-| Alert                   | Fires when                                                            |
-|-------------------------|-----------------------------------------------------------------------|
-| `LedgerDown`            | The ledger has not answered for 1 minute                              |
-| `LedgerCheckpointStale` | New evidence has waited more than 10 minutes for a checkpoint         |
-| `LedgerHighErrorRate`   | The ledger answers more than one 5xx every ten seconds                |
-| `CoreDown`              | The core has not answered for 1 minute                                |
-| `LedgerOutboxBacklog`   | More than 1000 core events have waited 10 minutes                     |
-| `LedgerOutboxFailing`   | The core keeps failing to deliver evidence                            |
-| `LedgerOutboxRejected`  | The ledger refused core evidence; `last_error` in the outbox says why |
+| Alert                   | Fires when                                                    |
+|-------------------------|---------------------------------------------------------------|
+| `LedgerDown`            | The ledger has not answered for 1 minute                      |
+| `LedgerCheckpointStale` | New evidence has waited more than 10 minutes for a checkpoint |
+| `LedgerHighErrorRate`   | The ledger answers more than one 5xx every ten seconds        |
 
 <p style="text-align: justify;">
 
@@ -273,14 +266,13 @@ The first log line names the channels that are on, such as `Alert channels: emai
 out of the environment. A Slack webhook URL comes from an incoming webhook of a Slack app. A Telegram bot token comes
 from @BotFather, and the chat id is the user's or group's id after they send the bot a message. The webhook channel
 posts the Alertmanager JSON to any URL, such as a ticketing system or an on-call service. `ALERT_GROUP_WAIT` (30s),
-`ALERT_GROUP_INTERVAL` (5m) and `ALERT_REPEAT_INTERVAL` (4h) tune how often messages are sent. Without a core running
-on the host, `CoreDown` fires; run only the ledger's scrape job, or turn the channels on once the core runs too.
+`ALERT_GROUP_INTERVAL` (5m) and `ALERT_REPEAT_INTERVAL` (4h) tune how often messages are sent.
 
 </p>
 
 <p style="text-align: justify;">
 
-Delivery was checked end to end: with email and webhook on, Prometheus fired `CoreDown`, and the message reached a
+Delivery was checked end to end: with email and webhook on, Prometheus fired an alert, and the message reached a
 test mail server and the webhook. In Kubernetes, give Alertmanager the same entrypoint `ledger/alertmanager/entrypoint.sh`
 with these variables, or use the Alertmanager configuration of the cluster's own monitoring stack.
 
@@ -290,36 +282,35 @@ with these variables, or use the Alertmanager configuration of the cluster's own
 
 <p style="text-align: justify;">
 
-Both applications limit requests per caller. A caller is its token or API key, or its address when it sends none.
+The ledger limits requests per caller. A caller is its token or API key, or its address when it sends none.
 Each caller has a bucket that holds the burst and refills at the per-minute rate; a request over it is answered 429
 `RATE_LIMIT_EXCEEDED` with `Retry-After` in seconds. Health and metrics under `/actuator/` are never limited. The
 limit is per instance and kept in memory, so with several replicas a caller can reach the limit once on each.
 
 </p>
 
-| Application | Requests a minute                     | Burst                           |
-|-------------|---------------------------------------|---------------------------------|
-| Ledger      | `LEDGER_RATE_LIMIT_PER_MINUTE` (1200) | `LEDGER_RATE_LIMIT_BURST` (200) |
-| Core        | `APP_RATE_LIMIT_PER_MINUTE` (1200)    | `APP_RATE_LIMIT_BURST` (200)    |
+| Requests a minute                     | Burst                           |
+|---------------------------------------|---------------------------------|
+| `LEDGER_RATE_LIMIT_PER_MINUTE` (1200) | `LEDGER_RATE_LIMIT_BURST` (200) |
 
 <p style="text-align: justify;">
 
 `0` turns the limit off. Behind a reverse proxy the address comes from `X-Forwarded-For`, so anonymous callers are
-told apart; let only the proxy set that header. Keep a limit at the proxy as well when the applications are exposed
+told apart; let only the proxy set that header. Keep a limit at the proxy as well when the ledger is exposed
 to the internet, since it can also stop floods before they reach Java.
 
 </p>
 
 ## Production Checklist
 
-* Profiles without `dev`: the applications refuse to start with the published development secrets
-* Operator keys, token secrets and the signing key from the secret manager, as files
+* Profiles without `dev`: the ledger refuses to start with the published development secrets
+* The operator key, the database password and the signing key from the secret manager, as files
 * A signing key generated for this ledger, with an offline copy
-* TLS at a reverse proxy or ingress in front of both applications; they speak plain HTTP
+* TLS at a reverse proxy or ingress in front of the ledger; it speaks plain HTTP
 * Management port reachable only inside the cluster
 * WAL archiving with point-in-time recovery, plus a regular logical dump, and a restore tested once
 * Signed checkpoints copied outside the ledger, and at least one independent witness cosigning the log
-* Prometheus scraping both applications, and at least one alert channel on
+* Prometheus scraping the ledger, and at least one alert channel on
 * Rate limits sized for the expected traffic, plus a limit at the reverse proxy for internet-facing deployments
 * `LEDGER_OIDC_*` set so principals approve grants with their own sign-in
 
