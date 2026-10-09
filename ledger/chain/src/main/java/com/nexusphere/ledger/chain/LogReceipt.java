@@ -15,6 +15,11 @@ public record LogReceipt(CoseSign1 message, String issuer, long treeSize, long l
 
     public static byte[] sign(String issuer, String keyId, long treeSize, long leafIndex, List<byte[]> path,
                               byte[] root, PrivateKey key) {
+        return sign(issuer, keyId, treeSize, leafIndex, path, root, Signer.of(key));
+    }
+
+    public static byte[] sign(String issuer, String keyId, long treeSize, long leafIndex, List<byte[]> path,
+                              byte[] root, Signer key) {
         Map<Object, Object> header = Map.of(
                 CoseSign1.ALG, CoseSign1.EDDSA,
                 CoseSign1.KID, keyId.getBytes(StandardCharsets.US_ASCII),

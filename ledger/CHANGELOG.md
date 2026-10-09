@@ -38,6 +38,8 @@ agent platforms and gateways.
 * Adapters that record or decide tool calls: a LangGraph callback handler and `govern` wrapper, OpenAI Agents SDK run
   hooks with a tool input guardrail, an Amazon Bedrock AgentCore Gateway interceptor for Lambda, and an agentgateway
   tracing configuration with an end-to-end check
+* Signing providers: the ledger signs through a local key or a HashiCorp Vault transit key that never leaves Vault;
+  a Vault key rotation becomes an endorsed ledger rotation, and a move from a local key to Vault is endorsed too
 * Browser verifier: one self-contained HTML page in React and TypeScript that verifies a package with the
   TypeScript SDK, pinned to the ledger key and optional witnesses, with a Content Security Policy that blocks every
   connection

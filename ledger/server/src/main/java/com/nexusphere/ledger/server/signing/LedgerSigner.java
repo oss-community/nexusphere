@@ -8,6 +8,7 @@ import com.nexusphere.ledger.chain.LogCheckpoint;
 import com.nexusphere.ledger.chain.LogReceipt;
 import com.nexusphere.ledger.chain.NoteKey;
 import com.nexusphere.ledger.chain.SignedCheckpoint;
+import com.nexusphere.ledger.chain.Signer;
 import com.nexusphere.ledger.chain.SigningKeys;
 import com.nexusphere.ledger.mandate.Jws;
 import com.nexusphere.ledger.mandate.MandateClaims;
@@ -27,20 +28,17 @@ import java.util.Optional;
 @Component
 public class LedgerSigner {
 
-    private final PrivateKey privateKey;
+    private final SigningProvider provider;
+    private final Signer signer;
     private final SigningKeys.PublicKeyInfo publicKey;
     private final List<SigningKey> keys;
 
-    LedgerSigner(LedgerProperties properties, SigningKeyStore store, TransactionTemplate transactions, Clock clock) {
+    LedgerSigner(LedgerProperties properties, SigningProvider provider, SigningKeyStore store,
+                 TransactionTemplate transactions, Clock clock) {
+        this.provider = provider;
+        this.signer = provider.signer();
+        this.publicKey = provider.publicKey();
         LedgerProperties.Signing signing = properties.signing();
-        if (signing == null || isBlank(signing.privateKey()) || isBlank(signing.publicKey())) {
-            throw new IllegalStateException("ledger.signing.private-key and ledger.signing.public-key must be set");
-        }
-        this.privateKey = SigningKeys.decodePrivate(signing.privateKey());
-        this.publicKey = SigningKeys.PublicKeyInfo.of(SigningKeys.decodePublic(signing.publicKey()));
-        if (!SigningKeys.matches(privateKey, publicKey.publicKey())) {
-            throw new IllegalStateException("ledger.signing.public-key does not belong to ledger.signing.private-key");
-        }
         this.keys = List.copyOf(transactions.execute(status -> activate(signing, store, clock.instant())));
     }
 
@@ -61,56 +59,63 @@ public class LedgerSigner {
             return store.all();
         }
         SigningKey previous = active.get();
-        PrivateKey previousPrivateKey = null;
-        if (!isBlank(signing.previousPrivateKey())) {
-            previousPrivateKey = SigningKeys.decodePrivate(signing.previousPrivateKey());
-            if (!SigningKeys.matches(previousPrivateKey, previous.publicKey().publicKey())) {
-                throw new IllegalStateException("ledger.signing.previous-private-key does not belong to the active "
-                        + "signing key " + previous.keyId());
-            }
-        } else if (!signing.unendorsedRotation()) {
+        Signer previousSigner = provider.signerFor(previous.publicKey())
+                .orElseGet(() -> configuredPrevious(signing, previous));
+        if (previousSigner == null && (signing == null || !signing.unendorsedRotation())) {
             throw new IllegalStateException("The signing key changes from " + previous.keyId() + " to "
                     + publicKey.keyId() + "; set ledger.signing.previous-private-key to the key of "
                     + previous.keyId() + ", or ledger.signing.unendorsed-rotation to true if that key is lost");
         }
-        KeyRotation rotation = KeyRotation.issue(publicKey, privateKey, previous.keyId(), previousPrivateKey, now);
+        KeyRotation rotation = KeyRotation.issue(publicKey, signer, previous.keyId(), previousSigner, now);
         store.retire(previous.keyId(), now);
         store.insert(new SigningKey(publicKey, rotation.activatedAt(), null, rotation, null));
         return store.all();
     }
 
+    private static Signer configuredPrevious(LedgerProperties.Signing signing, SigningKey previous) {
+        if (signing == null || signing.previousPrivateKey() == null || signing.previousPrivateKey().isBlank()) {
+            return null;
+        }
+        PrivateKey previousPrivateKey = SigningKeys.decodePrivate(signing.previousPrivateKey());
+        if (!SigningKeys.matches(previousPrivateKey, previous.publicKey().publicKey())) {
+            throw new IllegalStateException("ledger.signing.previous-private-key does not belong to the active "
+                    + "signing key " + previous.keyId());
+        }
+        return Signer.of(previousPrivateKey);
+    }
+
     public SignedCheckpoint sign(long sequence, String headHash, Instant createdAt) {
         Checkpoint checkpoint = new Checkpoint(sequence, headHash, createdAt, publicKey.keyId());
-        return new SignedCheckpoint(checkpoint, SigningKeys.sign(privateKey, checkpoint.signedBytes()));
+        return new SignedCheckpoint(checkpoint, SigningKeys.sign(signer, checkpoint.signedBytes()));
     }
 
     public LogCheckpoint.Note sign(LogCheckpoint checkpoint) {
-        return checkpoint.sign(new NoteKey(checkpoint.origin(), NoteKey.ED25519, publicKey.publicKey()), privateKey);
+        return checkpoint.sign(new NoteKey(checkpoint.origin(), NoteKey.ED25519, publicKey.publicKey()), signer);
     }
 
     public LogCheckpoint.Signature cosign(String name, String body, long time) {
-        return LogCheckpoint.cosign(body, new NoteKey(name, NoteKey.COSIGNATURE, publicKey.publicKey()), privateKey,
+        return LogCheckpoint.cosign(body, new NoteKey(name, NoteKey.COSIGNATURE, publicKey.publicKey()), signer,
                 time);
     }
 
     public byte[] signStatement(EvidenceEntry entry, String issuer) {
-        return EvidenceStatement.sign(entry, issuer, publicKey.keyId(), privateKey);
+        return EvidenceStatement.sign(entry, issuer, publicKey.keyId(), signer);
     }
 
     public byte[] signReceipt(String issuer, long treeSize, long leafIndex, List<byte[]> path, byte[] root) {
-        return LogReceipt.sign(issuer, publicKey.keyId(), treeSize, leafIndex, path, root, privateKey);
+        return LogReceipt.sign(issuer, publicKey.keyId(), treeSize, leafIndex, path, root, signer);
     }
 
     public String signMandate(MandateClaims claims) {
-        return Mandates.issue(claims, publicKey.keyId(), privateKey);
+        return Mandates.issue(claims, publicKey.keyId(), signer);
     }
 
     public String signStatusList(StatusList statusList) {
-        return statusList.sign(publicKey.keyId(), privateKey);
+        return statusList.sign(publicKey.keyId(), signer);
     }
 
     public String sign(String type, Map<String, ?> payload) {
-        return Jws.sign(type, publicKey.keyId(), payload, privateKey);
+        return Jws.sign(type, publicKey.keyId(), payload, signer);
     }
 
     public SigningKeys.PublicKeyInfo publicKey() {
@@ -123,9 +128,5 @@ public class LedgerSigner {
 
     public Optional<SigningKeys.PublicKeyInfo> find(String keyId) {
         return keys.stream().filter(k -> k.keyId().equals(keyId)).map(SigningKey::publicKey).findFirst();
-    }
-
-    private static boolean isBlank(String value) {
-        return value == null || value.isBlank();
     }
 }

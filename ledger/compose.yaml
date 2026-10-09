@@ -55,6 +55,34 @@ services:
     restart: always
     ports:
       - "8091:8091"
+  vault:
+    image: hashicorp/vault:2.1
+    container_name: vault
+    hostname: vault
+    restart: always
+    ports:
+      - "8200:8200"
+    environment:
+      VAULT_DEV_ROOT_TOKEN_ID: ${VAULT_DEV_ROOT_TOKEN:-nexusphere-vault-development-token}
+      SKIP_SETCAP: "true"
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:8200/v1/sys/health"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+  vault-init:
+    image: hashicorp/vault:2.1
+    container_name: vault-init
+    restart: "no"
+    environment:
+      VAULT_ADDR: http://vault:8200
+      VAULT_TOKEN: ${VAULT_DEV_ROOT_TOKEN:-nexusphere-vault-development-token}
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - vault secrets list | grep -q '^transit/' || vault secrets enable transit; vault read transit/keys/nexusphere-ledger > /dev/null 2>&1 || vault write -f transit/keys/nexusphere-ledger type=ed25519
+    depends_on:
+      vault:
+        condition: service_healthy
   ledger:
     image: samanalishiri/nexusphere-ledger:latest
     build:
@@ -80,9 +108,15 @@ services:
       LEDGER_OIDC_AUDIENCE: nexusphere-ledger
       LEDGER_OIDC_JWKS_URI: http://keycloak:8080/realms/nexusphere/protocol/openid-connect/certs
       LEDGER_OIDC_PRINCIPAL_CLAIM: preferred_username
+      LEDGER_SIGNING_PROVIDER: ${LEDGER_SIGNING_PROVIDER:-local}
+      LEDGER_SIGNING_PREVIOUS_PRIVATE_KEY: MC4CAQAwBQYDK2VwBCIEIDPXxsOX77t9k2XIr5aVh1AORIeW8w4rXooP+vMeOPKL
+      LEDGER_SIGNING_VAULT_ADDRESS: http://vault:8200
+      LEDGER_SIGNING_VAULT_TOKEN: ${VAULT_DEV_ROOT_TOKEN:-nexusphere-vault-development-token}
     depends_on:
       ledger-postgresql:
         condition: service_healthy
+      vault-init:
+        condition: service_completed_successfully
       demo-mcp:
         condition: service_started
       keycloak:

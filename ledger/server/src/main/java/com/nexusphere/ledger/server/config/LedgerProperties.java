@@ -18,8 +18,12 @@ public record LedgerProperties(Security security, Signing signing, Checkpoint ch
     public record Security(String apiKey) {
     }
 
-    public record Signing(String privateKey, String publicKey, String previousPrivateKey,
-                          boolean unendorsedRotation) {
+    public record Signing(String provider, String privateKey, String publicKey, String previousPrivateKey,
+                          boolean unendorsedRotation, Vault vault) {
+
+        public record Vault(String address, String token, String tokenFile, String namespace, String mount,
+                            String key, Duration timeout) {
+        }
     }
 
     public record Oidc(String issuer, String audience, URI jwksUri, String principalClaim, String clientId) {

@@ -126,6 +126,44 @@ The details of the rotation record are in [Key Rotation](../ledger/README.md#key
 
 </p>
 
+### Keys in Vault
+
+<p style="text-align: justify;">
+
+In production the key is better kept in HashiCorp Vault, where it cannot be copied out. The ledger signs through the
+transit engine, as described in [Keys in Vault](../ledger/README.md#keys-in-vault).
+
+</p>
+
+Step 1. Create the transit key; `exportable` stays false, so nobody can read the private key:
+
+```shell
+vault secrets enable transit
+vault write -f transit/keys/nexusphere-ledger type=ed25519
+```
+
+Step 2. Give the ledger a policy with only what it needs, and a token or an auth role bound to it:
+
+```shell
+vault policy write nexusphere-ledger - <<'POLICY'
+path "transit/keys/nexusphere-ledger" { capabilities = ["read"] }
+path "transit/sign/nexusphere-ledger" { capabilities = ["update"] }
+POLICY
+```
+
+Step 3. Start the ledger with `LEDGER_SIGNING_PROVIDER=vault`, `LEDGER_SIGNING_VAULT_ADDRESS` and the token in
+`LEDGER_SIGNING_VAULT_TOKEN_FILE`, written by the Vault agent; when the ledger signed with a local key before, add that
+key as `LEDGER_SIGNING_PREVIOUS_PRIVATE_KEY` for this one start.
+
+Step 4. Check that `/api/v1/keys` shows the Vault key as `ACTIVE`.
+
+<p style="text-align: justify;">
+
+To rotate, rotate the transit key in Vault and restart every instance; keep older versions in Vault, since the ledger
+needs the previous version once to endorse the new one.
+
+</p>
+
 ## Backup and Restore
 
 ### What to Back Up
@@ -305,7 +343,7 @@ to the internet, since it can also stop floods before they reach Java.
 
 * Profiles without `dev`: the ledger refuses to start with the published development secrets
 * The operator key, the database password and the signing key from the secret manager, as files
-* A signing key generated for this ledger, with an offline copy
+* A signing key generated for this ledger, with an offline copy, or a non-exportable Vault transit key
 * TLS at a reverse proxy or ingress in front of the ledger; it speaks plain HTTP
 * Management port reachable only inside the cluster
 * WAL archiving with point-in-time recovery, plus a regular logical dump, and a restore tested once

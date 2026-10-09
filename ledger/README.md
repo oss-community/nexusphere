@@ -110,6 +110,7 @@ curl -X GET http://localhost:8090/actuator/health
 | `ledger-adminer`    | http://localhost:8092     | Adminer for `ledger-postgresql`                  |
 | `keycloak`          | http://localhost:8180     | Keycloak, admin `admin`/`admin`                  |
 | `ledger-ui`         | http://localhost:5173     | The web UI, built from `frontend`                |
+| `vault`             | http://localhost:8200     | Vault in development mode with a transit key     |
 | `otel-collector`    | localhost:4317, 4318      | OpenTelemetry Collector, OTLP gRPC and HTTP      |
 | `prometheus`        | http://localhost:9090     | Prometheus with the ledger alerts                |
 | `alertmanager`      | http://localhost:9093     | Alertmanager, no channel until one is set        |
@@ -272,10 +273,18 @@ LEDGER_DATABASE_DB: ledger
 LEDGER_DATABASE_USERNAME: ledger
 LEDGER_DATABASE_PASSWORD: ledger
 LEDGER_API_KEY:
+LEDGER_SIGNING_PROVIDER: local
 LEDGER_SIGNING_PRIVATE_KEY:
 LEDGER_SIGNING_PUBLIC_KEY:
 LEDGER_SIGNING_PREVIOUS_PRIVATE_KEY:
 LEDGER_SIGNING_UNENDORSED_ROTATION: false
+LEDGER_SIGNING_VAULT_ADDRESS:
+LEDGER_SIGNING_VAULT_TOKEN:
+LEDGER_SIGNING_VAULT_TOKEN_FILE:
+LEDGER_SIGNING_VAULT_NAMESPACE:
+LEDGER_SIGNING_VAULT_MOUNT: transit
+LEDGER_SIGNING_VAULT_KEY: nexusphere-ledger
+LEDGER_SIGNING_VAULT_TIMEOUT: 10s
 LEDGER_CHECKPOINT_INTERVAL: 1m
 LEDGER_LOG_ORIGIN:
 LEDGER_LOG_WITNESS_TIMEOUT: 10s
@@ -311,7 +320,9 @@ LEDGER_RATE_LIMIT_BURST: 200
 
 `LEDGER_API_KEY` and the signing keys have no default outside the `dev` profile, and the ledger refuses to start with
 the published development secrets unless `dev` is active. The private key is a base64 PKCS#8 Ed25519 key and the public
-key is its base64 X.509 encoding; the ledger refuses to start when they do not match. The tables live in the `ledger`
+key is its base64 X.509 encoding; the ledger refuses to start when they do not match. With
+`LEDGER_SIGNING_PROVIDER=vault` the private key stays in a HashiCorp Vault transit key and the `LEDGER_SIGNING_VAULT_*`
+settings replace both keys, as in [Keys in Vault](#keys-in-vault). The tables live in the `ledger`
 schema, so the ledger can share a database with other applications. Any setting can also come from a file of the same name in
 `LEDGER_SECRETS_DIR`, which is how a secret manager hands over keys; backups, keys and metrics are described in
 [Operations](../docs/operations.md). Each caller, by key or by address when it has none, gets
@@ -550,6 +561,46 @@ export LEDGER_SIGNING_PRIVATE_KEY=$(base64 -w0 ledger-signing-2.der)
 export LEDGER_SIGNING_PUBLIC_KEY=$(openssl pkey -inform DER -in ledger-signing-2.der -pubout -outform DER | base64 -w0)
 curl http://localhost:8090/api/v1/keys -H "Authorization: Bearer nexusphere-ledger-development-key-change-me"
 ```
+
+### Keys in Vault
+
+<p style="text-align: justify;">
+
+With `LEDGER_SIGNING_PROVIDER=vault` the ledger never holds its private key. It reads the public keys of every version
+of an Ed25519 key in the Vault transit engine, signs with the latest version through `POST /v1/{mount}/sign/{key}`, and
+checks at startup that Vault's signature matches the published key. The token comes from
+`LEDGER_SIGNING_VAULT_TOKEN`, or from `LEDGER_SIGNING_VAULT_TOKEN_FILE`, which is read again on every call so the Vault
+agent can renew it. A rotation in Vault (`vault write -f transit/keys/{key}/rotate`) becomes a ledger rotation at the
+next restart, endorsed by the previous version, which Vault still holds. Moving from a local key to Vault is endorsed
+when `LEDGER_SIGNING_PREVIOUS_PRIVATE_KEY` holds the local key for that one restart.
+
+</p>
+
+Step 1. Start the stack with Vault signing; the compose file runs Vault in development mode and creates the key:
+
+```shell
+LEDGER_SIGNING_PROVIDER=vault docker compose --file ledger/compose.yaml --project-name ledger up -d --build
+```
+
+Step 2. Check the keys; the last one must be `ACTIVE` with a rotation endorsed by the development key:
+
+```shell
+curl -s http://localhost:8090/api/v1/keys -H "Authorization: Bearer nexusphere-ledger-development-key-change-me" | jq '.[] | {keyId, status, previous: .rotation.previousKeyId}'
+```
+
+Step 3. Rotate the key in Vault and restart the ledger; one more key must appear, endorsed by the one before:
+
+```shell
+docker exec -e VAULT_TOKEN=nexusphere-vault-development-token vault vault write -f transit/keys/nexusphere-ledger/rotate
+docker compose --file ledger/compose.yaml --project-name ledger restart ledger
+```
+
+<p style="text-align: justify;">
+
+A retired key never signs again, so going back to `local` after this needs a new local key and its own rotation. The
+Vault policy of the ledger's token needs only `read` on `{mount}/keys/{key}` and `update` on `{mount}/sign/{key}`.
+
+</p>
 
 ## Agents, Grants and Decisions
 

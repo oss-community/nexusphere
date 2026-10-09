@@ -122,6 +122,7 @@ server's API.
 * Java 21, Spring Boot 4.1, Maven
 * PostgreSQL 18 with the `ledger` schema and Flyway migrations
 * Spring JDBC, Spring Security OAuth2 JOSE for principal tokens, Micrometer with Prometheus
+* HashiCorp Vault transit as an optional home for the signing key
 * React and TypeScript for the web UI and the browser verifier
 * Python and TypeScript SDKs that implement every format independently
 * Go for the OpenTelemetry Collector exporter

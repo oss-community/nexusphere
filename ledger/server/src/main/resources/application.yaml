@@ -22,10 +22,19 @@ ledger:
   security:
     api-key: ${LEDGER_API_KEY:}
   signing:
+    provider: ${LEDGER_SIGNING_PROVIDER:local}
     private-key: ${LEDGER_SIGNING_PRIVATE_KEY:}
     public-key: ${LEDGER_SIGNING_PUBLIC_KEY:}
     previous-private-key: ${LEDGER_SIGNING_PREVIOUS_PRIVATE_KEY:}
     unendorsed-rotation: ${LEDGER_SIGNING_UNENDORSED_ROTATION:false}
+    vault:
+      address: ${LEDGER_SIGNING_VAULT_ADDRESS:}
+      token: ${LEDGER_SIGNING_VAULT_TOKEN:}
+      token-file: ${LEDGER_SIGNING_VAULT_TOKEN_FILE:}
+      namespace: ${LEDGER_SIGNING_VAULT_NAMESPACE:}
+      mount: ${LEDGER_SIGNING_VAULT_MOUNT:transit}
+      key: ${LEDGER_SIGNING_VAULT_KEY:nexusphere-ledger}
+      timeout: ${LEDGER_SIGNING_VAULT_TIMEOUT:10s}
   checkpoint:
     interval: ${LEDGER_CHECKPOINT_INTERVAL:1m}
   log:

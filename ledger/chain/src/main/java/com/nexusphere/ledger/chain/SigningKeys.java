@@ -69,14 +69,27 @@ public final class SigningKeys {
     }
 
     public static String sign(PrivateKey key, byte[] data) {
+        return Base64.getEncoder().encodeToString(signRaw(key, data));
+    }
+
+    public static String sign(Signer signer, byte[] data) {
+        return Base64.getEncoder().encodeToString(signer.sign(data));
+    }
+
+    static byte[] signRaw(PrivateKey key, byte[] data) {
         try {
             Signature signature = Signature.getInstance(ALGORITHM);
             signature.initSign(key);
             signature.update(data);
-            return Base64.getEncoder().encodeToString(signature.sign());
+            return signature.sign();
         } catch (GeneralSecurityException e) {
             throw new IllegalStateException("Signing failed", e);
         }
+    }
+
+    public static boolean matches(Signer signer, PublicKey publicKey) {
+        byte[] probe = "nexusphere-ledger/key-check".getBytes(StandardCharsets.UTF_8);
+        return verify(publicKey, probe, sign(signer, probe));
     }
 
     public static boolean verify(PublicKey key, byte[] data, String base64Signature) {
