@@ -115,25 +115,25 @@ sovereignty is logical and enforced by the network context of every request.
 
 ### Modules
 
-| Module                | Responsibility                                                                       | Depends on                                                              |
-|-----------------------|--------------------------------------------------------------------------------------|-------------------------------------------------------------------------|
-| `core/shared`         | Identifiers, execution context, correlation ID, event envelope, time, error model    | nothing                                                                 |
-| `core/network`        | Network lifecycle                                                                    | shared                                                                  |
-| `core/organization`   | Organizations inside a network                                                       | network                                                                 |
-| `core/identity`       | Identities, ownership, credentials                                                   | network, organization                                                   |
-| `core/membership`     | Memberships and principal resolution                                                 | identity, organization, network                                         |
-| `core/authorization`  | Roles and central authorization decisions; defines evidence ports                    | membership, identity, network                                           |
-| `core/trust`          | Scoped, directional trust from networks and organizations                            | identity, membership, network, organization                             |
-| `core/federation`     | Federation lifecycle and scope                                                       | membership, network, trust                                              |
-| `core/delegation`     | Delegations and their constraints                                                    | authorization, membership, network                                      |
-| `core/capability`     | Capability types and capabilities                                                    | authorization, identity, membership, network, organization              |
-| `core/discovery`      | Local and federated capability discovery                                             | capability, federation, network, authorization                          |
-| `core/agreement`      | Versioned agreements                                                                 | authorization, discovery, membership                                    |
-| `core/transaction`    | Transactions under agreements                                                        | agreement, authorization, capability                                    |
-| `core/audit`          | Append-only audit events and accountability trails                                   | identity, authorization, membership, capability, agreement, transaction |
-| `core/integration`    | Agent and machine adapters                                                           | membership, discovery, agreement, transaction                           |
-| `core/bootstrap`      | Application, security, persistence wiring, error handling, architecture tests        | all modules                                                             |
-| `core/core-e2e-tests` | Black-box end-to-end tests, see [End-to-End Tests](../core/core-e2e-tests/README.md) | bootstrap at test time                                                  |
+| Module                                                    | Responsibility                                                                    | Depends on                                                              |
+|-----------------------------------------------------------|-----------------------------------------------------------------------------------|-------------------------------------------------------------------------|
+| [`core/shared`](../core/shared/README.md)                 | Identifiers, execution context, correlation ID, event envelope, time, error model | nothing                                                                 |
+| [`core/network`](../core/network/README.md)               | Network lifecycle                                                                 | shared                                                                  |
+| [`core/organization`](../core/organization/README.md)     | Organizations inside a network                                                    | network                                                                 |
+| [`core/identity`](../core/identity/README.md)             | Identities, ownership, credentials                                                | network, organization                                                   |
+| [`core/membership`](../core/membership/README.md)         | Memberships and principal resolution                                              | identity, organization, network                                         |
+| [`core/authorization`](../core/authorization/README.md)   | Roles and central authorization decisions; defines evidence ports                 | membership, identity, network                                           |
+| [`core/trust`](../core/trust/README.md)                   | Scoped, directional trust from networks and organizations                         | identity, membership, network, organization                             |
+| [`core/federation`](../core/federation/README.md)         | Federation lifecycle and scope                                                    | membership, network, trust                                              |
+| [`core/delegation`](../core/delegation/README.md)         | Delegations and their constraints                                                 | authorization, membership, network                                      |
+| [`core/capability`](../core/capability/README.md)         | Capability types and capabilities                                                 | authorization, identity, membership, network, organization              |
+| [`core/discovery`](../core/discovery/README.md)           | Local and federated capability discovery                                          | capability, federation, network, authorization                          |
+| [`core/agreement`](../core/agreement/README.md)           | Versioned agreements                                                              | authorization, discovery, membership                                    |
+| [`core/transaction`](../core/transaction/README.md)       | Transactions under agreements                                                     | agreement, authorization, capability                                    |
+| [`core/audit`](../core/audit/README.md)                   | Append-only audit events and accountability trails                                | identity, authorization, membership, capability, agreement, transaction |
+| [`core/integration`](../core/integration/README.md)       | Agent and machine adapters                                                        | membership, discovery, agreement, transaction                           |
+| [`core/bootstrap`](../core/bootstrap/README.md)           | Application, security, persistence wiring, error handling, architecture tests     | all modules                                                             |
+| [`core/core-e2e-tests`](../core/core-e2e-tests/README.md) | Black-box end-to-end tests                                                        | bootstrap at test time                                                  |
 
 ### Inside a Module
 
