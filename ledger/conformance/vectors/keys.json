@@ -1,0 +1,11 @@
+{
+  "description" : "RFC 8032 test keys 1 (ledger) and 2 (witness); never use them for real evidence",
+  "ledgerSeed" : "9d61b19deffd5a60ba844af492ec2cc44449c5697b326919703bac031cae7f60",
+  "ledgerPrivateKey" : "MC4CAQAwBQYDK2VwBCIEIJ1hsZ3v/VpguoRK9JLsLMREScVpezJpGXA7rAMcrn9g",
+  "ledgerPublicKey" : "MCowBQYDK2VwAyEA11qYAYKxCrfVS/7TyWQHOg7hcvPapiMlrwIaaPcHURo=",
+  "ledgerKeyId" : "06e3fd8fda29bb60",
+  "logVerifierKey" : "ledger.example+3d9d4b31+AddamAGCsQq31Uv+08lkBzoO4XLz2qYjJa8CGmj3B1Ea",
+  "witnessSeed" : "4ccd089b28ff96da9db6c346ec114e0f5b8a319f35aba624da8cf6ed4fb8a6fb",
+  "witnessPublicKey" : "MCowBQYDK2VwAyEAPUAXw+hDiVqStwqnTRt+vJyYLM8uxJaMwM1V8Sr0Zgw=",
+  "witnessVerifierKey" : "witness.example+67550f4e+BD1AF8PoQ4lakrcKp00bfrycmCzPLsSWjMDNVfEq9GYM"
+}

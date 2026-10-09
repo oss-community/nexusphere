@@ -19,6 +19,7 @@
 * [MCP Gateway](#mcp-gateway)
 * [Mandates](#mandates)
 * [A2A Gateway](#a2a-gateway)
+* [Conformance Vectors](#conformance-vectors)
 * [Nexusphere Core](#nexusphere-core)
 * [API](#api)
 * [End-to-End Tests](ledger-e2e-tests/README.md)
@@ -36,12 +37,24 @@ interval. Anyone holding the published public key can check the chain and the ch
 
 </p>
 
+<p style="text-align: justify;">
+
+The ledger is an evidence layer, not another agent platform. Agent identity and per-call decisions are already offered
+by Amazon Bedrock AgentCore, Google Agent Gateway, Microsoft Entra Agent ID and open gateways such as agentgateway. The
+ledger keeps them and records what they decide: a gateway, a platform hook or the agent itself sends each decision and
+outcome to `POST /api/v1/evidence` (or `POST /api/v1/evidence/batch`) with its own agent key. Where nothing decides
+yet, the ledger's MCP and A2A gateways do it. What the ledger adds is the proof: a transparency log that witnesses
+cosign, SCITT statements and receipts, evidence packages with selective disclosure, mandates other organizations can
+check, and receipts both sides of an exchange hold.
+
+</p>
+
 ## Modules
 
 | Module                                                  | Responsibility                                                                                               |
 |---------------------------------------------------------|--------------------------------------------------------------------------------------------------------------|
-| [`ledger/chain`](chain/README.md)                       | Canonical JSON, evidence entry, hash chain verifier, Ed25519 keys and checkpoints. No framework dependencies |
-| [`ledger/mandate`](mandate/README.md)                   | Mandate tokens, status lists, JWK keys and the mandate verifier SDK for other organizations                  |
+| [`ledger/chain`](chain/README.md)                       | Evidence format, hash chain, Merkle log, signed notes, COSE statements, receipts. No framework dependencies  |
+| [`ledger/mandate`](mandate/README.md)                   | SD-JWT VC mandates, status lists, JWK keys and the mandate verifier SDK for other organizations              |
 | [`ledger/server`](server/README.md)                     | Spring Boot service: evidence API, PostgreSQL storage, checkpoint scheduler, verification                    |
 | [`ledger/verifier`](verifier/README.md)                 | Command-line verifier for evidence packages and mandates, with no server dependency                          |
 | [`ledger/demo-mcp`](demo-mcp/README.md)                 | Demo MCP server with file and mail tools, and the demo script                                                |
@@ -787,11 +800,22 @@ agent sees only the events of the task.
 curl -X POST http://localhost:8090/a2a/out/supplier -H "Authorization: Bearer {agentApiKey}" -H "X-Ledger-Principal: alice" -H "Content-Type: application/json" -d '{"jsonrpc":"2.0","id":"1","method":"message/send","params":{"message":{"role":"user","messageId":"1","parts":[{"kind":"text","text":"Order 40 pallets"}]}}}'
 ```
 
+## Conformance Vectors
+
+<p style="text-align: justify;">
+
+[Conformance Vectors](conformance/README.md) hold fixed inputs and outputs for every format the ledger produces, made
+with the published RFC 8032 test keys: canonical JSON, the evidence chain and checkpoints, Merkle roots and proofs,
+signed notes and cosignatures, SCITT statements and receipts, and an SD-JWT VC mandate. Another implementation checks
+itself against them, and `ConformanceVectorsTest` in `ledger/verifier` fails when the ledger's own output changes.
+
+</p>
+
 ## Nexusphere Core
 
 <p style="text-align: justify;">
 
-The Nexusphere core can feed this ledger. With `APP_LEDGER_URL` and `APP_LEDGER_API_KEY` (the operator key) set on
+The Nexusphere core is an optional reference integration that shows a multi-party platform feeding this ledger. With `APP_LEDGER_URL` and `APP_LEDGER_API_KEY` (the operator key) set on
 the core, its authorization decisions, delegation changes and other domain events arrive as evidence through an
 outbox, each delegation becomes a grant from the delegator to the delegate, and suspending or revoking the delegation
 revokes the grant. The delegate asks the core, not the ledger, for a mandate. Agent and principal ids are the core's

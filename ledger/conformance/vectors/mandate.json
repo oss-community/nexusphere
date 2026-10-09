@@ -1,0 +1,29 @@
+{
+  "description" : "SD-JWT VC mandate; salts are random, so check it rather than reproduce it",
+  "token" : "eyJhbGciOiJFZERTQSIsInR5cCI6ImRjK3NkLWp3dCIsImtpZCI6IjA2ZTNmZDhmZGEyOWJiNjAifQ.eyJpc3MiOiJodHRwczovL2xlZGdlci5leGFtcGxlIiwidmN0IjoidXJuOm5leHVzcGhlcmU6dmN0OmFnZW50LW1hbmRhdGU6MSIsInN1YiI6InNhbGVzLWFnZW50IiwiYXVkIjoiaHR0cHM6Ly9zdXBwbGllci5leGFtcGxlIiwianRpIjoiMDAwMDAwMDAtMDAwMC00MDAwLTgwMDAtMDAwMDAwMDAwMGFhIiwiaWF0IjoxNzkwODQxNjAwLCJuYmYiOjE3OTA4NDE2MDAsImV4cCI6MTgyMjM3NzYwMCwibWFuZGF0ZSI6eyJhY3Rpb25zIjpbImEyYS9zZW5kIl0sInRhcmdldHMiOlsic3VwcGxpZXIvKiJdLCJtYXhVc2VzIjo1LCJfc2QiOlsiTS1TaFl2UlpIdG91VHBoLWtoUWJwRFo5UVQwU0psdDFYSkg4d2xrSEtPQSIsIk1jaVJFTnNEMFNnX3dvVXZzZG9QMmR1eGR5cWhQckttWlpSNGRGMDFpZkEiLCJWQV90VFBVVUlWYXNydjFRUjg0dUpLM1VwdUNWSnVaLTRtZkpLS1hBSS1zIl19LCJzdGF0dXMiOnsic3RhdHVzX2xpc3QiOnsiaWR4IjozLCJ1cmkiOiJodHRwczovL2xlZGdlci5leGFtcGxlL3B1YmxpYy92MS9tYW5kYXRlcy9zdGF0dXMifX0sIl9zZF9hbGciOiJzaGEtMjU2In0.TxKyFlVZO8QeyXfXQHZgYXkHxpdhF5Mzl08Pl2Tqr1MU-dDGWt0oMcia-BlF0pT2P83WrnSq23mratk-122fBg~WyJzZER4dVY2OXo0Z240MjBwN0kxRm93IiwicHJpbmNpcGFsIiwiZ2xvYmV4Il0~WyIzOERXTEItRUJhLUlqNy1ZTFd2NENRIiwiZ3JhbnQiLCIwMDAwMDAwMC0wMDAwLTQwMDAtODAwMC0wMDAwMDAwMDAwYmIiXQ~WyJYYWU5MzVWcGg1R2Y1by1ZTkhhZGxRIiwidGVybXNIYXNoIiwiNTFkMjM2MWY0ZmFlYTNiYzhmOWZhY2RiYzdkOTlhYmI1NTU1OTZhMmU1MWY3YjI1ZmQzYjQxYzkzNTg3ZTYxNiJd~",
+  "presentedWithGrantOnly" : "eyJhbGciOiJFZERTQSIsInR5cCI6ImRjK3NkLWp3dCIsImtpZCI6IjA2ZTNmZDhmZGEyOWJiNjAifQ.eyJpc3MiOiJodHRwczovL2xlZGdlci5leGFtcGxlIiwidmN0IjoidXJuOm5leHVzcGhlcmU6dmN0OmFnZW50LW1hbmRhdGU6MSIsInN1YiI6InNhbGVzLWFnZW50IiwiYXVkIjoiaHR0cHM6Ly9zdXBwbGllci5leGFtcGxlIiwianRpIjoiMDAwMDAwMDAtMDAwMC00MDAwLTgwMDAtMDAwMDAwMDAwMGFhIiwiaWF0IjoxNzkwODQxNjAwLCJuYmYiOjE3OTA4NDE2MDAsImV4cCI6MTgyMjM3NzYwMCwibWFuZGF0ZSI6eyJhY3Rpb25zIjpbImEyYS9zZW5kIl0sInRhcmdldHMiOlsic3VwcGxpZXIvKiJdLCJtYXhVc2VzIjo1LCJfc2QiOlsiTS1TaFl2UlpIdG91VHBoLWtoUWJwRFo5UVQwU0psdDFYSkg4d2xrSEtPQSIsIk1jaVJFTnNEMFNnX3dvVXZzZG9QMmR1eGR5cWhQckttWlpSNGRGMDFpZkEiLCJWQV90VFBVVUlWYXNydjFRUjg0dUpLM1VwdUNWSnVaLTRtZkpLS1hBSS1zIl19LCJzdGF0dXMiOnsic3RhdHVzX2xpc3QiOnsiaWR4IjozLCJ1cmkiOiJodHRwczovL2xlZGdlci5leGFtcGxlL3B1YmxpYy92MS9tYW5kYXRlcy9zdGF0dXMifX0sIl9zZF9hbGciOiJzaGEtMjU2In0.TxKyFlVZO8QeyXfXQHZgYXkHxpdhF5Mzl08Pl2Tqr1MU-dDGWt0oMcia-BlF0pT2P83WrnSq23mratk-122fBg~WyIzOERXTEItRUJhLUlqNy1ZTFd2NENRIiwiZ3JhbnQiLCIwMDAwMDAwMC0wMDAwLTQwMDAtODAwMC0wMDAwMDAwMDAwYmIiXQ~",
+  "claims" : {
+    "iss" : "https://ledger.example",
+    "vct" : "urn:nexusphere:vct:agent-mandate:1",
+    "sub" : "sales-agent",
+    "aud" : "https://supplier.example",
+    "jti" : "00000000-0000-4000-8000-0000000000aa",
+    "iat" : 1790841600,
+    "nbf" : 1790841600,
+    "exp" : 1822377600,
+    "mandate" : {
+      "principal" : "globex",
+      "actions" : [ "a2a/send" ],
+      "targets" : [ "supplier/*" ],
+      "maxUses" : 5,
+      "grant" : "00000000-0000-4000-8000-0000000000bb",
+      "termsHash" : "51d2361f4faea3bc8f9facdbc7d99abb555596a2e51f7b25fd3b41c93587e616"
+    },
+    "status" : {
+      "status_list" : {
+        "idx" : 3,
+        "uri" : "https://ledger.example/public/v1/mandates/status"
+      }
+    }
+  }
+}

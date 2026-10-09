@@ -2,7 +2,8 @@
 
 ## 1.0.0 (not released yet)
 
-First release of the Nexusphere Ledger, a self-hosted evidence ledger for AI agent actions.
+First release of the Nexusphere Ledger, a self-hosted evidence layer for AI agent actions that sits beside existing
+agent platforms and gateways.
 
 * Evidence entries in a SHA-256 hash chain with append-only PostgreSQL storage and Ed25519-signed checkpoints
 * Agents with their own API keys, grants from principals to agents, and ALLOW/DENY decisions with reason codes and
@@ -38,6 +39,7 @@ First release of the Nexusphere Ledger, a self-hosted evidence ledger for AI age
   log, served by the API, carried in evidence packages and checked by the verifier's `statement` command
 * Mandates are IETF SD-JWT VCs (`dc+sd-jwt`): the principal, grant and terms hash are selectively disclosable, the
   limits are not, and the documentation maps them to AP2 and Verifiable Intent
+* Conformance vectors for every format, signed with the RFC 8032 test keys and checked by a test
 * Dockerfiles, compose file with Adminer, Keycloak, Prometheus, Alertmanager and the web UI, Kubernetes manifest, demo MCP server
   and demo script
 

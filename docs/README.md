@@ -1,6 +1,6 @@
 # <p align="center">Nexusphere Project Description</p>
 
-<p align="center">Federated trust and coordination infrastructure for human and autonomous actors.</p>
+<p align="center">The vision behind Nexusphere and the design of the core, its reference integration.</p>
 
 ## <p align="center">Table of Content</p>
 
@@ -15,6 +15,13 @@
 * [Out of Scope](#out-of-scope)
 
 ## Vision
+
+<p style="text-align: justify;">
+
+The product is the [Nexusphere Ledger](../ledger/README.md), the evidence layer for AI agents. This page describes
+the wider vision and the core, which implements it as an optional reference integration that feeds the ledger.
+
+</p>
 
 <p style="text-align: justify;">
 
