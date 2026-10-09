@@ -29,6 +29,7 @@ record.
 * Evidence packages with selective disclosure for auditors
 * Transparency log over the evidence with inclusion and consistency proofs, cosigned by witnesses, and a C2SP
   witness endpoint so the ledger can witness other logs
+* SCITT signed statements and RFC 9942 receipts for every entry
 * Signed mandates, the revocation status list and the public keys as JWKS
 * Signing key history: rotation at startup with a cross-signed rotation record, retired keys kept for verification
 * A2A gateway that sends and receives requests between two ledgers with evidence and signed receipts on both sides

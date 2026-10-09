@@ -17,6 +17,7 @@ public record PackageReport(
         String logOrigin,
         Long logTreeSize,
         long provenEntries,
+        long receiptedEntries,
         List<String> witnesses,
         List<String> problems) {
 }

@@ -25,7 +25,9 @@ public final class VerifierCli {
             [--witness <verifier key>]... [--witnesses-required <n>] [--json] <package.json>
                    nexusphere-ledger-verify mandate --issuer <url> [--issuer <url>] [--audience <aud>] \
             [--action <action> --target <target>] [--public-key <key> | --public-key-file <file>] [--skip-status] \
-            [--json] <token | token file | ->""";
+            [--json] <token | token file | ->
+                   nexusphere-ledger-verify statement [--public-key <key> | --public-key-file <file>] \
+            [--receipt <receipt.cose>] <statement.cose>""";
 
     private static final JsonMapper JSON = JsonMapper.builder().enable(SerializationFeature.INDENT_OUTPUT).build();
 
@@ -39,6 +41,9 @@ public final class VerifierCli {
     public static int run(String[] args, PrintStream out, PrintStream err) {
         if (args.length > 0 && "mandate".equals(args[0])) {
             return MandateCli.run(Arrays.copyOfRange(args, 1, args.length), out, err, USAGE_TEXT);
+        }
+        if (args.length > 0 && "statement".equals(args[0])) {
+            return StatementCli.run(Arrays.copyOfRange(args, 1, args.length), out, err, USAGE_TEXT);
         }
         String publicKey = null;
         List<NoteKey> witnesses = new ArrayList<>();
@@ -102,6 +107,7 @@ public final class VerifierCli {
         if (r.logTreeSize() != null) {
             out.println("  Log         : " + r.logOrigin() + ", " + r.logTreeSize() + " entries, "
                     + r.provenEntries() + " disclosed entries proven");
+            out.println("  Receipts    : " + r.receiptedEntries() + " SCITT statements with receipts");
             out.println("  Witnesses   : " + (r.witnesses().isEmpty() ? "none" : String.join(", ", r.witnesses())));
         }
         if (r.valid()) {

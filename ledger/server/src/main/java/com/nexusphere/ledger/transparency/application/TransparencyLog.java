@@ -27,6 +27,7 @@ public class TransparencyLog {
     private final LogCheckpointRepository checkpoints;
     private final LedgerSigner signer;
     private final String origin;
+    private final String issuer;
     private final MerkleTree.Subtrees subtrees;
 
     TransparencyLog(MerkleNodeRepository nodes, LogCheckpointRepository checkpoints, LedgerSigner signer,
@@ -35,6 +36,7 @@ public class TransparencyLog {
         this.checkpoints = checkpoints;
         this.signer = signer;
         this.origin = origin(properties);
+        this.issuer = properties.mandate().issuer();
         this.subtrees = (level, index) -> nodes.find(level, index).orElseThrow(() -> new IllegalStateException(
                 "The transparency log has no node at level " + level + " index " + index));
     }
@@ -120,6 +122,18 @@ public class TransparencyLog {
 
     public Optional<StoredCheckpoint> find(long size) {
         return checkpoints.find(size);
+    }
+
+    public byte[] statement(EvidenceEntry entry) {
+        return signer.signStatement(entry, issuer);
+    }
+
+    public byte[] receipt(EvidenceEntry entry, StoredCheckpoint checkpoint) {
+        return receipt(entry.sequence(), checkpoint, inclusionProof(entry.sequence() - 1, checkpoint.size()));
+    }
+
+    public byte[] receipt(long sequence, StoredCheckpoint checkpoint, List<byte[]> proof) {
+        return signer.signReceipt(origin, checkpoint.size(), sequence - 1, proof, checkpoint.root());
     }
 
     public String cosignedNote(StoredCheckpoint checkpoint) {

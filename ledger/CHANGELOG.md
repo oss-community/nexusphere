@@ -34,6 +34,8 @@ First release of the Nexusphere Ledger, a self-hosted evidence ledger for AI age
   inclusion and consistency proofs are served by the API and carried in evidence packages
 * Witness cosigning with the C2SP `tlog-witness` protocol: the ledger asks configured witnesses to cosign each log
   checkpoint, any ledger can witness other logs, and the verifier can require cosignatures from given witnesses
+* IETF SCITT signed statements (COSE hash envelopes) for every entry and RFC 9942 receipts from the transparency
+  log, served by the API, carried in evidence packages and checked by the verifier's `statement` command
 * Dockerfiles, compose file with Adminer, Keycloak, Prometheus, Alertmanager and the web UI, Kubernetes manifest, demo MCP server
   and demo script
 

@@ -5,6 +5,7 @@ import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Optional;
 
 public final class MerkleTree {
 
@@ -91,15 +92,19 @@ public final class MerkleTree {
     }
 
     public static boolean verifyInclusion(byte[] leafHash, long index, long size, List<byte[]> proof, byte[] root) {
+        return rootFromInclusion(leafHash, index, size, proof).map(r -> Arrays.equals(r, root)).orElse(false);
+    }
+
+    public static Optional<byte[]> rootFromInclusion(byte[] leafHash, long index, long size, List<byte[]> proof) {
         if (index < 0 || index >= size) {
-            return false;
+            return Optional.empty();
         }
         long fn = index;
         long sn = size - 1;
         byte[] r = leafHash;
         for (byte[] p : proof) {
             if (sn == 0) {
-                return false;
+                return Optional.empty();
             }
             if ((fn & 1) == 1 || fn == sn) {
                 r = nodeHash(p, r);
@@ -115,7 +120,7 @@ public final class MerkleTree {
             fn >>= 1;
             sn >>= 1;
         }
-        return sn == 0 && Arrays.equals(r, root);
+        return sn == 0 ? Optional.of(r) : Optional.empty();
     }
 
     public static boolean verifyConsistency(long first, long second, List<byte[]> proof, byte[] firstRoot,

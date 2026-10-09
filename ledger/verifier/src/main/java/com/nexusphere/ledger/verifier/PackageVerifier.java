@@ -5,9 +5,11 @@ import com.nexusphere.ledger.chain.ChainVerifier;
 import com.nexusphere.ledger.chain.Checkpoint;
 import com.nexusphere.ledger.chain.EvidenceEntry;
 import com.nexusphere.ledger.chain.EvidenceLink;
+import com.nexusphere.ledger.chain.EvidenceStatement;
 import com.nexusphere.ledger.chain.Hashes;
 import com.nexusphere.ledger.chain.KeyRotation;
 import com.nexusphere.ledger.chain.LogCheckpoint;
+import com.nexusphere.ledger.chain.LogReceipt;
 import com.nexusphere.ledger.chain.MerkleTree;
 import com.nexusphere.ledger.chain.NoteKey;
 import com.nexusphere.ledger.chain.SignedCheckpoint;
@@ -17,6 +19,7 @@ import tools.jackson.databind.JsonNode;
 
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Base64;
 import java.util.Collection;
 import java.util.HashMap;
@@ -106,9 +109,9 @@ public final class PackageVerifier {
                 problems);
     }
 
-    private record LogResult(String origin, Long size, long proven, List<String> witnesses) {
+    private record LogResult(String origin, Long size, long proven, long receipted, List<String> witnesses) {
 
-        static final LogResult NONE = new LogResult(null, null, 0, List.of());
+        static final LogResult NONE = new LogResult(null, null, 0, 0, List.of());
     }
 
     private static LogResult log(JsonNode pkg, Collection<SigningKeys.PublicKeyInfo> keys, long size,
@@ -138,11 +141,14 @@ public final class PackageVerifier {
                     + " of the signed checkpoint");
         }
         Map<Long, List<byte[]>> proofs = new HashMap<>();
+        Map<Long, JsonNode> scitt = new HashMap<>();
         for (JsonNode proof : log.path("proofs")) {
             List<byte[]> hashes = new ArrayList<>();
             proof.path("hashes").forEach(hash -> hashes.add(Base64.getDecoder().decode(hash.asString())));
             proofs.put(proof.path("sequence").asLong(), hashes);
+            scitt.put(proof.path("sequence").asLong(), proof);
         }
+        long receipted = 0;
         long proven = 0;
         for (JsonNode node : pkg.path("links")) {
             if (!node.path("entry").isObject()) {
@@ -157,6 +163,15 @@ public final class PackageVerifier {
             } else {
                 proven++;
             }
+            JsonNode statement = scitt.get(sequence);
+            if (statement != null && statement.has("statement")) {
+                String problem = scittProblem(statement, link(node), keys, checkpoint);
+                if (problem == null) {
+                    receipted++;
+                } else {
+                    problems.add("sequence " + sequence + " " + problem);
+                }
+            }
         }
         List<String> cosigned = witnessKeys.stream().filter(key -> note.cosignedBy(key).isPresent())
                 .map(NoteKey::name).toList();
@@ -164,7 +179,42 @@ public final class PackageVerifier {
             problems.add("the log checkpoint is cosigned by " + cosigned.size() + " of the " + requiredWitnesses
                     + " required witnesses");
         }
-        return new LogResult(checkpoint.origin(), checkpoint.size(), proven, cosigned);
+        return new LogResult(checkpoint.origin(), checkpoint.size(), proven, receipted, cosigned);
+    }
+
+    private static String scittProblem(JsonNode signed, EvidenceLink link,
+                                       Collection<SigningKeys.PublicKeyInfo> keys, LogCheckpoint checkpoint) {
+        EvidenceStatement statement;
+        LogReceipt receipt;
+        try {
+            statement = EvidenceStatement.parse(Base64.getDecoder().decode(text(signed, "statement")));
+            receipt = LogReceipt.parse(Base64.getDecoder().decode(text(signed, "receipt")));
+        } catch (RuntimeException e) {
+            return "has a statement or receipt that cannot be read: " + e.getMessage();
+        }
+        SigningKeys.PublicKeyInfo statementKey = keys.stream()
+                .filter(key -> key.keyId().equals(statement.keyId())).findFirst().orElse(null);
+        SigningKeys.PublicKeyInfo receiptKey = keys.stream()
+                .filter(key -> key.keyId().equals(receipt.keyId())).findFirst().orElse(null);
+        if (statementKey == null || !statement.verify(statementKey.publicKey())) {
+            return "has a statement that is not signed by a trusted ledger key";
+        }
+        if (!statement.describes(link)) {
+            return "has a statement for different evidence";
+        }
+        if (receiptKey == null || !receipt.verify(statement.leafHash(), receiptKey.publicKey())) {
+            return "has a receipt that does not prove its statement with a trusted ledger key";
+        }
+        if (receipt.treeSize() != checkpoint.size()
+                || !Arrays.equals(receipt.root(statement.leafHash()).orElseThrow(), checkpoint.root())) {
+            return "has a receipt for a different log checkpoint";
+        }
+        return null;
+    }
+
+    private static EvidenceLink link(JsonNode node) {
+        return new EvidenceLink(node.path("sequence").asLong(), text(node, "previousHash"), text(node, "contentHash"),
+                text(node, "hash"));
     }
 
     public static EvidenceEntry entry(JsonNode node) {
@@ -269,7 +319,7 @@ public final class PackageVerifier {
                                         LogResult log, List<String> problems) {
         return new PackageReport(valid, keyId, pinnedKeyId, anchor, checkpoint, createdAt, first, checked, disclosed,
                 nullable(pkg.path("scope"), "agentId"), nullable(pkg.path("scope"), "principalId"), log.origin(),
-                log.size(), log.proven(), log.witnesses(), List.copyOf(problems));
+                log.size(), log.proven(), log.receipted(), log.witnesses(), List.copyOf(problems));
     }
 
     private static String text(JsonNode node, String field) {

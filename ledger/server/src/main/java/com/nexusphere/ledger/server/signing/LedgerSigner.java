@@ -1,8 +1,11 @@
 package com.nexusphere.ledger.server.signing;
 
 import com.nexusphere.ledger.chain.Checkpoint;
+import com.nexusphere.ledger.chain.EvidenceEntry;
+import com.nexusphere.ledger.chain.EvidenceStatement;
 import com.nexusphere.ledger.chain.KeyRotation;
 import com.nexusphere.ledger.chain.LogCheckpoint;
+import com.nexusphere.ledger.chain.LogReceipt;
 import com.nexusphere.ledger.chain.NoteKey;
 import com.nexusphere.ledger.chain.SignedCheckpoint;
 import com.nexusphere.ledger.chain.SigningKeys;
@@ -88,6 +91,14 @@ public class LedgerSigner {
     public LogCheckpoint.Signature cosign(String name, String body, long time) {
         return LogCheckpoint.cosign(body, new NoteKey(name, NoteKey.COSIGNATURE, publicKey.publicKey()), privateKey,
                 time);
+    }
+
+    public byte[] signStatement(EvidenceEntry entry, String issuer) {
+        return EvidenceStatement.sign(entry, issuer, publicKey.keyId(), privateKey);
+    }
+
+    public byte[] signReceipt(String issuer, long treeSize, long leafIndex, List<byte[]> path, byte[] root) {
+        return LogReceipt.sign(issuer, publicKey.keyId(), treeSize, leafIndex, path, root, privateKey);
     }
 
     public String signMandate(MandateClaims claims) {

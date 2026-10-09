@@ -127,6 +127,10 @@ other, which watches it, to cosign its log checkpoints over the C2SP witness pro
 |                           | This ledger witnesses no log unless configured                                |
 | `WitnessE2ETest`          | A witness cosigns every checkpoint that extends what it saw                   |
 |                           | A witness refuses a forked or stale checkpoint                                |
+| `ScittE2ETest`            | Every entry has a signed statement and a receipt from the log                 |
+|                           | A receipt can be asked for at an earlier log checkpoint                       |
+|                           | Statements and receipts belong to the evidence owner                          |
+|                           | A package carries a statement and receipt for every disclosed entry           |
 
 ##
 

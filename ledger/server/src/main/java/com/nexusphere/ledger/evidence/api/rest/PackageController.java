@@ -55,15 +55,17 @@ class PackageController {
         }
     }
 
-    record ProofResponse(long sequence, List<String> hashes) {
+    record ProofResponse(long sequence, List<String> hashes, String statement, String receipt) {
     }
 
     record LogResponse(String checkpoint, List<ProofResponse> proofs) {
 
         static LogResponse of(EvidencePackage.Log log) {
+            Base64.Encoder base64 = Base64.getEncoder();
             return new LogResponse(log.checkpoint(), log.proofs().entrySet().stream()
-                    .map(e -> new ProofResponse(e.getKey(), e.getValue().stream()
-                            .map(hash -> Base64.getEncoder().encodeToString(hash)).toList()))
+                    .map(e -> new ProofResponse(e.getKey(), e.getValue().stream().map(base64::encodeToString).toList(),
+                            base64.encodeToString(log.statements().get(e.getKey())),
+                            base64.encodeToString(log.receipts().get(e.getKey()))))
                     .toList());
         }
     }
