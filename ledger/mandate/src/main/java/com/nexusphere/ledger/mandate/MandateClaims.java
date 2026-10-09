@@ -26,7 +26,9 @@ public record MandateClaims(
         String statusListUrl,
         long statusIndex) {
 
-    public static final String TYPE = "nexusphere-mandate+jwt";
+    public static final String TYPE = "dc+sd-jwt";
+    public static final String VCT = "urn:nexusphere:vct:agent-mandate:1";
+    public static final List<String> SELECTIVE = List.of("principal", "grant", "termsHash");
 
     public MandateClaims {
         actions = List.copyOf(actions);
@@ -52,6 +54,7 @@ public record MandateClaims(
     public Map<String, Object> toPayload() {
         Map<String, Object> payload = new LinkedHashMap<>();
         payload.put("iss", issuer);
+        payload.put("vct", VCT);
         payload.put("sub", agentId);
         if (audience != null) {
             payload.put("aud", audience);
@@ -61,14 +64,20 @@ public record MandateClaims(
         payload.put("nbf", notBefore.getEpochSecond());
         payload.put("exp", expiresAt.getEpochSecond());
         Map<String, Object> mandate = new LinkedHashMap<>();
-        mandate.put("principal", principalId);
+        if (principalId != null) {
+            mandate.put("principal", principalId);
+        }
         mandate.put("actions", actions);
         mandate.put("targets", targets);
         if (maxUses != null) {
             mandate.put("maxUses", maxUses);
         }
-        mandate.put("grant", grantId.toString());
-        mandate.put("termsHash", termsHash);
+        if (grantId != null) {
+            mandate.put("grant", grantId.toString());
+        }
+        if (termsHash != null) {
+            mandate.put("termsHash", termsHash);
+        }
         payload.put("mandate", mandate);
         Map<String, Object> status = new LinkedHashMap<>();
         Map<String, Object> statusList = new LinkedHashMap<>();
@@ -80,19 +89,22 @@ public record MandateClaims(
     }
 
     public static MandateClaims fromPayload(JsonNode p) {
+        if (!VCT.equals(p.path("vct").asString(null))) {
+            throw new IllegalArgumentException("The token is not a " + VCT + " credential");
+        }
         JsonNode m = p.path("mandate");
         JsonNode s = p.path("status").path("status_list");
         return new MandateClaims(
                 required(p, "iss"),
                 UUID.fromString(required(p, "jti")),
                 required(p, "sub"),
-                required(m, "principal"),
+                optional(m, "principal"),
                 p.path("aud").isString() ? p.path("aud").asString() : null,
                 strings(m.path("actions")),
                 strings(m.path("targets")),
                 m.path("maxUses").isNumber() ? m.path("maxUses").asLong() : null,
-                UUID.fromString(required(m, "grant")),
-                required(m, "termsHash"),
+                m.path("grant").isString() ? UUID.fromString(m.path("grant").asString()) : null,
+                optional(m, "termsHash"),
                 Instant.ofEpochSecond(number(p, "iat")),
                 Instant.ofEpochSecond(number(p, "nbf")),
                 Instant.ofEpochSecond(number(p, "exp")),
@@ -105,6 +117,10 @@ public record MandateClaims(
             throw new IllegalArgumentException("The mandate has no " + field);
         }
         return node.path(field).asString();
+    }
+
+    private static String optional(JsonNode node, String field) {
+        return node.path(field).isString() ? node.path(field).asString() : null;
     }
 
     private static long number(JsonNode node, String field) {

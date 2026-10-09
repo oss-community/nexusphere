@@ -11,6 +11,7 @@ import com.nexusphere.ledger.mandate.ExchangeRequest;
 import com.nexusphere.ledger.mandate.Jws;
 import com.nexusphere.ledger.mandate.MandateClaims;
 import com.nexusphere.ledger.mandate.Mandates;
+import com.nexusphere.ledger.mandate.SdJwt;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
@@ -111,7 +112,7 @@ class A2aE2ETest extends LedgerE2ETestBase {
         assertThat(claims.issuer()).isEqualTo(SUPPLIER_ISSUER);
         assertThat(outbound.path("receiptStatus").asString()).isEqualTo("VERIFIED");
         assertThat(outbound.path("receipt").asString()).isEqualTo(receipt);
-        assertThat(Jws.parse(outbound.path("mandate").asString()).payload().path("aud").asString())
+        assertThat(SdJwt.parse(outbound.path("mandate").asString()).jwt().payload().path("aud").asString())
                 .isEqualTo(SUPPLIER_ISSUER);
     }
 

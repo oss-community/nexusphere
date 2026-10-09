@@ -96,6 +96,9 @@ class A2aInbound {
             return unauthenticated(id, "The mandate cannot be trusted.", fatal);
         }
         MandateClaims claims = check.claims();
+        if (claims.principalId() == null) {
+            return unauthenticated(id, "The mandate must disclose its principal.", List.of());
+        }
         String requestHash = Hashes.sha256(body);
         Instant now = clock.instant().truncatedTo(ChronoUnit.SECONDS);
         ExchangeRequest request;
@@ -121,8 +124,12 @@ class A2aInbound {
         Map<String, String> attributes = new LinkedHashMap<>();
         attributes.put("a2a.issuer", claims.issuer());
         attributes.put("a2a.sender", claims.agentId());
-        attributes.put("a2a.grant", claims.grantId().toString());
-        attributes.put("a2a.termsHash", claims.termsHash());
+        if (claims.grantId() != null) {
+            attributes.put("a2a.grant", claims.grantId().toString());
+        }
+        if (claims.termsHash() != null) {
+            attributes.put("a2a.termsHash", claims.termsHash());
+        }
         attributes.put("a2a.method", method);
         attributes.put("a2a.exchange", exchangeId.toString());
         List<String> problems = new ArrayList<>(check.problems().stream().map(p -> p.code().name()).toList());

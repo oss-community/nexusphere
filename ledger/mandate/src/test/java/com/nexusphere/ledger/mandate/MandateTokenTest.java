@@ -26,27 +26,57 @@ class MandateTokenTest {
     }
 
     @Test
-    void issuedMandateRoundTripsAndVerifies() {
+    void issuedMandateIsAnSdJwtVcThatRoundTripsAndVerifies() {
         MandateClaims claims = claims();
         String token = Mandates.issue(claims, "kid-1", KEYS.getPrivate());
 
-        Jws.Parsed parsed = Jws.parse(token);
+        SdJwt sdJwt = SdJwt.parse(token);
+        Jws.Parsed parsed = sdJwt.jwt();
 
+        assertThat(token).endsWith("~");
         assertThat(parsed.header().path("alg").asString()).isEqualTo("EdDSA");
-        assertThat(parsed.header().path("typ").asString()).isEqualTo(MandateClaims.TYPE);
+        assertThat(parsed.header().path("typ").asString()).isEqualTo("dc+sd-jwt");
         assertThat(parsed.header().path("kid").asString()).isEqualTo("kid-1");
+        assertThat(parsed.payload().path("vct").asString()).isEqualTo(MandateClaims.VCT);
+        assertThat(parsed.payload().path("_sd_alg").asString()).isEqualTo("sha-256");
+        assertThat(parsed.payload().toString()).doesNotContain("alice").doesNotContain(claims.termsHash());
+        assertThat(parsed.payload().path("mandate").path("_sd").size()).isEqualTo(3);
+        assertThat(sdJwt.disclosures()).extracting(SdJwt.Disclosure::name)
+                .containsExactlyInAnyOrder("principal", "grant", "termsHash");
         assertThat(parsed.verify(KEYS.getPublic())).isTrue();
         assertThat(parsed.verify(OTHER.getPublic())).isFalse();
-        assertThat(MandateClaims.fromPayload(parsed.payload())).isEqualTo(claims);
+        assertThat(Mandates.claims(token)).isEqualTo(claims);
     }
 
     @Test
-    void tamperedPayloadFailsVerification() {
-        String token = Mandates.issue(claims(), "kid-1", KEYS.getPrivate());
-        String[] parts = token.split("\\.");
-        String forged = Jws.encode(Jws.parse(token).payload().toString().replace("alice", "mallory").getBytes());
+    void aHolderCanWithholdSelectiveClaimsButNotTheLimits() {
+        MandateClaims claims = claims();
+        SdJwt sdJwt = SdJwt.parse(Mandates.issue(claims, "kid-1", KEYS.getPrivate()));
 
-        assertThat(Jws.parse(parts[0] + "." + forged + "." + parts[2]).verify(KEYS.getPublic())).isFalse();
+        MandateClaims presented = Mandates.claims(sdJwt.present(java.util.Set.of("grant")));
+
+        assertThat(presented.principalId()).isNull();
+        assertThat(presented.termsHash()).isNull();
+        assertThat(presented.grantId()).isEqualTo(claims.grantId());
+        assertThat(presented.maxUses()).isEqualTo(5L);
+        assertThat(presented.actions()).isEqualTo(claims.actions());
+    }
+
+    @Test
+    void forgedOrForeignDisclosuresAreRejected() {
+        String token = Mandates.issue(claims(), "kid-1", KEYS.getPrivate());
+        SdJwt sdJwt = SdJwt.parse(token);
+        String jwt = token.substring(0, token.indexOf('~'));
+        String forged = SdJwt.Disclosure.of("principal", "mallory").encoded();
+        String[] parts = jwt.split("\\.");
+        String changed = Jws.encode(sdJwt.jwt().payload().toString().replace("invoice-agent", "mallory").getBytes());
+
+        assertThatThrownBy(() -> SdJwt.parse(jwt + "~" + forged + "~").claims())
+                .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> SdJwt.parse(jwt)).isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> SdJwt.parse(token + token.substring(token.indexOf('~') + 1)))
+                .isInstanceOf(IllegalArgumentException.class);
+        assertThat(Jws.parse(parts[0] + "." + changed + "." + parts[2]).verify(KEYS.getPublic())).isFalse();
     }
 
     @Test
