@@ -1,0 +1,13 @@
+[ {
+  "sha256" : "5f8b5a3f1f23b71c75f17aa175c0cb4ba64b8cbff0975de6d6c0921edf78e3ed",
+  "input" : {
+    "b" : "text with \"quotes\" and \\ and é and ✓",
+    "a" : 42,
+    "c" : {
+      "z" : [ 3, "two", true ],
+      "a" : null
+    },
+    "aa" : -7
+  },
+  "canonical" : "{\"a\":42,\"aa\":-7,\"b\":\"text with \\\"quotes\\\" and \\\\ and é and ✓\",\"c\":{\"a\":null,\"z\":[3,\"two\",true]}}"
+} ]

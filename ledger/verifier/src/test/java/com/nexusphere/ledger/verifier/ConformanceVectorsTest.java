@@ -1,0 +1,301 @@
+package com.nexusphere.ledger.verifier;
+
+import com.nexusphere.ledger.chain.CanonicalJson;
+import com.nexusphere.ledger.chain.Checkpoint;
+import com.nexusphere.ledger.chain.EvidenceEntry;
+import com.nexusphere.ledger.chain.EvidenceStatement;
+import com.nexusphere.ledger.chain.Hashes;
+import com.nexusphere.ledger.chain.LogCheckpoint;
+import com.nexusphere.ledger.chain.LogReceipt;
+import com.nexusphere.ledger.chain.MerkleTree;
+import com.nexusphere.ledger.chain.NoteKey;
+import com.nexusphere.ledger.chain.SignedCheckpoint;
+import com.nexusphere.ledger.chain.SigningKeys;
+import com.nexusphere.ledger.mandate.KeyResolver;
+import com.nexusphere.ledger.mandate.MandateCheck;
+import com.nexusphere.ledger.mandate.MandateClaims;
+import com.nexusphere.ledger.mandate.MandateVerifier;
+import com.nexusphere.ledger.mandate.Mandates;
+import com.nexusphere.ledger.mandate.SdJwt;
+import org.junit.jupiter.api.Test;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.SerializationFeature;
+import tools.jackson.databind.json.JsonMapper;
+
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.security.KeyFactory;
+import java.security.PrivateKey;
+import java.security.PublicKey;
+import java.security.spec.PKCS8EncodedKeySpec;
+import java.time.Clock;
+import java.time.Instant;
+import java.time.ZoneOffset;
+import java.time.temporal.ChronoUnit;
+import java.util.ArrayList;
+import java.util.Base64;
+import java.util.HexFormat;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.TreeMap;
+import java.util.UUID;
+
+import static org.assertj.core.api.Assertions.assertThat;
+
+class ConformanceVectorsTest {
+
+    private static final Path DIR = Path.of("../conformance/vectors");
+    private static final boolean WRITE = Boolean.getBoolean("conformance.write");
+    private static final JsonMapper JSON = JsonMapper.builder().enable(SerializationFeature.INDENT_OUTPUT).build();
+    private static final HexFormat HEX = HexFormat.of();
+    private static final Base64.Encoder B64 = Base64.getEncoder();
+
+    private static final String LEDGER_SEED = "9d61b19deffd5a60ba844af492ec2cc44449c5697b326919703bac031cae7f60";
+    private static final String LEDGER_PUBLIC = "d75a980182b10ab7d54bfed3c964073a0ee172f3daa62325af021a68f707511a";
+    private static final String WITNESS_SEED = "4ccd089b28ff96da9db6c346ec114e0f5b8a319f35aba624da8cf6ed4fb8a6fb";
+    private static final String WITNESS_PUBLIC = "3d4017c3e843895a92b70aa74d1b7ebc9c982ccf2ec4968cc0cd55f12af4660c";
+    private static final String ISSUER = "https://ledger.example";
+    private static final String ORIGIN = "ledger.example";
+    private static final String WITNESS = "witness.example";
+    private static final Instant T0 = Instant.parse("2026-10-01T08:00:00.123456Z");
+
+    private static final PrivateKey LEDGER_KEY = privateKey(LEDGER_SEED);
+    private static final PublicKey LEDGER = NoteKey.publicKey(HEX.parseHex(LEDGER_PUBLIC));
+    private static final PrivateKey WITNESS_KEY = privateKey(WITNESS_SEED);
+    private static final PublicKey WITNESS_PUBLIC_KEY = NoteKey.publicKey(HEX.parseHex(WITNESS_PUBLIC));
+    private static final String KEY_ID = SigningKeys.keyIdOf(LEDGER);
+
+    private static PrivateKey privateKey(String seed) {
+        try {
+            return KeyFactory.getInstance("Ed25519").generatePrivate(new PKCS8EncodedKeySpec(
+                    HEX.parseHex("302e020100300506032b657004220420" + seed)));
+        } catch (Exception e) {
+            throw new IllegalStateException(e);
+        }
+    }
+
+    private static List<EvidenceEntry> entries() {
+        List<EvidenceEntry> entries = new ArrayList<>();
+        String previous = Hashes.GENESIS;
+        String[][] actions = {
+                {"invoice-agent", "acme", "tools/call", "read_invoice", "ALLOW", null, "SUCCEEDED"},
+                {"invoice-agent", "acme", "tools/call", "pay_invoice", "DENY", "NOT_COVERED", "DENIED"},
+                {"sales-agent", "globex", "a2a/send", "supplier/sales", "ALLOW", null, "PENDING"}};
+        for (int i = 0; i < actions.length; i++) {
+            String[] a = actions[i];
+            TreeMap<String, String> attributes = new TreeMap<>();
+            attributes.put("tool", a[3]);
+            attributes.put("note", "café ✓");
+            EvidenceEntry entry = new EvidenceEntry(UUID.fromString("00000000-0000-4000-8000-00000000000" + (i + 1)),
+                    i + 1, T0.plusSeconds(i), T0.plusSeconds(i).plusMillis(5), a[0], a[1], a[2], a[3], a[4], a[5],
+                    null, Hashes.sha256(a[3].getBytes()), null, a[6], "conversation-1", attributes, previous, null)
+                    .sealed();
+            entries.add(entry);
+            previous = entry.hash();
+        }
+        return entries;
+    }
+
+    private static List<byte[]> leaves(List<EvidenceEntry> entries) {
+        return entries.stream().map(e -> MerkleTree.leafHash(HEX.parseHex(e.hash()))).toList();
+    }
+
+    private static JsonNode check(String name, Object vector) throws IOException {
+        JsonNode node = JSON.readTree(JSON.writeValueAsString(vector));
+        Path file = DIR.resolve(name);
+        if (WRITE) {
+            Files.createDirectories(DIR);
+            Files.writeString(file, JSON.writeValueAsString(node) + "\n");
+        }
+        JsonNode stored = JSON.readTree(file.toFile());
+        assertThat(stored).as(name).isEqualTo(node);
+        return stored;
+    }
+
+    @Test
+    void keys() throws IOException {
+        Map<String, Object> v = new LinkedHashMap<>();
+        v.put("description", "RFC 8032 test keys 1 (ledger) and 2 (witness); never use them for real evidence");
+        v.put("ledgerSeed", LEDGER_SEED);
+        v.put("ledgerPrivateKey", SigningKeys.encode(LEDGER_KEY));
+        v.put("ledgerPublicKey", SigningKeys.encode(LEDGER));
+        v.put("ledgerKeyId", KEY_ID);
+        v.put("logVerifierKey", new NoteKey(ORIGIN, NoteKey.ED25519, LEDGER).vkey());
+        v.put("witnessSeed", WITNESS_SEED);
+        v.put("witnessPublicKey", SigningKeys.encode(WITNESS_PUBLIC_KEY));
+        v.put("witnessVerifierKey", new NoteKey(WITNESS, NoteKey.COSIGNATURE, WITNESS_PUBLIC_KEY).vkey());
+        check("keys.json", v);
+
+        assertThat(SigningKeys.matches(LEDGER_KEY, LEDGER)).isTrue();
+        assertThat(SigningKeys.matches(WITNESS_KEY, WITNESS_PUBLIC_KEY)).isTrue();
+    }
+
+    @Test
+    void canonicalJson() throws IOException {
+        Map<String, Object> nested = new LinkedHashMap<>();
+        nested.put("z", List.of(3, "two", true));
+        nested.put("a", null);
+        Map<String, Object> input = new LinkedHashMap<>();
+        input.put("b", "text with \"quotes\" and \\ and é and ✓");
+        input.put("a", 42);
+        input.put("c", nested);
+        input.put("aa", -7);
+        List<Map<String, Object>> cases = List.of(
+                Map.of("input", input, "canonical", CanonicalJson.write(input),
+                        "sha256", Hashes.sha256(CanonicalJson.bytes(input))));
+        check("canonical-json.json", cases);
+    }
+
+    @Test
+    void evidenceChain() throws IOException {
+        List<Map<String, Object>> v = new ArrayList<>();
+        for (EvidenceEntry entry : entries()) {
+            Map<String, Object> item = new LinkedHashMap<>();
+            item.put("content", entry.canonicalContent());
+            item.put("canonicalContent", CanonicalJson.write(entry.canonicalContent()));
+            item.put("sequence", entry.sequence());
+            item.put("previousHash", entry.previousHash());
+            item.put("contentHash", entry.contentHash());
+            item.put("hash", entry.hash());
+            v.add(item);
+        }
+        Checkpoint checkpoint = new Checkpoint(3, entries().getLast().hash(), T0.plusSeconds(60), KEY_ID);
+        SignedCheckpoint signed = new SignedCheckpoint(checkpoint,
+                SigningKeys.sign(LEDGER_KEY, checkpoint.signedBytes()));
+        Map<String, Object> vector = new LinkedHashMap<>();
+        vector.put("entries", v);
+        vector.put("checkpoint", Map.of("signedBytes", new String(checkpoint.signedBytes()),
+                "signature", signed.signature()));
+        check("evidence-chain.json", vector);
+
+        assertThat(signed.verify(SigningKeys.PublicKeyInfo.of(LEDGER))).isTrue();
+    }
+
+    @Test
+    void merkleTree() throws IOException {
+        List<byte[]> leaves = new ArrayList<>();
+        for (int i = 0; i < 8; i++) {
+            leaves.add(MerkleTree.leafHash(new byte[]{(byte) i}));
+        }
+        MerkleTree.Subtrees tree = MerkleTree.of(leaves);
+        List<Object> roots = new ArrayList<>();
+        List<Object> inclusion = new ArrayList<>();
+        List<Object> consistency = new ArrayList<>();
+        for (int size = 0; size <= 8; size++) {
+            roots.add(Map.of("size", size, "root", HEX.formatHex(MerkleTree.root(tree, size))));
+            for (int index = 0; index < size; index++) {
+                inclusion.add(Map.of("index", index, "size", size,
+                        "proof", hex(MerkleTree.inclusionProof(tree, index, size))));
+            }
+            for (int first = 1; first <= size; first++) {
+                consistency.add(Map.of("first", first, "second", size,
+                        "proof", hex(MerkleTree.consistencyProof(tree, first, size))));
+            }
+        }
+        Map<String, Object> vector = new LinkedHashMap<>();
+        vector.put("description", "RFC 9162 tree over leaves whose data is the single byte 0x00, 0x01, ... 0x07");
+        vector.put("leafHashes", hex(leaves));
+        vector.put("roots", roots);
+        vector.put("inclusionProofs", inclusion);
+        vector.put("consistencyProofs", consistency);
+        JsonNode stored = check("merkle-tree.json", vector);
+
+        for (JsonNode proof : stored.path("inclusionProofs")) {
+            int size = proof.path("size").asInt();
+            assertThat(MerkleTree.verifyInclusion(leaves.get(proof.path("index").asInt()), proof.path("index").asLong(),
+                    size, unhex(proof.path("proof")), MerkleTree.root(tree, size))).isTrue();
+        }
+    }
+
+    @Test
+    void signedNoteAndCosignature() throws IOException {
+        List<EvidenceEntry> entries = entries();
+        byte[] root = MerkleTree.root(MerkleTree.of(leaves(entries)), entries.size());
+        LogCheckpoint.Note note = new LogCheckpoint(ORIGIN, entries.size(), root)
+                .sign(new NoteKey(ORIGIN, NoteKey.ED25519, LEDGER), LEDGER_KEY);
+        NoteKey witness = new NoteKey(WITNESS, NoteKey.COSIGNATURE, WITNESS_PUBLIC_KEY);
+        LogCheckpoint.Note cosigned = note.with(LogCheckpoint.cosign(note.body(), witness, WITNESS_KEY, 1_760_000_000L));
+        Map<String, Object> vector = new LinkedHashMap<>();
+        vector.put("description", "Log checkpoint over the three evidence-chain entries, cosigned at time 1760000000");
+        vector.put("rootHash", B64.encodeToString(root));
+        vector.put("note", note.text());
+        vector.put("cosignedNote", cosigned.text());
+        JsonNode stored = check("signed-note.json", vector);
+
+        LogCheckpoint.Note parsed = LogCheckpoint.parse(stored.path("cosignedNote").asString());
+        assertThat(parsed.signedBy(new NoteKey(ORIGIN, NoteKey.ED25519, LEDGER))).isTrue();
+        assertThat(parsed.cosignedBy(witness)).contains(1_760_000_000L);
+    }
+
+    @Test
+    void scittStatementsAndReceipts() throws IOException {
+        List<EvidenceEntry> entries = entries();
+        MerkleTree.Subtrees tree = MerkleTree.of(leaves(entries));
+        byte[] root = MerkleTree.root(tree, entries.size());
+        List<Object> v = new ArrayList<>();
+        for (EvidenceEntry entry : entries) {
+            long index = entry.sequence() - 1;
+            v.add(Map.of("sequence", entry.sequence(),
+                    "statement", HEX.formatHex(EvidenceStatement.sign(entry, ISSUER, KEY_ID, LEDGER_KEY)),
+                    "receipt", HEX.formatHex(LogReceipt.sign(ORIGIN, KEY_ID, entries.size(), index,
+                            MerkleTree.inclusionProof(tree, index, entries.size()), root, LEDGER_KEY))));
+        }
+        Map<String, Object> vector = new LinkedHashMap<>();
+        vector.put("description", "COSE_Sign1 statements and RFC 9942 receipts, hex, for the evidence-chain entries");
+        vector.put("rootHash", HEX.formatHex(root));
+        vector.put("items", v);
+        JsonNode stored = check("scitt.json", vector);
+
+        for (JsonNode item : stored.path("items")) {
+            EvidenceStatement statement = EvidenceStatement.parse(HEX.parseHex(item.path("statement").asString()));
+            LogReceipt receipt = LogReceipt.parse(HEX.parseHex(item.path("receipt").asString()));
+            assertThat(statement.verify(LEDGER)).isTrue();
+            assertThat(statement.describes(entries.get((int) statement.sequence() - 1).link())).isTrue();
+            assertThat(receipt.verify(statement.leafHash(), LEDGER)).isTrue();
+        }
+    }
+
+    @Test
+    void sdJwtMandate() throws IOException {
+        Path file = DIR.resolve("mandate.json");
+        MandateClaims claims = new MandateClaims(ISSUER, UUID.fromString("00000000-0000-4000-8000-0000000000aa"),
+                "sales-agent", "globex", "https://supplier.example", List.of("a2a/send"), List.of("supplier/*"), 5L,
+                UUID.fromString("00000000-0000-4000-8000-0000000000bb"), Hashes.sha256("terms".getBytes()),
+                T0.truncatedTo(ChronoUnit.SECONDS), T0.truncatedTo(ChronoUnit.SECONDS),
+                Instant.parse("2027-10-01T08:00:00Z"), ISSUER + "/public/v1/mandates/status", 3);
+        if (WRITE) {
+            String token = Mandates.issue(claims, KEY_ID, LEDGER_KEY);
+            Map<String, Object> vector = new LinkedHashMap<>();
+            vector.put("description", "SD-JWT VC mandate; salts are random, so check it rather than reproduce it");
+            vector.put("token", token);
+            vector.put("presentedWithGrantOnly", SdJwt.parse(token).present(Set.of("grant")));
+            vector.put("claims", claims.toPayload());
+            Files.writeString(file, JSON.writeValueAsString(vector) + "\n");
+        }
+        JsonNode stored = JSON.readTree(file.toFile());
+        MandateVerifier verifier = MandateVerifier.builder().trustIssuer(ISSUER).keys(KeyResolver.fixed(ISSUER, LEDGER))
+                .skipStatus().clock(Clock.fixed(T0.plusSeconds(3600), ZoneOffset.UTC)).build();
+
+        MandateCheck full = verifier.verify(stored.path("token").asString(), "a2a/send", "supplier/orders");
+        MandateCheck presented = verifier.verify(stored.path("presentedWithGrantOnly").asString());
+
+        assertThat(full.problems()).isEmpty();
+        assertThat(full.claims()).isEqualTo(claims);
+        assertThat(JSON.readTree(JSON.writeValueAsString(full.claims().toPayload()))).isEqualTo(stored.path("claims"));
+        assertThat(presented.problems()).isEmpty();
+        assertThat(presented.claims().principalId()).isNull();
+    }
+
+    private static List<String> hex(List<byte[]> hashes) {
+        return hashes.stream().map(HEX::formatHex).toList();
+    }
+
+    private static List<byte[]> unhex(JsonNode array) {
+        List<byte[]> hashes = new ArrayList<>();
+        array.forEach(node -> hashes.add(HEX.parseHex(node.asString())));
+        return hashes;
+    }
+}

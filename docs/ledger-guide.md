@@ -8,6 +8,7 @@
 * [Install](#install)
 * [Agents](#agents)
 * [Real Agents and MCP Servers](#real-agents-and-mcp-servers)
+* [Beside an Existing Gateway](#beside-an-existing-gateway)
 * [Connect the Core](#connect-the-core)
 * [Present It](#present-it)
 * [Next Steps](#next-steps)
@@ -186,11 +187,27 @@ evidence. The A2A gateway and its settings are in [Nexusphere Ledger](../ledger/
 
 </p>
 
+## Beside an Existing Gateway
+
+<p style="text-align: justify;">
+
+When agents already run behind a platform or gateway that decides their tool calls, such as Amazon Bedrock AgentCore,
+Google Agent Gateway or agentgateway, keep it and let the ledger hold the proof. Register one ledger agent per real
+agent, then have the gateway, a hook of the platform or the agent itself send every decision and its outcome as
+evidence with that agent's key. The entries get the same chain, log, witnesses, statements and packages as calls that
+pass through the ledger's own gateway.
+
+</p>
+
+```shell
+curl -X POST http://localhost:8090/api/v1/evidence -H "Authorization: Bearer {agentApiKey}" -H "Content-Type: application/json" -d '{"agentId":"invoice-agent","principalId":"alice","action":"tools/call","target":"send_email","decision":"ALLOW","reason":"agentcore-policy","outcome":"SUCCEEDED","correlationId":"session-42","attributes":{"gateway":"agentcore"}}'
+```
+
 ## Connect the Core
 
 <p style="text-align: justify;">
 
-The Nexusphere core can feed the ledger: its authorization decisions and delegations become evidence and grants, and a
+The Nexusphere core, an optional reference integration, can feed the ledger: its authorization decisions and delegations become evidence and grants, and a
 delegate asks the core for a mandate. Start the core with the ledger's address and operator key; the details are in
 [Nexusphere Core Integration](../core/integration/README.md#ledger).
 

@@ -1,32 +1,75 @@
 # <p align="center">Nexusphere</p>
 
-<p align="center">Federated trust and coordination infrastructure for human and autonomous actors.</p>
+<p align="center">Verifiable evidence of what AI agents do, for whom and with whose permission, across organizations.</p>
 
 ## <p align="center">Table of Content</p>
 
 * [Documentation](#documentation)
+* [Nexusphere Ledger](#nexusphere-ledger)
 * [Getting Started](#getting-started)
 * [Dockerized](#dockerized)
 * [Kubernetes](#kubernetes)
 * [DevOps](#devops)
 * [Service URLs](#service-urls)
 * [Nexusphere Core](#nexusphere-core)
-* [Nexusphere Ledger](#nexusphere-ledger)
 
 ## Documentation
 
-| Part                       | Documents                                                                                                            |
-|----------------------------|----------------------------------------------------------------------------------------------------------------------|
-| Introduction               | This page, [Project Description](docs/README.md)                                                                     |
-| Getting Started            | [Local Environment Setup](docs/local-setup.md), [Ledger Guide](docs/ledger-guide.md)                                 |
-| Nexusphere Core            | [Modules](docs/README.md#modules), one README per module                                                             |
-| Nexusphere Ledger          | [Nexusphere Ledger](ledger/README.md), its [Modules](ledger/README.md#modules) and [Changelog](ledger/CHANGELOG.md)  |
-| Web UI                     | [Nexusphere Frontend](frontend/README.md)                                                                            |
-| Operations                 | [Operations](docs/operations.md), [DevOps Step by Step](docs/devops-guide.md)                                        |
-| Testing                    | [Core End-to-End Tests](core/core-e2e-tests/README.md), [Ledger End-to-End Tests](ledger/ledger-e2e-tests/README.md) |
-| Build and Delivery Toolkit | [mvn-devops](mvn-devops/README.md)                                                                                   |
+| Part                       | Documents                                                                                                                                                                |
+|----------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| Introduction               | This page, [Project Description](docs/README.md)                                                                                                                         |
+| Getting Started            | [Ledger Guide](docs/ledger-guide.md), [Local Environment Setup](docs/local-setup.md)                                                                                     |
+| Nexusphere Ledger          | [Nexusphere Ledger](ledger/README.md), its [Modules](ledger/README.md#modules), [Conformance Vectors](ledger/conformance/README.md) and [Changelog](ledger/CHANGELOG.md) |
+| Web UI                     | [Nexusphere Frontend](frontend/README.md)                                                                                                                                |
+| Operations                 | [Operations](docs/operations.md), [DevOps Step by Step](docs/devops-guide.md)                                                                                            |
+| Testing                    | [Ledger End-to-End Tests](ledger/ledger-e2e-tests/README.md), [Core End-to-End Tests](core/core-e2e-tests/README.md)                                                     |
+| Nexusphere Core            | Optional reference integration: [Modules](docs/README.md#modules), one README per module                                                                                 |
+| Build and Delivery Toolkit | [mvn-devops](mvn-devops/README.md)                                                                                                                                       |
+
+## Nexusphere Ledger
+
+<p style="text-align: justify;">
+
+The Nexusphere Ledger is the product. It is a self-hosted evidence layer for AI agents: every action an agent takes
+for a person or an organization becomes an entry that a third party can verify offline, without trusting the operator.
+It does not replace the agent platforms and gateways that already decide what an agent may do; it sits beside them and
+keeps the proof. A gateway or agent platform sends its decisions and outcomes to `POST /api/v1/evidence`, and where no
+gateway exists the ledger's own MCP and A2A gateways decide and record. Its configuration and API are in
+[Nexusphere Ledger](ledger/README.md), and a walkthrough is in the [Ledger Guide](docs/ledger-guide.md).
+
+</p>
+
+| Need                                       | Already provided by                                                                    | What the ledger adds                                                                                           |
+|--------------------------------------------|----------------------------------------------------------------------------------------|----------------------------------------------------------------------------------------------------------------|
+| Agent identity and tool-call decisions     | Amazon Bedrock AgentCore, Google Agent Gateway, Microsoft Entra Agent ID, agentgateway | Records their decisions as evidence, or decides itself through its MCP and A2A gateways                        |
+| Evidence a third party can verify          | Logs and audit trails the operator controls                                            | Hash chain, Merkle transparency log with witness cosignatures, SCITT statements and receipts, offline verifier |
+| Proof of authority across organizations    | AP2 and Verifiable Intent, for payments only                                           | Grants with principal consent, SD-JWT VC mandates and signed A2A receipts on both sides                        |
+| Disclosure to an auditor or a counterparty | Exports of raw logs                                                                    | Evidence packages that disclose only the selected entries and prove the rest of the log                        |
+
+<p style="text-align: justify;">
+
+The formats follow open standards so other tools can check them: RFC 9162 Merkle trees, C2SP signed notes and the
+`tlog-witness` protocol, IETF SCITT signed statements with RFC 9942 receipts, SD-JWT VCs and the IETF Token Status
+List. [Conformance Vectors](ledger/conformance/README.md) let another implementation test itself against the ledger.
+
+</p>
+
+```shell
+mvn -pl ledger/server,ledger/verifier,ledger/demo-mcp -am package -DskipTests=true
+docker compose --file ledger/compose.yaml --project-name ledger up -d --build
+ledger/demo-mcp/demo.sh
+docker compose --file ledger/compose.yaml --project-name ledger down
+```
+
 
 ## Getting Started
+
+<p style="text-align: justify;">
+
+Build, test and verify cover the whole repository. Run, Dockerized and Kubernetes start the Nexusphere Core reference
+integration; the ledger's own quick start is in [Nexusphere Ledger](#nexusphere-ledger).
+
+</p>
 
 ### Prerequisites
 
@@ -216,6 +259,16 @@ Database: nexusphere
 ```
 
 ## Nexusphere Core
+
+<p style="text-align: justify;">
+
+The core is an optional reference integration, not a separate product. It shows how a multi-party platform feeds the
+ledger: with `APP_LEDGER_URL` set, every authorization decision, delegation change and other domain event with an
+actor is written to an outbox in the same database transaction and forwarded to the ledger as evidence. A delegation
+becomes a ledger grant from the delegator to the delegate, suspend and revoke revoke it, and resume grants it again, so
+the delegate can ask the core for a signed mandate to carry to other organizations. The ledger does not depend on it.
+
+</p>
 
 The vision, concepts, invariants, architecture, use cases, scenarios and roadmap are described in the
 [Project Description](docs/README.md). The end-to-end test scenarios are listed in
@@ -449,33 +502,6 @@ Every response carries an `X-Correlation-Id` header. Errors use one model:
   "message": "Network 7c1e… is not active",
   "correlationId": "4f0b…"
 }
-```
-
-## Nexusphere Ledger
-
-<p style="text-align: justify;">
-
-`ledger/` is a separate product built on the same stack: a self-hosted, tamper-evident evidence ledger for the actions
-of AI agents, with a hash chain, append-only storage and Ed25519-signed checkpoints that anyone can verify offline, and
-signed mandates an agent carries to other organizations. It is a standalone service and does not depend on the core.
-Its configuration and API are in [Nexusphere Ledger](ledger/README.md).
-
-</p>
-
-<p style="text-align: justify;">
-
-The core can feed a ledger. With `APP_LEDGER_URL` set, every authorization decision, delegation change and other
-domain event with an actor is written to an outbox in the same database transaction and forwarded to the ledger as
-evidence. A delegation becomes a ledger grant from the delegator to the delegate, suspend and revoke revoke it, and
-resume grants it again, so the delegate can ask the core for a signed mandate to carry to other organizations.
-
-</p>
-
-```shell
-mvn -pl ledger/server,ledger/verifier,ledger/demo-mcp -am package -DskipTests=true
-docker compose --file ledger/compose.yaml --project-name ledger up -d --build
-ledger/demo-mcp/demo.sh
-docker compose --file ledger/compose.yaml --project-name ledger down
 ```
 
 ##

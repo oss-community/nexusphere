@@ -1,0 +1,6 @@
+{
+  "description" : "Log checkpoint over the three evidence-chain entries, cosigned at time 1760000000",
+  "rootHash" : "90RRkUjPdhDtfUN4Wrq8Ov9MaYasc6xpVzjnZKeU58g=",
+  "note" : "ledger.example\n3\n90RRkUjPdhDtfUN4Wrq8Ov9MaYasc6xpVzjnZKeU58g=\n\n— ledger.example PZ1LMQPvrftAs+kIwtdBxqjzxn0EfwfA3HrfFGS0FIkAtk14lhFXOH2opNYYagbuWosQz6owqY3LPt/LjMGJNxwBvgI=\n",
+  "cosignedNote" : "ledger.example\n3\n90RRkUjPdhDtfUN4Wrq8Ov9MaYasc6xpVzjnZKeU58g=\n\n— ledger.example PZ1LMQPvrftAs+kIwtdBxqjzxn0EfwfA3HrfFGS0FIkAtk14lhFXOH2opNYYagbuWosQz6owqY3LPt/LjMGJNxwBvgI=\n— witness.example Z1UPTgAAAABo53gAuuWN5kTCbxrM20pX3kLwrkAPg8taAPtat1eWRr9KZEG+cpzRBHDZrJiiMsqe+lffhClwCF00s0fjonZQ0RrLCA==\n"
+}
