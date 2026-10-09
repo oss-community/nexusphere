@@ -11,7 +11,7 @@ export const VALID = 0;
 export const INVALID = 1;
 export const USAGE = 2;
 
-export const USAGE_TEXT = `Usage: nexusphere-ledger-verify [--public-key <base64 X.509 Ed25519 key> | --public-key-file <file>] [--witness <verifier key>]... [--witnesses-required <n>] [--json] <package.json>
+export const USAGE_TEXT = `Usage: nexusphere-ledger-verify [--public-key <base64 X.509 Ed25519 key> | --public-key-file <file>] [--keys <keys.json>] [--witness <verifier key>]... [--witnesses-required <n>] [--json] <package.json>
        nexusphere-ledger-verify mandate --issuer <url> [--issuer <url>] [--audience <aud>] [--action <action> --target <target>] [--public-key <key> | --public-key-file <file>] [--skip-status] [--json] <token | token file | ->
        nexusphere-ledger-verify statement [--public-key <key> | --public-key-file <file>] [--receipt <receipt.cose>] <statement.cose>`;
 
@@ -78,18 +78,24 @@ export async function run(args: string[], io: Io): Promise<number> {
 
 async function pkg(args: string[], io: Io): Promise<number> {
   const { options, positional } = parse(args, [
-    "--public-key", "--public-key-file", "--witness", "--witnesses-required", "--json",
+    "--public-key", "--public-key-file", "--keys", "--witness", "--witnesses-required", "--json",
   ]);
   if (positional === null) {
     throw new UsageError();
   }
   let data: Record<string, unknown>;
   let key: string | null;
+  let keys: Record<string, unknown>[] | undefined;
+  let reading = positional;
   try {
     key = publicKey(options);
     data = JSON.parse(readFileSync(positional, "utf8"));
+    if (options["--keys"]) {
+      reading = options["--keys"][0];
+      keys = JSON.parse(readFileSync(reading, "utf8"));
+    }
   } catch (e) {
-    io.err(`Cannot read ${positional}: ${(e as Error).message}\n`);
+    io.err(`Cannot read ${reading}: ${(e as Error).message}\n`);
     return USAGE;
   }
   const required = options["--witnesses-required"];
@@ -101,6 +107,7 @@ async function pkg(args: string[], io: Io): Promise<number> {
     report = await verifyPackage(data, key, {
       witnesses: options["--witness"] ?? [],
       requiredWitnesses: required ? Number(required[0]) : undefined,
+      keys,
     });
   } catch {
     throw new UsageError();
@@ -133,6 +140,12 @@ function printPackage(r: PackageReport, io: Io) {
     lines.push(`  Log         : ${r.logOrigin}, ${r.logTreeSize} entries, ${r.provenEntries} disclosed entries proven`);
     lines.push(`  Receipts    : ${r.receiptedEntries} SCITT statements with receipts`);
     lines.push(`  Witnesses   : ${r.witnesses.length ? r.witnesses.join(", ") : "none"}`);
+  }
+  if (r.revokedKeys.length) {
+    lines.push(
+      `  Revoked     : ${r.revokedKeys.join(", ")}${
+        r.valid ? " (witnesses prove the log checkpoint predates the compromise)" : ""}`,
+    );
   }
   lines.push(r.valid ? "Result: VALID" : "Result: INVALID");
   if (!r.valid) {

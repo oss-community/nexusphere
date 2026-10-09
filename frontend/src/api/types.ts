@@ -43,10 +43,11 @@ export interface SigningKey {
   keyId: string
   algorithm: string
   publicKey: string
-  status: 'ACTIVE' | 'RETIRED'
+  status: 'ACTIVE' | 'RETIRED' | 'REVOKED'
   activatedAt: string
   retiredAt: string | null
   rotation: { previousKeyId: string } | null
+  revocation: { compromisedAt: string; revokedAt: string; reason: string; revokerKeyId: string } | null
 }
 
 export interface VerificationReport {

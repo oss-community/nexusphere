@@ -142,7 +142,9 @@ print(report.valid, report.disclosed_entries, report.problems)
 
 Pass witness verifier keys as the third argument and the number of cosignatures needed as the fourth, as with the
 Java verifier. A key in the package is trusted only when it is the pinned key or signed key rotations lead to it from
-the pinned key. `report.to_dict()` has the same fields as the Java `PackageReport`.
+the pinned key. Pass `key_list` with the list from `GET /api/v1/keys` to apply key revocations, as the
+[Ledger README](../../README.md#key-revocation) describes; the command takes it as `--keys keys.json`.
+`report.to_dict()` has the same fields as the Java `PackageReport`.
 
 </p>
 

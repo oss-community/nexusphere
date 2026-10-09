@@ -48,7 +48,7 @@ class A2aKeys implements KeyResolver {
     @Override
     public Optional<PublicKey> resolve(String issuer, String keyId) {
         if (mandates.issuer().equals(issuer)) {
-            return signer.find(keyId).map(SigningKeys.PublicKeyInfo::publicKey);
+            return signer.findTrusted(keyId).map(SigningKeys.PublicKeyInfo::publicKey);
         }
         return jwks.resolve(issuer, keyId);
     }

@@ -19,7 +19,7 @@ const URL = process.env.NEXUSPHERE_LEDGER_URL;
 const OPERATOR_KEY = process.env.NEXUSPHERE_LEDGER_API_KEY ?? "nexusphere-ledger-development-key-change-me";
 
 describe.skipIf(!URL)("a running ledger", async () => {
-  const operator = new LedgerClient(URL!, { apiKey: OPERATOR_KEY });
+  const operator = new LedgerClient(URL ?? "", { apiKey: OPERATOR_KEY });
   const agentId = "ts-agent-" + crypto.randomUUID().substring(0, 8);
   const registered = URL ? await operator.registerAgent(agentId, "TypeScript SDK test", "acme") : {};
   const agent = new LedgerClient(URL ?? "", { apiKey: registered.apiKey as string });

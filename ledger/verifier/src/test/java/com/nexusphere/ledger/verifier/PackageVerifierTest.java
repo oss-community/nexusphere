@@ -3,7 +3,12 @@ package com.nexusphere.ledger.verifier;
 import com.nexusphere.ledger.chain.Checkpoint;
 import com.nexusphere.ledger.chain.EvidenceEntry;
 import com.nexusphere.ledger.chain.Hashes;
+import com.nexusphere.ledger.chain.KeyRevocation;
 import com.nexusphere.ledger.chain.KeyRotation;
+import com.nexusphere.ledger.chain.LogCheckpoint;
+import com.nexusphere.ledger.chain.MerkleTree;
+import com.nexusphere.ledger.chain.NoteKey;
+import com.nexusphere.ledger.chain.Signer;
 import com.nexusphere.ledger.chain.SigningKeys;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
@@ -19,6 +24,8 @@ import java.nio.file.Path;
 import java.security.KeyPair;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Base64;
+import java.util.HexFormat;
 import java.util.List;
 import java.util.TreeMap;
 import java.util.UUID;
@@ -152,6 +159,118 @@ class PackageVerifierTest {
         assertThat(old.valid()).isFalse();
         assertThat(old.problems()).anyMatch(p -> p.contains("does not reach"));
         assertThat(current.problems()).isEmpty();
+    }
+
+    private static final KeyPair NEXT = SigningKeys.generate();
+    private static final KeyPair WITNESS = SigningKeys.generate();
+    private static final NoteKey WITNESS_KEY = new NoteKey("witness.example", NoteKey.COSIGNATURE,
+            WITNESS.getPublic());
+    private static final Instant COMPROMISED = Instant.parse("2026-10-08T00:00:00Z");
+
+    private static ObjectNode witnessed(ObjectNode pkg, Instant cosignedAt) {
+        List<byte[]> leaves = new ArrayList<>();
+        pkg.path("links").forEach(link -> leaves.add(MerkleTree.leafHash(
+                HexFormat.of().parseHex(link.path("hash").asString()))));
+        MerkleTree.Subtrees tree = MerkleTree.of(leaves);
+        LogCheckpoint checkpoint = new LogCheckpoint("ledger.example", leaves.size(),
+                MerkleTree.root(tree, leaves.size()));
+        LogCheckpoint.Note note = checkpoint.sign(new NoteKey("ledger.example", NoteKey.ED25519, KEYS.getPublic()),
+                KEYS.getPrivate());
+        note = note.with(LogCheckpoint.cosign(note.body(), WITNESS_KEY, WITNESS.getPrivate(),
+                cosignedAt.getEpochSecond()));
+        ObjectNode log = pkg.putObject("log").put("checkpoint", note.text());
+        ArrayNode proofs = log.putArray("proofs");
+        pkg.path("links").forEach(link -> {
+            if (link.path("entry").isObject()) {
+                long sequence = link.path("sequence").asLong();
+                ArrayNode hashes = proofs.addObject().put("sequence", sequence).putArray("hashes");
+                MerkleTree.inclusionProof(tree, sequence - 1, leaves.size())
+                        .forEach(hash -> hashes.add(Base64.getEncoder().encodeToString(hash)));
+            }
+        });
+        return pkg;
+    }
+
+    private static ArrayNode keyList(KeyPair revoker) {
+        String keyId = SigningKeys.keyIdOf(KEYS.getPublic());
+        SigningKeys.PublicKeyInfo next = SigningKeys.PublicKeyInfo.of(NEXT.getPublic());
+        Instant activatedAt = COMPROMISED.plusSeconds(3600);
+        KeyRotation rotation = KeyRotation.issue(next, NEXT.getPrivate(), keyId, KEYS.getPrivate(), activatedAt);
+        KeyRevocation revocation = KeyRevocation.issue(keyId, COMPROMISED, activatedAt, "key leaked",
+                SigningKeys.keyIdOf(revoker.getPublic()), Signer.of(revoker.getPrivate()));
+        ArrayNode keys = JSON.createArrayNode();
+        keys.addObject().put("keyId", keyId).put("publicKey", SigningKeys.encode(KEYS.getPublic()))
+                .put("status", "REVOKED").putObject("revocation").put("format", KeyRevocation.FORMAT)
+                .put("compromisedAt", COMPROMISED.toString()).put("revokedAt", activatedAt.toString())
+                .put("reason", revocation.reason()).put("revokerKeyId", revocation.revokerKeyId())
+                .put("signature", revocation.signature());
+        ObjectNode listed = keys.addObject().put("keyId", next.keyId()).put("publicKey", next.encoded())
+                .put("status", "ACTIVE").put("activatedAt", activatedAt.toString());
+        listed.putObject("rotation").put("previousKeyId", keyId).put("keySignature", rotation.keySignature())
+                .put("previousKeySignature", rotation.previousKeySignature());
+        return keys;
+    }
+
+    private static PackageReport verifyRevoked(ObjectNode pkg, KeyPair revoker, List<NoteKey> witnesses) {
+        return PackageVerifier.verify(pkg, SigningKeys.encode(NEXT.getPublic()), keyList(revoker), witnesses, 0);
+    }
+
+    @Test
+    void aRevokedKeyIsValidWhenWitnessesProveTheLogBeforeTheCompromise() {
+        PackageReport report = verifyRevoked(witnessed(pkg(4, 2), COMPROMISED.minusSeconds(60)), NEXT,
+                List.of(WITNESS_KEY));
+
+        assertThat(report.problems()).isEmpty();
+        assertThat(report.revokedKeys()).containsExactly(SigningKeys.keyIdOf(KEYS.getPublic()));
+        assertThat(report.witnesses()).containsExactly("witness.example");
+    }
+
+    @Test
+    void aRevokedKeyIsInvalidWhenTheWitnessesCosignedAfterTheCompromise() {
+        PackageReport report = verifyRevoked(witnessed(pkg(4, 2), COMPROMISED.plusSeconds(60)), NEXT,
+                List.of(WITNESS_KEY));
+
+        assertThat(report.valid()).isFalse();
+        assertThat(report.problems()).anyMatch(p -> p.contains("revoked as compromised from " + COMPROMISED)
+                && p.contains("0 of the 1 required witness cosignatures"));
+    }
+
+    @Test
+    void aRevokedKeyIsInvalidWithoutWitnesses() {
+        assertThat(verifyRevoked(pkg(4, 2), NEXT, List.of()).valid()).isFalse();
+        assertThat(verifyRevoked(witnessed(pkg(4, 2), COMPROMISED.minusSeconds(60)), NEXT, List.of()).valid())
+                .isFalse();
+    }
+
+    @Test
+    void aRevocationByAnUntrustedKeyIsIgnored() {
+        PackageReport report = verifyRevoked(pkg(4, 2), SigningKeys.generate(), List.of());
+
+        assertThat(report.problems()).isEmpty();
+        assertThat(report.revokedKeys()).isEmpty();
+    }
+
+    @Test
+    void theRevocationInTheKeyListAppliesWhenThePackageOmitsIt() {
+        PackageReport withoutList = PackageVerifier.verify(pkg(4, 2), SigningKeys.encode(KEYS.getPublic()));
+        PackageReport withList = PackageVerifier.verify(pkg(4, 2), SigningKeys.encode(KEYS.getPublic()),
+                keyList(NEXT), List.of(), 0);
+
+        assertThat(withoutList.valid()).isTrue();
+        assertThat(withList.valid()).isFalse();
+        assertThat(withList.revokedKeys()).containsExactly(SigningKeys.keyIdOf(KEYS.getPublic()));
+    }
+
+    @Test
+    void aKeyEndorsedByARevokedKeyAfterItsCompromiseIsNotReached() {
+        ObjectNode pkg = rotated(NEXT, true);
+        ((ArrayNode) pkg.path("keys")).remove(1);
+
+        PackageReport report = PackageVerifier.verify(pkg, SigningKeys.encode(KEYS.getPublic()), keyList(NEXT),
+                List.of(), 0);
+
+        assertThat(report.valid()).isFalse();
+        assertThat(report.problems()).anyMatch(p -> p.contains("does not reach"));
     }
 
     @Test

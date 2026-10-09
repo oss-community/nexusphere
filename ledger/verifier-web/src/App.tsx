@@ -7,6 +7,8 @@ export function App() {
   const [fileName, setFileName] = useState<string | null>(null)
   const [packageText, setPackageText] = useState('')
   const [publicKey, setPublicKey] = useState('')
+  const [keyListName, setKeyListName] = useState<string | null>(null)
+  const [keyListText, setKeyListText] = useState('')
   const [witnesses, setWitnesses] = useState('')
   const [requiredWitnesses, setRequiredWitnesses] = useState('')
   const [result, setResult] = useState<Verification | null>(null)
@@ -21,6 +23,16 @@ export function App() {
     setPackageText(await file.text())
     setResult(null)
     setError(null)
+  }
+
+  async function loadKeyList(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0]
+    if (!file) {
+      return
+    }
+    setKeyListName(file.name)
+    setKeyListText(await file.text())
+    setResult(null)
   }
 
   function chosen(event: ChangeEvent<HTMLInputElement>) {
@@ -38,7 +50,7 @@ export function App() {
     setError(null)
     setResult(null)
     try {
-      setResult(await verify({ packageText, publicKey, witnesses, requiredWitnesses }))
+      setResult(await verify({ packageText, publicKey, keyListText, witnesses, requiredWitnesses }))
     } catch (e) {
       setError((e as Error).message)
     } finally {
@@ -70,6 +82,15 @@ export function App() {
             value={publicKey}
             onChange={(event) => setPublicKey(event.target.value)}
             placeholder="MCowBQYDK2VwAyEA..., the publicKey that GET /api/v1/keys lists"
+          />
+        </label>
+        <label className="drop small">
+          <span>{keyListName ?? 'Optional: the ledger key list (JSON from GET /api/v1/keys), to apply revocations'}</span>
+          <input
+            type="file"
+            accept="application/json,.json"
+            aria-label="Key list file"
+            onChange={(event) => void loadKeyList(event)}
           />
         </label>
         <label>
@@ -119,6 +140,13 @@ function Result({ verification }: { verification: Verification }) {
     ['Receipts', String(report.receiptedEntries)],
     ['Witnesses', report.witnesses.length ? report.witnesses.join(', ') : 'none'],
   ]
+  if (report.revokedKeys.length > 0) {
+    rows.push([
+      'Revoked keys',
+      report.revokedKeys.join(', ') +
+        (report.valid ? ', the witnesses prove the log checkpoint predates the compromise' : ''),
+    ])
+  }
   return (
     <section className="panel" aria-label="Result">
       <p className={`badge ${report.valid ? 'good' : 'bad'}`} data-testid="verdict">

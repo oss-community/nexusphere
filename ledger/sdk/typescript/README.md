@@ -144,8 +144,10 @@ console.log(report.valid, report.disclosedEntries, report.problems);
 
 <p style="text-align: justify;">
 
-Pass `{ witnesses: [verifierKey], requiredWitnesses: 1 }` as the third argument to require witness cosignatures. The
-report has the same fields as the Java `PackageReport`.
+Pass `{ witnesses: [verifierKey], requiredWitnesses: 1 }` as the third argument to require witness cosignatures, and
+`keys` with the list from `GET /api/v1/keys` to apply key revocations, as the
+[Ledger README](../../README.md#key-revocation) describes; the command takes it as `--keys keys.json`. The report has
+the same fields as the Java `PackageReport`.
 
 </p>
 

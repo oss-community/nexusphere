@@ -19,5 +19,6 @@ public record PackageReport(
         long provenEntries,
         long receiptedEntries,
         List<String> witnesses,
+        List<String> revokedKeys,
         List<String> problems) {
 }

@@ -1,6 +1,6 @@
 import { concat, equal, fromBase64, fromHex, toBase64, toHex } from "./bytes.js";
 import { canonicalBytes, sha256 } from "./canonical.js";
-import { formatInstant } from "./timestamps.js";
+import { formatInstant, parseMicros } from "./timestamps.js";
 
 export const ALGORITHM = "Ed25519";
 export const ROTATION_FORMAT = "nexusphere-ledger/key-rotation/v1";
@@ -216,15 +216,146 @@ export function rotationBytes(keyId: string, publicKey: string, previousKeyId: s
   });
 }
 
+export const REVOCATION_FORMAT = "nexusphere-ledger/key-revocation/v1";
+
+export interface KeyRevocationFields {
+  keyId: string;
+  compromisedAt: string;
+  revokedAt: string;
+  reason: string;
+  revokerKeyId: string;
+  signature: string;
+}
+
+export class KeyRevocation {
+  readonly keyId: string;
+  readonly compromisedAt: string;
+  readonly revokedAt: string;
+  readonly reason: string;
+  readonly revokerKeyId: string;
+  readonly signature: string;
+
+  constructor(fields: KeyRevocationFields) {
+    for (const name of ["keyId", "compromisedAt", "revokedAt", "reason", "revokerKeyId", "signature"] as const) {
+      if (typeof fields[name] !== "string") {
+        throw new Error("A key revocation needs " + name);
+      }
+    }
+    this.keyId = fields.keyId;
+    this.compromisedAt = formatInstant(fields.compromisedAt);
+    this.revokedAt = formatInstant(fields.revokedAt);
+    this.reason = fields.reason;
+    this.revokerKeyId = fields.revokerKeyId;
+    this.signature = fields.signature;
+  }
+
+  static async issue(
+    keyId: string,
+    compromisedAt: string,
+    revokedAt: string,
+    reason: string,
+    revoker: PrivateKey,
+  ): Promise<KeyRevocation> {
+    if (keyId === revoker.keyId) {
+      throw new Error("A key cannot revoke itself");
+    }
+    const content = revocationBytes(keyId, compromisedAt, revokedAt, reason, revoker.keyId);
+    return new KeyRevocation({
+      keyId,
+      compromisedAt,
+      revokedAt,
+      reason,
+      revokerKeyId: revoker.keyId,
+      signature: await revoker.signBase64(content),
+    });
+  }
+
+  async verify(revoker: PublicKey): Promise<boolean> {
+    return (
+      this.keyId !== this.revokerKeyId &&
+      revoker.keyId === this.revokerKeyId &&
+      (await revoker.verifyBase64(
+        revocationBytes(this.keyId, this.compromisedAt, this.revokedAt, this.reason, this.revokerKeyId),
+        this.signature,
+      ))
+    );
+  }
+
+  covers(time: string): boolean {
+    return parseMicros(time) >= parseMicros(this.compromisedAt);
+  }
+
+  get compromisedEpochSecond(): number {
+    const micros = parseMicros(this.compromisedAt);
+    const seconds = micros / 1_000_000n;
+    return Number(micros < 0n && micros % 1_000_000n !== 0n ? seconds - 1n : seconds);
+  }
+}
+
+export function revocationBytes(
+  keyId: string,
+  compromisedAt: string,
+  revokedAt: string,
+  reason: string,
+  revokerKeyId: string,
+): Uint8Array {
+  return canonicalBytes({
+    format: REVOCATION_FORMAT,
+    keyId,
+    compromisedAt: formatInstant(compromisedAt),
+    revokedAt: formatInstant(revokedAt),
+    reason,
+    revokerKeyId,
+  });
+}
+
 export async function trustedKeys(
   pinned: PublicKey,
   keys: Iterable<PublicKey>,
   rotations: KeyRotation[],
+  revocations: KeyRevocation[] = [],
 ): Promise<Map<string, PublicKey>> {
+  return (await trustedAndRevoked(pinned, keys, rotations, revocations)).trusted;
+}
+
+export async function trustedAndRevoked(
+  pinned: PublicKey,
+  keys: Iterable<PublicKey>,
+  rotations: KeyRotation[],
+  revocations: KeyRevocation[] = [],
+): Promise<{ trusted: Map<string, PublicKey>; revoked: Map<string, KeyRevocation> }> {
   const known = new Map<string, PublicKey>();
   for (const key of keys) {
     known.set(key.keyId, key);
   }
+  const revoked = await revokedKeys(await walk(pinned, known, rotations, new Map()), revocations);
+  return { trusted: await walk(pinned, known, rotations, revoked), revoked };
+}
+
+export async function revokedKeys(
+  trusted: Map<string, PublicKey>,
+  revocations: KeyRevocation[],
+): Promise<Map<string, KeyRevocation>> {
+  const revoked = new Map<string, KeyRevocation>();
+  for (const revocation of revocations) {
+    const revoker = trusted.get(revocation.revokerKeyId);
+    if (!trusted.has(revocation.keyId) || !revoker || !(await revocation.verify(revoker))) {
+      continue;
+    }
+    const known = revoked.get(revocation.keyId);
+    if (!known || parseMicros(revocation.compromisedAt) < parseMicros(known.compromisedAt)) {
+      revoked.set(revocation.keyId, revocation);
+    }
+  }
+  return revoked;
+}
+
+async function walk(
+  pinned: PublicKey,
+  known: Map<string, PublicKey>,
+  rotations: KeyRotation[],
+  revoked: Map<string, KeyRevocation>,
+): Promise<Map<string, PublicKey>> {
   const trusted = new Map<string, PublicKey>([[pinned.keyId, pinned]]);
   let changed = true;
   while (changed) {
@@ -239,7 +370,13 @@ export async function trustedKeys(
         changed = true;
       }
       const endorser = trusted.get(rotation.previousKeyId);
-      if (endorser && !trusted.has(rotation.keyId) && (await rotation.verifiedByPrevious(endorser))) {
+      const revocation = revoked.get(rotation.previousKeyId);
+      if (
+        endorser &&
+        !trusted.has(rotation.keyId) &&
+        (!revocation || !revocation.covers(rotation.activatedAt)) &&
+        (await rotation.verifiedByPrevious(endorser))
+      ) {
         trusted.set(rotation.keyId, (await rotation.key()) as PublicKey);
         changed = true;
       }

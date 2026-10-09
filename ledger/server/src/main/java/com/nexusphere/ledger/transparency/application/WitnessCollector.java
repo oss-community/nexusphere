@@ -74,6 +74,10 @@ public class WitnessCollector {
         return witnesses.stream().map(Witness::name).toList();
     }
 
+    public List<NoteKey> witnessKeys() {
+        return witnesses.stream().map(Witness::key).toList();
+    }
+
     public void collect() {
         if (witnesses.isEmpty()) {
             return;

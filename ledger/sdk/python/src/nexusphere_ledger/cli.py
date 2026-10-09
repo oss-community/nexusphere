@@ -57,6 +57,7 @@ def _package(args, out, err) -> int:
     parser = _Parser(prog="nexusphere-ledger-verify", add_help=False)
     parser.add_argument("--public-key")
     parser.add_argument("--public-key-file")
+    parser.add_argument("--keys")
     parser.add_argument("--witness", action="append", default=[])
     parser.add_argument("--witnesses-required", type=int)
     parser.add_argument("--json", action="store_true")
@@ -64,15 +65,21 @@ def _package(args, out, err) -> int:
     options = _parse(parser, args, err)
     if options is None:
         return USAGE
+    reading = options.package
     try:
         public_key = _public_key(options)
         with open(options.package, encoding="utf-8") as file:
             pkg = json.load(file)
+        key_list = None
+        if options.keys:
+            reading = options.keys
+            with open(options.keys, encoding="utf-8") as file:
+                key_list = json.load(file)
     except (OSError, ValueError) as e:
-        err.write("Cannot read %s: %s\n" % (options.package, e))
+        err.write("Cannot read %s: %s\n" % (reading, e))
         return USAGE
     try:
-        report = verify_package(pkg, public_key, options.witness, options.witnesses_required)
+        report = verify_package(pkg, public_key, options.witness, options.witnesses_required, key_list)
     except ValueError as e:
         err.write("Invalid argument: %s\n" % e)
         return USAGE
@@ -104,6 +111,9 @@ def _print_package(r, out):
                   % (r.log_origin, r.log_tree_size, r.proven_entries))
         out.write("  Receipts    : %d SCITT statements with receipts\n" % r.receipted_entries)
         out.write("  Witnesses   : %s\n" % (", ".join(r.witnesses) if r.witnesses else "none"))
+    if r.revoked_keys:
+        out.write("  Revoked     : %s%s\n" % (", ".join(r.revoked_keys), " (witnesses prove the log checkpoint "
+                                             "predates the compromise)" if r.valid else ""))
     if r.valid:
         out.write("Result: VALID\n")
     else:

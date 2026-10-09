@@ -28,6 +28,8 @@ database, so an auditor, a court or a counterparty can verify what a ledger hand
 * Pin the ledger's public key with `--public-key`, print JSON with `--json`, and exit with 0 (valid), 1 (invalid) or 2
   (usage error)
 * Accept checkpoints signed by other keys of the ledger only when signed key rotations lead to them from the pinned key
+* Apply key revocations from the package or from the key list given with `--keys`: a revoked key counts only where
+  witness cosignatures prove that the log checkpoint predates its compromise
 * Run the [Conformance Vectors](../conformance/README.md) in `ConformanceVectorsTest`
 
 ## Dependencies

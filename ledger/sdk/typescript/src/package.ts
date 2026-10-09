@@ -11,7 +11,7 @@ import {
   nullable,
   required,
 } from "./evidence.js";
-import { KeyRotation, PublicKey, trustedKeys } from "./keys.js";
+import { KeyRevocation, KeyRotation, PublicKey, revokedKeys, trustedAndRevoked } from "./keys.js";
 import { leafHash, verifyInclusion } from "./merkle.js";
 import { ED25519, LogCheckpoint, Note, NoteKey } from "./note.js";
 
@@ -34,12 +34,14 @@ export interface PackageReport {
   provenEntries: number;
   receiptedEntries: number;
   witnesses: string[];
+  revokedKeys: string[];
   problems: string[];
 }
 
 export interface PackageOptions {
   witnesses?: (string | NoteKey)[];
   requiredWitnesses?: number;
+  keys?: Json[];
 }
 
 interface LogResult {
@@ -48,9 +50,19 @@ interface LogResult {
   proven: number;
   receipted: number;
   witnesses: string[];
+  cosignedAt: Map<string, number>;
+  signers: string[];
 }
 
-const NO_LOG: LogResult = { origin: null, size: null, proven: 0, receipted: 0, witnesses: [] };
+const NO_LOG: LogResult = {
+  origin: null,
+  size: null,
+  proven: 0,
+  receipted: 0,
+  witnesses: [],
+  cosignedAt: new Map(),
+  signers: [],
+};
 
 export async function verifyPackage(
   pkg: Json,
@@ -63,7 +75,7 @@ export async function verifyPackage(
   const requiredWitnesses = options.requiredWitnesses ?? witnessKeys.length;
   const problems: string[] = [];
   const scope = isObject(pkg.scope) ? (pkg.scope as Json) : {};
-  const empty = (): PackageReport => report(false, null, null, null, 0, null, 0, 0, 0, scope, NO_LOG, problems);
+  const empty = (): PackageReport => report(false, null, null, null, 0, null, 0, 0, 0, scope, NO_LOG, [], problems);
   if (pkg.format !== PACKAGE_FORMAT) {
     problems.push(`unknown package format ${pkg.format ?? "null"}`);
     return empty();
@@ -80,7 +92,8 @@ export async function verifyPackage(
     problems.push(`the checkpoints cannot be read: ${(e as Error).message}`);
     return empty();
   }
-  const keys = await readKeys(pkg, publicKey, problems);
+  const found = await readKeys(pkg, options.keys ?? [], publicKey, problems);
+  const keys = found ? found.trusted : null;
   const pinned = publicKey !== null;
   const key = keys && keyFor(keys, checkpoint, pinned, problems);
   if (key && !(await checkpoint.verify(key))) {
@@ -139,6 +152,10 @@ export async function verifyPackage(
   const log = keys
     ? await verifyLog(pkg, [...keys.values()], checkpoint.sequence, witnessKeys, requiredWitnesses, problems)
     : NO_LOG;
+  const used = [checkpoint.keyId, ...(anchor ? [anchor.keyId] : []), ...log.signers];
+  const revoked = found
+    ? revokedUsed(found.revoked, used, log, Math.max(1, requiredWitnesses), problems)
+    : [];
   return report(
     problems.length === 0,
     checkpoint.keyId,
@@ -151,8 +168,42 @@ export async function verifyPackage(
     disclosed,
     scope,
     log,
+    revoked,
     problems,
   );
+}
+
+function revokedUsed(
+  revoked: Map<string, KeyRevocation>,
+  used: string[],
+  log: LogResult,
+  requiredWitnesses: number,
+  problems: string[],
+): string[] {
+  const found: string[] = [];
+  for (const keyId of new Set(used)) {
+    const revocation = revoked.get(keyId);
+    if (!revocation) {
+      continue;
+    }
+    found.push(keyId);
+    const before = [...log.cosignedAt.values()].filter((time) => time < revocation.compromisedEpochSecond).length;
+    if (before < requiredWitnesses) {
+      problems.push(
+        `key ${keyId} was revoked as compromised from ${javaInstant(revocation.compromisedAt)}, and ${before} of the ${requiredWitnesses} required witness cosignatures prove that the log checkpoint was made before then`,
+      );
+    }
+  }
+  return found;
+}
+
+function javaInstant(text: string): string {
+  const [head, rest] = text.replace(/Z$/, "").split(".");
+  let fraction = (rest ?? "").replace(/0+$/, "");
+  if (fraction) {
+    fraction = fraction.padEnd(3 * Math.ceil(fraction.length / 3), "0");
+  }
+  return head + (fraction ? "." + fraction : "") + "Z";
 }
 
 async function verifyLog(
@@ -178,14 +229,13 @@ async function verifyLog(
     return NO_LOG;
   }
   const checkpoint = note.checkpoint;
-  let signed = false;
+  const signers: string[] = [];
   for (const key of keys) {
     if (await note.signedBy(await NoteKey.of(checkpoint.origin, ED25519, key))) {
-      signed = true;
-      break;
+      signers.push(key.keyId);
     }
   }
-  if (!signed) {
+  if (signers.length === 0) {
     problems.push("the log checkpoint is not signed by a trusted ledger key");
   }
   if (checkpoint.size !== size) {
@@ -226,7 +276,7 @@ async function verifyLog(
     }
     const statement = scitt.get(sequence);
     if (statement && "statement" in statement) {
-      const problem = await scittProblem(statement, link, keys, checkpoint);
+      const problem = await scittProblem(statement, link, keys, checkpoint, signers);
       if (problem === null) {
         receipted++;
       } else {
@@ -234,16 +284,26 @@ async function verifyLog(
       }
     }
   }
-  const cosigned: string[] = [];
+  const cosignedAt = new Map<string, number>();
   for (const key of witnessKeys) {
-    if ((await note.cosignedBy(key)) !== null) {
-      cosigned.push(key.name);
+    const time = await note.cosignedBy(key);
+    if (time !== null && !cosignedAt.has(key.name)) {
+      cosignedAt.set(key.name, time);
     }
   }
+  const cosigned = [...cosignedAt.keys()];
   if (cosigned.length < requiredWitnesses) {
     problems.push(`the log checkpoint is cosigned by ${cosigned.length} of the ${requiredWitnesses} required witnesses`);
   }
-  return { origin: checkpoint.origin, size: checkpoint.size, proven, receipted, witnesses: cosigned };
+  return {
+    origin: checkpoint.origin,
+    size: checkpoint.size,
+    proven,
+    receipted,
+    witnesses: cosigned,
+    cosignedAt,
+    signers: [...new Set(signers)],
+  };
 }
 
 async function scittProblem(
@@ -251,6 +311,7 @@ async function scittProblem(
   link: EvidenceLink,
   keys: PublicKey[],
   checkpoint: LogCheckpoint,
+  signers: string[],
 ): Promise<string | null> {
   let statement: EvidenceStatement;
   let receipt: LogReceipt;
@@ -265,6 +326,7 @@ async function scittProblem(
   if (!statementKey || !(await statement.verify(statementKey))) {
     return "has a statement that is not signed by a trusted ledger key";
   }
+  signers.push(statementKey.keyId);
   if (!statement.describes(link)) {
     return "has a statement for different evidence";
   }
@@ -272,6 +334,7 @@ async function scittProblem(
   if (!receiptKey || !(await receipt.verify(leaf, receiptKey))) {
     return "has a receipt that does not prove its statement with a trusted ledger key";
   }
+  signers.push(receiptKey.keyId);
   if (receipt.treeSize !== checkpoint.size || !equal(await receipt.root(leaf), checkpoint.root)) {
     return "has a receipt for a different log checkpoint";
   }
@@ -315,11 +378,17 @@ async function disclosedMismatch(
   return null;
 }
 
-async function readKeys(pkg: Json, pinned: string | null, problems: string[]): Promise<Map<string, PublicKey> | null> {
+async function readKeys(
+  pkg: Json,
+  keyList: Json[],
+  pinned: string | null,
+  problems: string[],
+): Promise<{ trusted: Map<string, PublicKey>; revoked: Map<string, KeyRevocation> } | null> {
   const listed = new Map<string, PublicKey>();
   const rotations: KeyRotation[] = [];
+  const revocations: KeyRevocation[] = [];
   try {
-    for (const node of Array.isArray(pkg.keys) ? (pkg.keys as Json[]) : []) {
+    for (const node of [...(Array.isArray(pkg.keys) ? (pkg.keys as Json[]) : []), ...keyList]) {
       const keyId = required(node, "keyId");
       const key = await PublicKey.fromBase64(required(node, "publicKey"));
       if (key.keyId !== keyId) {
@@ -340,11 +409,24 @@ async function readKeys(pkg: Json, pinned: string | null, problems: string[]): P
           }),
         );
       }
+      const revocation = node.revocation;
+      if (isObject(revocation)) {
+        revocations.push(
+          new KeyRevocation({
+            keyId,
+            compromisedAt: required(revocation, "compromisedAt"),
+            revokedAt: required(revocation, "revokedAt"),
+            reason: required(revocation, "reason"),
+            revokerKeyId: required(revocation, "revokerKeyId"),
+            signature: required(revocation, "signature"),
+          }),
+        );
+      }
     }
     if (pinned === null) {
-      return listed;
+      return { trusted: listed, revoked: await revokedKeys(listed, revocations) };
     }
-    return await trustedKeys(await PublicKey.fromBase64(pinned), listed.values(), rotations);
+    return await trustedAndRevoked(await PublicKey.fromBase64(pinned), listed.values(), rotations, revocations);
   } catch (e) {
     problems.push(`the public keys cannot be read: ${(e as Error).message}`);
     return null;
@@ -391,6 +473,7 @@ function report(
   disclosedEntries: number,
   scope: Json,
   log: LogResult,
+  revokedKeys: string[],
   problems: string[],
 ): PackageReport {
   return {
@@ -410,6 +493,7 @@ function report(
     provenEntries: log.proven,
     receiptedEntries: log.receipted,
     witnesses: [...log.witnesses],
+    revokedKeys: [...revokedKeys],
     problems: [...problems],
   };
 }

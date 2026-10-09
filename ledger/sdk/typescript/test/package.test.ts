@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { KeyRotation, PrivateKey, toBase64, verifyPackage, utf8 } from "../src/index.js";
+import { KeyRevocation, KeyRotation, PrivateKey, toBase64, verifyPackage, utf8 } from "../src/index.js";
 import { LEDGER_KEY, buildPackage, entries, keyRecord, witnessNoteKey } from "./support.js";
 
 const PINNED = LEDGER_KEY.publicKey.encoded;
@@ -95,5 +95,81 @@ describe("verifyPackage", async () => {
     expect((await verifyPackage(empty, PINNED)).problems).toContain("the package discloses no evidence");
     empty.format = "other";
     expect((await verifyPackage(empty, PINNED)).problems).toEqual(["unknown package format other"]);
+  });
+});
+
+describe("revoked keys", async () => {
+  const chain = await entries(4);
+  const next = await PrivateKey.generate();
+  const witnesses = [(await witnessNoteKey()).vkey];
+
+  async function keyList(compromisedAt: string, revoker: PrivateKey = next) {
+    const rotation = await KeyRotation.issue(next, LEDGER_KEY.keyId, LEDGER_KEY, "2025-10-11T00:00:00Z");
+    const revocation = await KeyRevocation.issue(
+      LEDGER_KEY.keyId,
+      compromisedAt,
+      "2025-10-11T00:00:00Z",
+      "key leaked",
+      revoker,
+    );
+    const revoked = keyRecord(LEDGER_KEY, "REVOKED");
+    revoked.revocation = {
+      format: "nexusphere-ledger/key-revocation/v1",
+      compromisedAt: revocation.compromisedAt,
+      revokedAt: revocation.revokedAt,
+      reason: revocation.reason,
+      revokerKeyId: revocation.revokerKeyId,
+      signature: revocation.signature,
+    };
+    return [revoked, keyRecord(next, "ACTIVE", rotation)];
+  }
+
+  async function verify(compromisedAt: string, witness = true, keys = witnesses, revoker?: PrivateKey) {
+    return verifyPackage(await buildPackage(chain, [2], { witness }), next.publicKey.encoded, {
+      witnesses: keys,
+      requiredWitnesses: 0,
+      keys: await keyList(compromisedAt, revoker),
+    });
+  }
+
+  it("stays valid where witnesses cosigned before the compromise", async () => {
+    const report = await verify("2025-10-10T00:00:00Z");
+    expect(report.problems).toEqual([]);
+    expect(report.revokedKeys).toEqual([LEDGER_KEY.keyId]);
+  });
+
+  it("is invalid where the witnesses cosigned after the compromise", async () => {
+    const report = await verify("2025-10-01T00:00:00Z");
+    expect(report.valid).toBe(false);
+    expect(report.problems).toContain(
+      `key ${LEDGER_KEY.keyId} was revoked as compromised from 2025-10-01T00:00:00Z, and 0 of the 1 required witness cosignatures prove that the log checkpoint was made before then`,
+    );
+  });
+
+  it("needs a witness", async () => {
+    expect((await verify("2025-10-10T00:00:00Z", false)).valid).toBe(false);
+    expect((await verify("2025-10-10T00:00:00Z", true, [])).valid).toBe(false);
+  });
+
+  it("ignores a revocation by an untrusted key", async () => {
+    const report = await verify("2025-10-01T00:00:00Z", true, witnesses, await PrivateKey.generate());
+    expect(report.problems).toEqual([]);
+    expect(report.revokedKeys).toEqual([]);
+  });
+
+  it("does not reach a key endorsed after the compromise", async () => {
+    const keys = await keyList("2025-10-01T00:00:00Z");
+    const report = await verifyPackage(await buildPackage(chain, [2], { key: next, keys: [keys[0]] }), PINNED, {
+      requiredWitnesses: 0,
+      keys,
+    });
+    expect(report.valid).toBe(false);
+    expect(report.problems.some((problem) => problem.includes("does not reach"))).toBe(true);
+  });
+
+  it("refuses a key that revokes itself", async () => {
+    await expect(
+      KeyRevocation.issue(LEDGER_KEY.keyId, "2025-10-01T00:00:00Z", "2025-10-01T00:00:00Z", "x", LEDGER_KEY),
+    ).rejects.toThrow("cannot revoke itself");
   });
 });
