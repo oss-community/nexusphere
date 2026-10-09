@@ -38,6 +38,9 @@ agent platforms and gateways.
 * Adapters that record or decide tool calls: a LangGraph callback handler and `govern` wrapper, OpenAI Agents SDK run
   hooks with a tool input guardrail, an Amazon Bedrock AgentCore Gateway interceptor for Lambda, and an agentgateway
   tracing configuration with an end-to-end check
+* Browser verifier: one self-contained HTML page in React and TypeScript that verifies a package with the
+  TypeScript SDK, pinned to the ledger key and optional witnesses, with a Content Security Policy that blocks every
+  connection
 * Secrets and signing keys from files written by a secret manager, Prometheus metrics with alert rules, and a tested
   backup and restore procedure
 * Rate limit per caller with 429 and `Retry-After`, and alert delivery by email, Slack, Telegram or webhook, each

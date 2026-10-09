@@ -114,6 +114,7 @@ server's API.
 | [`ledger/sdk/typescript`](../ledger/sdk/typescript/README.md)     | TypeScript client and offline verifier for Node and browsers                        |
 | [`ledger/otel-exporter`](../ledger/otel-exporter/README.md)       | OpenTelemetry Collector exporter from agent spans to evidence                       |
 | [`ledger/adapters`](../ledger/adapters/README.md)                 | Adapters for LangGraph, OpenAI Agents SDK, AgentCore and agentgateway               |
+| [`ledger/verifier-web`](../ledger/verifier-web/README.md)         | Package verifier in the browser, as one HTML file with no network access            |
 | [`frontend`](../frontend/README.md)                               | Web UI for operators and principals                                                 |
 
 ### Stack
@@ -121,7 +122,7 @@ server's API.
 * Java 21, Spring Boot 4.1, Maven
 * PostgreSQL 18 with the `ledger` schema and Flyway migrations
 * Spring JDBC, Spring Security OAuth2 JOSE for principal tokens, Micrometer with Prometheus
-* React and TypeScript for the web UI
+* React and TypeScript for the web UI and the browser verifier
 * Python and TypeScript SDKs that implement every format independently
 * Go for the OpenTelemetry Collector exporter
 * JUnit 5, AssertJ and Testcontainers for tests; Vitest for the web UI
