@@ -156,6 +156,10 @@ func TestOutcomes(t *testing.T) {
 	if e.Decision != "DENY" || e.Outcome != "DENIED" || e.Reason != "NOT_COVERED" || e.DelegationID != "grant-1" {
 		t.Errorf("denied span gave %+v", e)
 	}
+	e, _ = mapOne(t, cfg, tool(map[string]any{"mcp.error.code": int64(-32602), "mcp.error.message": "Unknown tool"}), nil)
+	if e.Outcome != "FAILED" || e.Reason != "JSON-RPC -32602 Unknown tool" {
+		t.Errorf("JSON-RPC error gave %s with %q", e.Outcome, e.Reason)
+	}
 	e, _ = mapOne(t, cfg, tool(map[string]any{"nexusphere.decision": "ALLOW"}), nil)
 	if e.Decision != "ALLOW" || e.Outcome != "SUCCEEDED" {
 		t.Errorf("allowed span gave %s %s", e.Decision, e.Outcome)

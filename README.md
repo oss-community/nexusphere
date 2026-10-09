@@ -38,7 +38,8 @@ rest are references to open when they are needed. All of them are also in one bo
 | 11   | [Python SDK](ledger/sdk/python/README.md)                    | Record evidence from Python and verify packages and mandates        |
 | 12   | [TypeScript SDK](ledger/sdk/typescript/README.md)            | The same for Node and browsers                                      |
 | 13   | [OpenTelemetry Exporter](ledger/otel-exporter/README.md)     | Evidence from the agent spans an OpenTelemetry Collector receives   |
-| 14   | [Changelog](ledger/CHANGELOG.md)                             | What each release contains                                          |
+| 14   | [Adapters](ledger/adapters/README.md)                        | LangGraph, OpenAI Agents SDK, AgentCore and agentgateway            |
+| 15   | [Changelog](ledger/CHANGELOG.md)                             | What each release contains                                          |
 
 ## Nexusphere Ledger
 
@@ -160,7 +161,8 @@ mvn package -DskipTests=true
 
 The web UI is built and tested with npm, as described in [Nexusphere Frontend](frontend/README.md), and the SDKs
 and the exporter with their own tools, as described in [Python SDK](ledger/sdk/python/README.md#test),
-[TypeScript SDK](ledger/sdk/typescript/README.md#test) and [OpenTelemetry Exporter](ledger/otel-exporter/README.md#test).
+[TypeScript SDK](ledger/sdk/typescript/README.md#test), [OpenTelemetry Exporter](ledger/otel-exporter/README.md#test) and
+[Adapters](ledger/adapters/README.md#test).
 
 </p>
 
@@ -218,7 +220,7 @@ name.
 
 | Folder       | Content                                                                                      |
 |--------------|----------------------------------------------------------------------------------------------|
-| `ledger`     | The ledger: chain, mandate, server, verifier, demo MCP, tests, conformance, SDKs, OTel       |
+| `ledger`     | The ledger: chain, mandate, server, verifier, demo MCP, tests, conformance, SDKs, adapters   |
 | `frontend`   | The web UI in React and TypeScript                                                           |
 | `docs`       | The documents above and the PDF guide                                                        |
 | `mvn-devops` | The build and delivery toolkit                                                               |

@@ -1,0 +1,20 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "nexusphere-openai-agents"
+version = "1.0.0"
+description = "Nexusphere Ledger evidence for OpenAI Agents SDK tool calls"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = ["nexusphere-ledger>=1.0.0", "openai-agents>=0.23"]
+classifiers = [
+    "Programming Language :: Python :: 3",
+]
+
+[project.urls]
+Homepage = "https://github.com/oss-community/nexusphere"
+
+[tool.setuptools.packages.find]
+where = ["src"]

@@ -20,7 +20,8 @@ Most agent frameworks and gateways already emit OpenTelemetry spans that follow 
 conventions. The `nexusphere` exporter is a Collector component that picks the spans of tool calls and agent
 invocations and records each one as evidence through `POST /api/v1/evidence/batch`. An agent needs no code change and
 no SDK: point its OTLP exporter at a Collector that has this exporter in its traces pipeline. The resulting entries get
-the same hash chain, transparency log, witnesses, statements and packages as any other evidence.
+the same hash chain, transparency log, witnesses, statements and packages as any other evidence. A ready configuration for
+agentgateway is in [Adapters](../adapters/agentgateway/README.md).
 
 </p>
 
@@ -43,13 +44,13 @@ later prove which input and output belonged to the call without holding them.
 | `target`        | `gen_ai.tool.name`; the invoked `gen_ai.agent.name` for `invoke_agent`; else the span name                   |
 | `occurredAt`    | The span start time                                                                                          |
 | `decision`      | `nexusphere.decision` (`ALLOW` or `DENY`) when the gateway sets it                                           |
-| `outcome`       | `DENIED` after a `DENY`, `FAILED` when the span status is an error, else `SUCCEEDED`                         |
+| `outcome`       | `DENIED` after a `DENY`, `FAILED` when the span status is an error or `mcp.error.code` is set, else `SUCCEEDED` |
 | `reason`        | `nexusphere.reason`, else `error.type` or the status message of a failed span                                |
 | `delegationId`  | `nexusphere.delegation.id`                                                                                   |
 | `inputHash`     | `nexusphere.input.hash`, else the SHA-256 of `gen_ai.tool.call.arguments`                                    |
 | `outputHash`    | `nexusphere.output.hash`, else the SHA-256 of `gen_ai.tool.call.result`                                      |
 | `correlationId` | `gen_ai.conversation.id`, else the trace ID                                                                  |
-| `attributes`    | `otel.trace_id`, `otel.span_id`, `otel.span_name`, `otel.duration_ms`, the model, provider, tool call ID and `service.name`, and the keys in `attributes` |
+| `attributes`    | `otel.trace_id`, `otel.span_id`, `otel.span_name`, `otel.duration_ms`, the model, provider, tool call ID, `mcp.session.id`, `mcp.target` and `service.name`, and the keys in `attributes` |
 
 <p style="text-align: justify;">
 

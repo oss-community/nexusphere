@@ -241,6 +241,13 @@ the trace id as its correlation id, and other spans are ignored.
 
 </p>
 
+<p style="text-align: justify;">
+
+For LangGraph, the OpenAI Agents SDK, Amazon Bedrock AgentCore Gateway and agentgateway, the
+[Adapters](../ledger/adapters/README.md) connect the ledger in a few lines and can also let it decide each call.
+
+</p>
+
 ## Present It
 
 | Step | Show                                                                  | Point                                               |
