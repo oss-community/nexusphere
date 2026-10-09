@@ -26,8 +26,10 @@ First release of the Nexusphere Ledger, a self-hosted evidence ledger for AI age
 * Web UI (React and TypeScript) for operators and principals: evidence, agents, grants, mandates, packages, A2A
   exchanges, ledger verification, and principal sign-in with PKCE to approve, deny and revoke grants
 * Evidence batches: up to 500 entries recorded in order in one call, all or none
-* Dockerfiles, compose file with Adminer, Keycloak and the web UI, Kubernetes manifest, demo MCP server and demo
-  script
+* Secrets and signing keys from files written by a secret manager, Prometheus metrics with alert rules, and a tested
+  backup and restore procedure
+* Dockerfiles, compose file with Adminer, Keycloak, Prometheus and the web UI, Kubernetes manifest, demo MCP server
+  and demo script
 
 ##
 

@@ -24,4 +24,13 @@ class ApiKeyE2ETest extends LedgerE2ETestBase {
     void healthIsOpenForProbes() {
         assertThat(anonymous().get("/actuator/health").status()).isEqualTo(200);
     }
+
+    @Test
+    void metricsAreOpenForPrometheus() {
+        LedgerClient.Response metrics = anonymous().get("/actuator/prometheus");
+
+        assertThat(metrics.status()).isEqualTo(200);
+        assertThat(metrics.body()).contains("ledger_head_sequence", "ledger_checkpoint_lag",
+                "ledger_checkpoint_age_seconds");
+    }
 }

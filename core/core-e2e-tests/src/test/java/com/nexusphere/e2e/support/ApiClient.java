@@ -71,7 +71,7 @@ public final class ApiClient {
 
     private HttpRequest.Builder request(String path) {
         HttpRequest.Builder builder = HttpRequest.newBuilder(URI.create(baseUrl + path)).header("Accept", "application/json");
-        defaultHeaders.forEach(builder::header);
+        defaultHeaders.forEach(builder::setHeader);
         return builder;
     }
 

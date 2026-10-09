@@ -22,6 +22,15 @@ class PlatformBootstrapE2ETest extends E2ETestBase {
     }
 
     @Test
+    @DisplayName("E2E-PLT-08 metrics are open for Prometheus and include the ledger outbox")
+    void metricsAreOpenForPrometheus() {
+        ApiClient.Response response = api().withHeader("Accept", "text/plain").get("/actuator/prometheus");
+
+        assertThat(response.status()).isEqualTo(200);
+        assertThat(response.body()).contains("nexusphere_ledger_outbox_pending", "http_server_requests_seconds");
+    }
+
+    @Test
     @DisplayName("E2E-PLT-02 the OpenAPI contract is published")
     void openApiIsPublished() {
         ApiClient.Response response = api().get("/v3/api-docs");

@@ -10,6 +10,8 @@ server:
 spring:
   application:
     name: nexusphere
+  config:
+    import: optional:configtree:${APP_SECRETS_DIR:/run/secrets/}
   profiles:
     active: ${APP_PROFILES:postgresql}
   mvc:
@@ -48,10 +50,15 @@ nexusphere:
     forward-interval: ${APP_LEDGER_FORWARD_INTERVAL:5s}
     batch-size: ${APP_LEDGER_BATCH_SIZE:100}
 management:
+  server:
+    port: ${APP_MANAGEMENT_PORT:}
   endpoints:
     web:
       exposure:
-        include: health, info
+        include: health, info, prometheus
+  metrics:
+    tags:
+      application: nexusphere
   endpoint:
     health:
       probes:

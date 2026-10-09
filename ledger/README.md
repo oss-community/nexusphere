@@ -20,6 +20,8 @@
 * [Nexusphere Core](#nexusphere-core)
 * [API](#api)
 * [End-to-End Tests](ledger-e2e-tests/README.md)
+* [Ledger Guide](../docs/ledger-guide.md)
+* [Operations](../docs/operations.md)
 
 ## Purpose
 
@@ -68,6 +70,7 @@ curl -X GET http://localhost:8090/actuator/health
 | `ledger-adminer`    | http://localhost:8092     | Adminer for `ledger-postgresql`                  |
 | `keycloak`          | http://localhost:8180     | Keycloak, admin `admin`/`admin`                  |
 | `ledger-ui`         | http://localhost:5173     | The web UI, built from `frontend`                |
+| `prometheus`        | http://localhost:9090     | Prometheus with the ledger and core alerts       |
 
 <p style="text-align: justify;">
 
@@ -207,6 +210,8 @@ LEDGER_OIDC_AUDIENCE:
 LEDGER_OIDC_JWKS_URI:
 LEDGER_OIDC_PRINCIPAL_CLAIM: sub
 LEDGER_OIDC_CLIENT_ID:
+LEDGER_SECRETS_DIR: /run/secrets/
+LEDGER_MANAGEMENT_PORT:
 ```
 
 <p style="text-align: justify;">
@@ -214,7 +219,9 @@ LEDGER_OIDC_CLIENT_ID:
 `LEDGER_API_KEY` and the signing keys have no default outside the `dev` profile, and the ledger refuses to start with
 the published development secrets unless `dev` is active. The private key is a base64 PKCS#8 Ed25519 key and the public
 key is its base64 X.509 encoding; the ledger refuses to start when they do not match. The tables live in the `ledger`
-schema, so the ledger can share a database with the core.
+schema, so the ledger can share a database with the core. Any setting can also come from a file of the same name in
+`LEDGER_SECRETS_DIR`, which is how a secret manager hands over keys; backups, keys and metrics are described in
+[Operations](../docs/operations.md).
 
 </p>
 

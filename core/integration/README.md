@@ -29,6 +29,7 @@ Nexusphere Ledger, so what happens in the core becomes verifiable evidence and d
 * Let machines start, complete and fail the tasks assigned to them
 * Write domain events to a ledger outbox in the same transaction and forward them to the ledger in order
 * Keep a ledger grant for every active delegation and issue mandates from it
+* Publish `nexusphere_ledger_outbox_pending` and `nexusphere_ledger_outbox_delivered_total` for monitoring
 * Owns the `integration` schema: `ledger_outbox` and `ledger_grant`
 
 ## Dependencies

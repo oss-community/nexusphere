@@ -7,6 +7,8 @@
 * [Project Description](docs/README.md)
 * [End-to-End Tests](core/core-e2e-tests/README.md)
 * [Local Environment Setup](docs/local-setup.md)
+* [Ledger Guide](docs/ledger-guide.md)
+* [Operations](docs/operations.md)
 * [Getting Started](#getting-started)
 * [Dockerized](#dockerized)
 * [Kubernetes](#kubernetes)
@@ -279,6 +281,8 @@ APP_LEDGER_URL: http://localhost:8090
 APP_LEDGER_API_KEY: nexusphere-ledger-development-key-change-me
 APP_LEDGER_FORWARD_INTERVAL: 5s
 APP_LEDGER_BATCH_SIZE: 100
+APP_SECRETS_DIR: /run/secrets/
+APP_MANAGEMENT_PORT:
 ```
 
 `APP_TOKEN_SECRET` and `APP_OPERATOR_SECRET` have no default outside the `dev` profile, and the application refuses to
@@ -287,7 +291,8 @@ for its work and one for its authorization decision, so the application refuses 
 `APP_DATABASE_POOL_SIZE` is greater than `APP_HTTP_THREADS`.
 
 The `APP_LEDGER_*` variables connect the core to a [Nexusphere Ledger](ledger/README.md); without `APP_LEDGER_URL` the
-core runs on its own.
+core runs on its own. Secrets can also come from files in `APP_SECRETS_DIR`, and metrics are on
+`/actuator/prometheus`; both are described in [Operations](docs/operations.md).
 
 ### API
 
