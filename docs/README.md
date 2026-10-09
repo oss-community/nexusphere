@@ -110,6 +110,7 @@ server's API.
 | [`ledger/demo-mcp`](../ledger/demo-mcp/README.md)                 | Demo MCP server and the demo script                                                 |
 | [`ledger/ledger-e2e-tests`](../ledger/ledger-e2e-tests/README.md) | End-to-end tests against the server and PostgreSQL                                  |
 | [`ledger/conformance`](../ledger/conformance/README.md)           | Conformance vectors for every format                                                |
+| [`ledger/sdk/python`](../ledger/sdk/python/README.md)             | Python client and offline verifier, on the same conformance vectors                 |
 | [`frontend`](../frontend/README.md)                               | Web UI for operators and principals                                                 |
 
 ### Stack
