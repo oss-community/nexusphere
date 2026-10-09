@@ -16,6 +16,10 @@ public record EvidenceStatement(CoseSign1 message, String issuer, String subject
     private static final HexFormat HEX = HexFormat.of();
 
     public static byte[] sign(EvidenceEntry entry, String issuer, String keyId, PrivateKey key) {
+        return sign(entry, issuer, keyId, Signer.of(key));
+    }
+
+    public static byte[] sign(EvidenceEntry entry, String issuer, String keyId, Signer key) {
         Map<Object, Object> header = Map.of(
                 CoseSign1.ALG, CoseSign1.EDDSA,
                 CoseSign1.KID, keyId.getBytes(StandardCharsets.US_ASCII),

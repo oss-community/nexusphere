@@ -100,20 +100,27 @@ public record LogCheckpoint(String origin, long size, byte[] root) {
     }
 
     public Note sign(NoteKey key, PrivateKey privateKey) {
+        return sign(key, Signer.of(privateKey));
+    }
+
+    public Note sign(NoteKey key, Signer signer) {
         if (key.type() != NoteKey.ED25519) {
             throw new IllegalArgumentException("A checkpoint is signed with an Ed25519 note key");
         }
         String body = body();
-        byte[] signature = Base64.getDecoder().decode(
-                SigningKeys.sign(privateKey, body.getBytes(StandardCharsets.UTF_8)));
+        byte[] signature = signer.sign(body.getBytes(StandardCharsets.UTF_8));
         return new Note(this, body, List.of(new Signature(key.name(), key.hash(), signature)));
     }
 
     public static Signature cosign(String body, NoteKey key, PrivateKey privateKey, long time) {
+        return cosign(body, key, Signer.of(privateKey), time);
+    }
+
+    public static Signature cosign(String body, NoteKey key, Signer signer, long time) {
         if (key.type() != NoteKey.COSIGNATURE) {
             throw new IllegalArgumentException("A cosignature uses a cosignature key");
         }
-        byte[] ed25519 = Base64.getDecoder().decode(SigningKeys.sign(privateKey, cosignedBytes(time, body)));
+        byte[] ed25519 = signer.sign(cosignedBytes(time, body));
         byte[] value = ByteBuffer.allocate(72).putLong(time).put(ed25519).array();
         return new Signature(key.name(), key.hash(), value);
     }

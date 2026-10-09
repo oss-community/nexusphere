@@ -26,8 +26,13 @@ public record CoseSign1(byte[] protectedBytes, Map<Object, Object> protectedHead
 
     public static byte[] sign(Map<Object, Object> protectedHeader, Map<Object, Object> unprotected, byte[] payload,
                               boolean detached, PrivateKey key) {
+        return sign(protectedHeader, unprotected, payload, detached, Signer.of(key));
+    }
+
+    public static byte[] sign(Map<Object, Object> protectedHeader, Map<Object, Object> unprotected, byte[] payload,
+                              boolean detached, Signer key) {
         byte[] protectedBytes = Cbor.encode(protectedHeader);
-        byte[] signature = Base64.getDecoder().decode(SigningKeys.sign(key, toBeSigned(protectedBytes, payload)));
+        byte[] signature = key.sign(toBeSigned(protectedBytes, payload));
         return Cbor.encode(new Cbor.Tagged(TAG,
                 Arrays.asList(protectedBytes, unprotected, detached ? null : payload, signature)));
     }

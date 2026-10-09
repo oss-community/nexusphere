@@ -22,11 +22,17 @@ public record KeyRotation(String keyId, String publicKey, String previousKeyId, 
 
     public static KeyRotation issue(SigningKeys.PublicKeyInfo key, PrivateKey privateKey, String previousKeyId,
                                     PrivateKey previousPrivateKey, Instant activatedAt) {
+        return issue(key, Signer.of(privateKey), previousKeyId,
+                previousPrivateKey == null ? null : Signer.of(previousPrivateKey), activatedAt);
+    }
+
+    public static KeyRotation issue(SigningKeys.PublicKeyInfo key, Signer signer, String previousKeyId,
+                                    Signer previousSigner, Instant activatedAt) {
         Instant normalized = Timestamps.normalize(activatedAt);
         byte[] content = signedBytes(key.keyId(), key.encoded(), previousKeyId, normalized);
         return new KeyRotation(key.keyId(), key.encoded(), previousKeyId, normalized,
-                SigningKeys.sign(privateKey, content),
-                previousPrivateKey == null ? null : SigningKeys.sign(previousPrivateKey, content));
+                SigningKeys.sign(signer, content),
+                previousSigner == null ? null : SigningKeys.sign(previousSigner, content));
     }
 
     public boolean endorsed() {

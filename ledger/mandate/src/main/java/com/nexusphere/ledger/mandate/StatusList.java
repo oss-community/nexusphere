@@ -1,5 +1,6 @@
 package com.nexusphere.ledger.mandate;
 
+import com.nexusphere.ledger.chain.Signer;
 import tools.jackson.databind.JsonNode;
 
 import java.io.ByteArrayInputStream;
@@ -25,6 +26,10 @@ public record StatusList(String issuer, String uri, Instant issuedAt, Instant ex
     }
 
     public String sign(String keyId, PrivateKey key) {
+        return sign(keyId, Signer.of(key));
+    }
+
+    public String sign(String keyId, Signer key) {
         Map<String, Object> header = new LinkedHashMap<>();
         header.put("alg", Jws.ALGORITHM);
         header.put("typ", TYPE);

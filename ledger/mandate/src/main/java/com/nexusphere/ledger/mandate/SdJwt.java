@@ -1,5 +1,6 @@
 package com.nexusphere.ledger.mandate;
 
+import com.nexusphere.ledger.chain.Signer;
 import com.nexusphere.ledger.chain.Hashes;
 import tools.jackson.core.JacksonException;
 import tools.jackson.databind.JsonNode;
@@ -55,6 +56,11 @@ public record SdJwt(Jws.Parsed jwt, String issuerJwt, List<Disclosure> disclosur
 
     public static String issue(Map<String, ?> header, Map<String, ?> payload, List<Disclosure> disclosures,
                                PrivateKey key) {
+        return issue(header, payload, disclosures, Signer.of(key));
+    }
+
+    public static String issue(Map<String, ?> header, Map<String, ?> payload, List<Disclosure> disclosures,
+                               Signer key) {
         StringBuilder token = new StringBuilder(Jws.sign(header, payload, key)).append('~');
         disclosures.forEach(disclosure -> token.append(disclosure.encoded()).append('~'));
         return token.toString();

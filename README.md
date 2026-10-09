@@ -216,6 +216,7 @@ name.
 | Adminer      | [http://localhost:8092](http://localhost:8092)                                 | Server `ledger-postgresql`, user and password `ledger` |
 | Prometheus   | [http://localhost:9090](http://localhost:9090)                                 | None                                                   |
 | Alertmanager | [http://localhost:9093](http://localhost:9093)                                 | None                                                   |
+| Vault        | [http://localhost:8200](http://localhost:8200)                                 | Token `nexusphere-vault-development-token`             |
 | OTLP         | localhost:4317 (gRPC), http://localhost:4318 (HTTP)                            | None, the Collector sends with the operator key        |
 
 ## Repository Layout

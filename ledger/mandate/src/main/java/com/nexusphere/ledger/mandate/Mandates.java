@@ -1,5 +1,6 @@
 package com.nexusphere.ledger.mandate;
 
+import com.nexusphere.ledger.chain.Signer;
 import java.security.PrivateKey;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -11,8 +12,12 @@ public final class Mandates {
     private Mandates() {
     }
 
-    @SuppressWarnings("unchecked")
     public static String issue(MandateClaims claims, String keyId, PrivateKey key) {
+        return issue(claims, keyId, Signer.of(key));
+    }
+
+    @SuppressWarnings("unchecked")
+    public static String issue(MandateClaims claims, String keyId, Signer key) {
         Map<String, Object> header = new LinkedHashMap<>();
         header.put("alg", Jws.ALGORITHM);
         header.put("typ", MandateClaims.TYPE);
