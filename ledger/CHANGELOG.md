@@ -28,7 +28,9 @@ First release of the Nexusphere Ledger, a self-hosted evidence ledger for AI age
 * Evidence batches: up to 500 entries recorded in order in one call, all or none
 * Secrets and signing keys from files written by a secret manager, Prometheus metrics with alert rules, and a tested
   backup and restore procedure
-* Dockerfiles, compose file with Adminer, Keycloak, Prometheus and the web UI, Kubernetes manifest, demo MCP server
+* Rate limit per caller with 429 and `Retry-After`, and alert delivery by email, Slack, Telegram or webhook, each
+  turned on by setting its address
+* Dockerfiles, compose file with Adminer, Keycloak, Prometheus, Alertmanager and the web UI, Kubernetes manifest, demo MCP server
   and demo script
 
 ##

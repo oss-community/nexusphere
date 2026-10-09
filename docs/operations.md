@@ -1,6 +1,6 @@
 # <p align="center">Operations</p>
 
-<p align="center">Secrets, signing keys, backup and restore, and monitoring for the core and the ledger.</p>
+<p align="center">Secrets, signing keys, backup and restore, monitoring, alerts and rate limits for the core and the ledger.</p>
 
 ## <p align="center">Table of Content</p>
 
@@ -8,6 +8,8 @@
 * [Signing Keys](#signing-keys)
 * [Backup and Restore](#backup-and-restore)
 * [Monitoring](#monitoring)
+* [Alert Channels](#alert-channels)
+* [Rate Limits](#rate-limits)
 * [Production Checklist](#production-checklist)
 
 ## Secrets
@@ -231,9 +233,76 @@ carry the `prometheus.io/scrape`, `prometheus.io/path` and `prometheus.io/port` 
 
 <p style="text-align: justify;">
 
-The rules are in `ledger/prometheus/alerts.yml`. Prometheus evaluates them; to receive them by mail or chat, add an
-Alertmanager with your receiver. Run a full chain verification (`/api/v1/verification`) on a schedule as well; it
+The rules are in `ledger/prometheus/alerts.yml`. Prometheus evaluates them and sends them to Alertmanager, which
+delivers them on the channels below. Run a full chain verification (`/api/v1/verification`) on a schedule as well; it
 reads the whole chain, so run it at a quiet hour rather than on every scrape.
+
+</p>
+
+## Alert Channels
+
+<p style="text-align: justify;">
+
+The ledger compose file runs Alertmanager on http://localhost:9093. No channel is on by default: alerts are visible
+there and in Prometheus but go nowhere until a channel's settings are given. Any number of channels can be on at once;
+each alert goes to all of them, again when it is resolved, and every 4 hours while it keeps firing.
+
+</p>
+
+| Channel  | Turned on by                                            | Optional                                                                                                          |
+|----------|---------------------------------------------------------|-------------------------------------------------------------------------------------------------------------------|
+| Email    | `ALERT_EMAIL_TO` and `ALERT_SMTP_HOST`                  | `ALERT_SMTP_PORT` (587), `ALERT_SMTP_FROM`, `ALERT_SMTP_USERNAME`, `ALERT_SMTP_PASSWORD`, `ALERT_SMTP_TLS` (true) |
+| Slack    | `ALERT_SLACK_WEBHOOK_URL`                               | `ALERT_SLACK_CHANNEL`                                                                                             |
+| Telegram | `ALERT_TELEGRAM_BOT_TOKEN` and `ALERT_TELEGRAM_CHAT_ID` |                                                                                                                   |
+| Webhook  | `ALERT_WEBHOOK_URL`                                     |                                                                                                                   |
+
+```shell
+ALERT_EMAIL_TO=ops@example.com ALERT_SMTP_HOST=smtp.example.com ALERT_SMTP_USERNAME=alerts ALERT_SMTP_PASSWORD=secret \
+  docker compose --file ledger/compose.yaml --project-name ledger up -d alertmanager
+docker logs alertmanager 2>&1 | head -1
+```
+
+<p style="text-align: justify;">
+
+The first log line names the channels that are on, such as `Alert channels: email`. The settings can also live in a
+`ledger/.env` file, and each one can come from a file of the same name in `/run/secrets`, so passwords and tokens stay
+out of the environment. A Slack webhook URL comes from an incoming webhook of a Slack app. A Telegram bot token comes
+from @BotFather, and the chat id is the user's or group's id after they send the bot a message. The webhook channel
+posts the Alertmanager JSON to any URL, such as a ticketing system or an on-call service. `ALERT_GROUP_WAIT` (30s),
+`ALERT_GROUP_INTERVAL` (5m) and `ALERT_REPEAT_INTERVAL` (4h) tune how often messages are sent. Without a core running
+on the host, `CoreDown` fires; run only the ledger's scrape job, or turn the channels on once the core runs too.
+
+</p>
+
+<p style="text-align: justify;">
+
+Delivery was checked end to end: with email and webhook on, Prometheus fired `CoreDown`, and the message reached a
+test mail server and the webhook. In Kubernetes, give Alertmanager the same entrypoint `ledger/alertmanager/entrypoint.sh`
+with these variables, or use the Alertmanager configuration of the cluster's own monitoring stack.
+
+</p>
+
+## Rate Limits
+
+<p style="text-align: justify;">
+
+Both applications limit requests per caller. A caller is its token or API key, or its address when it sends none.
+Each caller has a bucket that holds the burst and refills at the per-minute rate; a request over it is answered 429
+`RATE_LIMIT_EXCEEDED` with `Retry-After` in seconds. Health and metrics under `/actuator/` are never limited. The
+limit is per instance and kept in memory, so with several replicas a caller can reach the limit once on each.
+
+</p>
+
+| Application | Requests a minute                     | Burst                           |
+|-------------|---------------------------------------|---------------------------------|
+| Ledger      | `LEDGER_RATE_LIMIT_PER_MINUTE` (1200) | `LEDGER_RATE_LIMIT_BURST` (200) |
+| Core        | `APP_RATE_LIMIT_PER_MINUTE` (1200)    | `APP_RATE_LIMIT_BURST` (200)    |
+
+<p style="text-align: justify;">
+
+`0` turns the limit off. Behind a reverse proxy the address comes from `X-Forwarded-For`, so anonymous callers are
+told apart; let only the proxy set that header. Keep a limit at the proxy as well when the applications are exposed
+to the internet, since it can also stop floods before they reach Java.
 
 </p>
 
@@ -246,8 +315,8 @@ reads the whole chain, so run it at a quiet hour rather than on every scrape.
 * Management port reachable only inside the cluster
 * WAL archiving with point-in-time recovery, plus a regular logical dump, and a restore tested once
 * Signed checkpoints copied outside the ledger
-* Prometheus scraping both applications, the alerts above routed to someone
-* Rate limits at the reverse proxy or ingress; the applications do not limit requests themselves
+* Prometheus scraping both applications, and at least one alert channel on
+* Rate limits sized for the expected traffic, plus a limit at the reverse proxy for internet-facing deployments
 * `LEDGER_OIDC_*` set so principals approve grants with their own sign-in
 
 ##

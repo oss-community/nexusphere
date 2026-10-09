@@ -49,6 +49,7 @@ public abstract class LedgerE2ETestBase {
         registry.add("ledger.mcp.servers.files.authorization", () -> FakeMcpServer.AUTHORIZATION);
         registry.add("ledger.mcp.servers.offline.url", () -> "http://localhost:1/mcp");
         registry.add("server.port", () -> PORT);
+        registry.add("ledger.rate-limit.per-minute", () -> "0");
         registry.add("ledger.mandate.issuer", () -> ISSUER);
         registry.add("ledger.a2a.peers.supplier.url", () -> SUPPLIER_ISSUER + "/a2a/in/sales");
         registry.add("ledger.a2a.peers.supplier.issuer", () -> SUPPLIER_ISSUER);

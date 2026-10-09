@@ -65,6 +65,7 @@ rotation happens at startup as it does in production.
 |                           | The operator can have the ledger verify a package                             |
 | `ApiKeyE2ETest`           | The API requires the ledger key                                               |
 |                           | Health is open for probes                                                     |
+| `RateLimitE2ETest`        | A caller over its rate limit is told when to retry                            |
 | `AgentE2ETest`            | A registered agent gets its own key once                                      |
 |                           | Registering the same agent twice is a conflict                                |
 |                           | A disabled agent or an old key is rejected                                    |

@@ -77,6 +77,7 @@ repository and architecture tests live in their own modules and are not listed h
 | `MachineAdapterE2ETest`            | `com.nexusphere.e2e.machine`       | E2E-SC02-01..04                                                         |
 | `ManagementAccessE2ETest`          | `com.nexusphere.e2e.security`      | E2E-SC18-01..04, E2E-SC15-11                                            |
 | `HardeningE2ETest`                 | `com.nexusphere.e2e.security`      | E2E-SC19-01..08                                                         |
+| `RateLimitE2ETest`                 | `com.nexusphere.e2e.security`      | E2E-SC19-09                                                             |
 
 ## Scenario Catalog
 
@@ -282,6 +283,7 @@ Status: ✓ implemented, ◐ partly implemented, ○ planned. The scenarios are 
 | E2E-SC19-06 | Every endpoint except sign-in, health, platform information and API docs needs a token                     | ✓      |
 | E2E-SC19-07 | A 128-character correlation id is kept in the audit trail                                                  | ✓      |
 | E2E-SC19-08 | More concurrent authorized requests than request threads never exhaust the connection pool                 | ✓      |
+| E2E-SC19-09 | A caller over its rate limit gets 429 with `Retry-After`, other callers and health are not affected        | ✓      |
 
 ## Cross-Cutting Checks
 

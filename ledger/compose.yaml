@@ -114,5 +114,31 @@ services:
       - "host.docker.internal:host-gateway"
     depends_on:
       - ledger
+      - alertmanager
+  alertmanager:
+    image: prom/alertmanager:v0.28.1
+    container_name: alertmanager
+    hostname: alertmanager
+    restart: always
+    ports:
+      - "9093:9093"
+    entrypoint: [ "/bin/sh", "/etc/alertmanager/entrypoint.sh" ]
+    volumes:
+      - "./alertmanager:/etc/alertmanager:ro"
+    environment:
+      ALERT_EMAIL_TO: ${ALERT_EMAIL_TO:-}
+      ALERT_SMTP_HOST: ${ALERT_SMTP_HOST:-}
+      ALERT_SMTP_PORT: ${ALERT_SMTP_PORT:-587}
+      ALERT_SMTP_FROM: ${ALERT_SMTP_FROM:-}
+      ALERT_SMTP_USERNAME: ${ALERT_SMTP_USERNAME:-}
+      ALERT_SMTP_PASSWORD: ${ALERT_SMTP_PASSWORD:-}
+      ALERT_SMTP_TLS: ${ALERT_SMTP_TLS:-true}
+      ALERT_SLACK_WEBHOOK_URL: ${ALERT_SLACK_WEBHOOK_URL:-}
+      ALERT_SLACK_CHANNEL: ${ALERT_SLACK_CHANNEL:-}
+      ALERT_TELEGRAM_BOT_TOKEN: ${ALERT_TELEGRAM_BOT_TOKEN:-}
+      ALERT_TELEGRAM_CHAT_ID: ${ALERT_TELEGRAM_CHAT_ID:-}
+      ALERT_WEBHOOK_URL: ${ALERT_WEBHOOK_URL:-}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
 volumes:
   ledger-postgresql-data:

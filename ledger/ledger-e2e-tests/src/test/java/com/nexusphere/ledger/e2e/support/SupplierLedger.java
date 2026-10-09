@@ -40,7 +40,8 @@ public final class SupplierLedger implements AutoCloseable {
                         "--ledger.a2a.agents.sales.authorization=" + FakeA2aAgent.AUTHORIZATION,
                         "--ledger.a2a.agents.down.url=http://localhost:1/a2a",
                         "--ledger.a2a.status-list-cache=0s",
-                        "--ledger.checkpoint.interval=1h");
+                        "--ledger.checkpoint.interval=1h",
+                        "--ledger.rate-limit.per-minute=0");
         return new SupplierLedger(postgres, context, baseUrl);
     }
 
