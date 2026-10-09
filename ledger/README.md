@@ -14,6 +14,7 @@
 * [SCITT Statements and Receipts](#scitt-statements-and-receipts)
 * [Evidence Packages](#evidence-packages)
 * [Key Rotation](#key-rotation)
+* [Key Revocation](#key-revocation)
 * [Agents, Grants and Decisions](#agents-grants-and-decisions)
 * [Principal Login and Consent](#principal-login-and-consent)
 * [MCP Gateway](#mcp-gateway)
@@ -501,7 +502,8 @@ the package. When the package has a `log`, the verifier also checks that the log
 covers the end checkpoint and proves every disclosed entry, and that each statement and receipt is signed by a trusted
 key, describes its entry and proves it in the same log checkpoint. Pass each witness's verifier key with `--witness` and the
 number of cosignatures needed with `--witnesses-required` (all given witnesses by default) to require that independent
-witnesses saw the same log.
+witnesses saw the same log. Pass the ledger's current key list from `GET /api/v1/keys` with `--keys` so the verifier
+also applies key revocations that happened after the package was exported, as in [Key Revocation](#key-revocation).
 
 </p>
 
@@ -530,7 +532,8 @@ Result: VALID
 
 The ledger keeps every signing key it has used. Checkpoints, mandates, status lists and A2A receipts are signed with the
 active key, and everything signed with a retired key still verifies, because each signature names its key and the
-retired keys stay published in `GET /api/v1/keys`, `GET /public/v1/keys` and every evidence package.
+retired keys stay published in `GET /api/v1/keys`, `GET /public/v1/keys` and every evidence package. A revoked key
+stays in `GET /api/v1/keys` and in packages, with its revocation, but leaves `GET /public/v1/keys`.
 
 </p>
 
@@ -601,6 +604,50 @@ A retired key never signs again, so going back to `local` after this needs a new
 Vault policy of the ledger's token needs only `read` on `{mount}/keys/{key}` and `update` on `{mount}/sign/{key}`.
 
 </p>
+
+## Key Revocation
+
+<p style="text-align: justify;">
+
+When a retired key leaks, the operator revokes it with the time from which it must be treated as compromised. The
+active key signs a revocation record (`nexusphere-ledger/key-revocation/v1`) with the key ID, `compromisedAt`,
+`revokedAt`, the reason and the revoker's key ID; the ledger records it as a `key/revoke` evidence entry and shows the
+key as `REVOKED`. The active key cannot be revoked: rotate first, so another key can sign the revocation. A revoked key
+leaves the public JWKS, so mandates it signed no longer verify.
+
+</p>
+
+<p style="text-align: justify;">
+
+A signature carries no trustworthy time of its own, since whoever holds the leaked key can write any time into it. A
+verifier therefore accepts a checkpoint, log checkpoint, statement or receipt of a revoked key only when witness
+cosignatures prove that the log checkpoint existed before `compromisedAt`: at least one cosignature, or
+`--witnesses-required` of them, with an earlier time. A rotation endorsed by a revoked key at or after `compromisedAt`
+gives no trust either, so pin the key that signed the revocation. A revocation counts only when a key the verifier
+trusts signed it.
+
+</p>
+
+Step 1. Rotate to a new key, as above, if the leaked key is still active.
+
+Step 2. Revoke the leaked key; `compromisedAt` is the earliest time the key may have been copied:
+
+```shell
+curl -s -X POST http://localhost:8090/api/v1/keys/{keyId}/revocation -H "Authorization: Bearer nexusphere-ledger-development-key-change-me" -H "Content-Type: application/json" -d '{"compromisedAt":"2026-10-08T00:00:00Z","reason":"backup copy leaked"}'
+```
+
+Step 3. Check the keys; the leaked key must show `REVOKED` with its revocation:
+
+```shell
+curl -s http://localhost:8090/api/v1/keys -H "Authorization: Bearer nexusphere-ledger-development-key-change-me" | tee keys.json | jq '.[] | {keyId, status, compromisedAt: .revocation.compromisedAt}'
+```
+
+Step 4. Verify an older package with the new key pinned, the key list and the witnesses; it must end with
+`Result: VALID` and name the revoked key:
+
+```shell
+java -jar ledger/verifier/target/verifier-1.0.0-SNAPSHOT-exec.jar --public-key "$(jq -r '.[] | select(.status == "ACTIVE") | .publicKey' keys.json)" --keys keys.json --witness "{witness verifier key}" package.json
+```
 
 ## Agents, Grants and Decisions
 
@@ -952,7 +999,8 @@ API key, except `/api/v1/principal/**`, which requires a principal token from th
 | GET    | `/api/v1/checkpoints`                   | List checkpoints by `after` and `limit`                                                                |
 | GET    | `/api/v1/log/proofs/inclusion`          | Inclusion proof for a `sequence` in the log at `treeSize`, by default the latest log checkpoint        |
 | GET    | `/api/v1/log/proofs/consistency`        | Consistency proof from `firstSize` to `secondSize`, by default the latest log checkpoint               |
-| GET    | `/api/v1/keys`                          | Signing keys with their status and rotation records                                                    |
+| GET    | `/api/v1/keys`                          | Signing keys with their status, rotation and revocation records                                        |
+| POST   | `/api/v1/keys/{keyId}/revocation`       | Revoke a retired key as compromised from `compromisedAt`, with a `reason` (operator)                   |
 | POST   | `/api/v1/packages`                      | Export an evidence package by `agentId`, `principalId`, `fromSequence` and `toSequence` (operator)     |
 | POST   | `/api/v1/packages/verify`               | Verify a package with the verifier library, pinned to `publicKey` when given (operator)                |
 | GET    | `/api/v1/verification`                  | Full verification report (operator)                                                                    |

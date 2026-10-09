@@ -9,6 +9,7 @@ import com.nexusphere.ledger.evidence.domain.model.PackageRequest;
 import com.nexusphere.ledger.server.security.Caller;
 import com.nexusphere.ledger.server.signing.KeyController;
 import com.nexusphere.ledger.server.signing.LedgerSigner;
+import com.nexusphere.ledger.transparency.application.WitnessCollector;
 import com.nexusphere.ledger.verifier.PackageReport;
 import com.nexusphere.ledger.verifier.PackageVerifier;
 import org.springframework.http.HttpHeaders;
@@ -18,6 +19,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.json.JsonMapper;
 
 import java.time.Instant;
 import java.util.Base64;
@@ -77,10 +79,14 @@ class PackageController {
 
     private final PackageService packages;
     private final LedgerSigner signer;
+    private final WitnessCollector witnesses;
+    private final JsonMapper json;
 
-    PackageController(PackageService packages, LedgerSigner signer) {
+    PackageController(PackageService packages, LedgerSigner signer, WitnessCollector witnesses, JsonMapper json) {
         this.packages = packages;
         this.signer = signer;
+        this.witnesses = witnesses;
+        this.json = json;
     }
 
     @PostMapping("/api/v1/packages")
@@ -104,6 +110,8 @@ class PackageController {
     PackageReport verify(Caller caller, @RequestParam(required = false) String publicKey,
                          @RequestBody JsonNode body) {
         caller.requireOperator();
-        return PackageVerifier.verify(body, publicKey == null || publicKey.isBlank() ? null : publicKey);
+        JsonNode keys = json.valueToTree(signer.keys().stream().map(KeyController.KeyResponse::of).toList());
+        return PackageVerifier.verify(body, publicKey == null || publicKey.isBlank() ? null : publicKey, keys,
+                witnesses.witnessKeys(), 0);
     }
 }

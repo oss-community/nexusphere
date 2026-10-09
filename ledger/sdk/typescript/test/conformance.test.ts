@@ -7,6 +7,8 @@ import {
   EvidenceLink,
   EvidenceStatement,
   Json,
+  KeyRevocation,
+  KeyRotation,
   LogCheckpoint,
   LogReceipt,
   MandateVerifier,
@@ -22,6 +24,9 @@ import {
   fromHex,
   linkHash,
   mandatePayload,
+  revocationBytes,
+  rotationBytes,
+  trustedAndRevoked,
   merkle,
   sha256Hex,
   toBase64,
@@ -213,5 +218,39 @@ describe("mandate.json", () => {
     expect(payload.mandate.grant).toBe(v.claims.mandate.grant);
     expect(payload.mandate.principal).toBeUndefined();
     expect(payload.mandate.termsHash).toBeUndefined();
+  });
+});
+
+describe("key-history.json", () => {
+  it("rebuilds the rotation and the revocation", async () => {
+    const v = vector("key-history.json");
+    const rotation = await KeyRotation.issue(WITNESS_KEY, LEDGER_KEY.keyId, LEDGER_KEY, v.rotation.activatedAt);
+    const revocation = await KeyRevocation.issue(
+      LEDGER_KEY.keyId,
+      v.revocation.compromisedAt,
+      v.revocation.revokedAt,
+      v.revocation.reason,
+      WITNESS_KEY,
+    );
+    expect(
+      new TextDecoder().decode(
+        rotationBytes(WITNESS_KEY.keyId, WITNESS_KEY.publicKey.encoded, LEDGER_KEY.keyId, rotation.activatedAt),
+      ),
+    ).toBe(v.rotation.signedContent);
+    expect(rotation.keySignature).toBe(v.rotation.keySignature);
+    expect(rotation.previousKeySignature).toBe(v.rotation.previousKeySignature);
+    expect(
+      new TextDecoder().decode(
+        revocationBytes(LEDGER_KEY.keyId, revocation.compromisedAt, revocation.revokedAt, revocation.reason,
+          WITNESS_KEY.keyId),
+      ),
+    ).toBe(v.revocation.signedContent);
+    expect(revocation.signature).toBe(v.revocation.signature);
+    expect(revocation.compromisedEpochSecond).toBe(v.compromisedEpochSecond);
+    const { trusted, revoked } = await trustedAndRevoked(WITNESS_KEY.publicKey, [LEDGER_KEY.publicKey], [rotation], [
+      revocation,
+    ]);
+    expect(trusted.has(LEDGER_KEY.keyId)).toBe(true);
+    expect(revoked.has(LEDGER_KEY.keyId)).toBe(true);
   });
 });

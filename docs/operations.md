@@ -114,15 +114,18 @@ Step 3. Put both files in the secret manager as `LEDGER_SIGNING_PRIVATE_KEY` and
 
 Step 4. Start the ledger and check that `/api/v1/keys` shows the new key as `ACTIVE`.
 
-| Situation          | What to do                                                                                                                          |
-|--------------------|-------------------------------------------------------------------------------------------------------------------------------------|
-| Planned rotation   | Put the new key in `LEDGER_SIGNING_PRIVATE_KEY`/`PUBLIC_KEY` and the old one in `LEDGER_SIGNING_PREVIOUS_PRIVATE_KEY`, then restart |
-| Lost or leaked key | Start with a new key and `LEDGER_SIGNING_UNENDORSED_ROTATION=true`; tell verifiers to pin the new public key                        |
-| After rotation     | Old evidence and checkpoints still verify: retired public keys stay published in `/api/v1/keys` and in packages                     |
+| Situation        | What to do                                                                                                                          |
+|------------------|-------------------------------------------------------------------------------------------------------------------------------------|
+| Planned rotation | Put the new key in `LEDGER_SIGNING_PRIVATE_KEY`/`PUBLIC_KEY` and the old one in `LEDGER_SIGNING_PREVIOUS_PRIVATE_KEY`, then restart |
+| Lost key         | Start with a new key and `LEDGER_SIGNING_UNENDORSED_ROTATION=true`; tell verifiers to pin the new public key                        |
+| Leaked key       | Rotate, then revoke the leaked key with its compromise time; tell verifiers to pin the new key and pass `--keys`                    |
+| After rotation   | Old evidence and checkpoints still verify: retired public keys stay published in `/api/v1/keys` and in packages                     |
 
 <p style="text-align: justify;">
 
-The details of the rotation record are in [Key Rotation](../ledger/README.md#key-rotation).
+The details of the rotation record are in [Key Rotation](../ledger/README.md#key-rotation), and those of revocation in
+[Key Revocation](../ledger/README.md#key-revocation). Run witnesses before a leak happens: after it, only their
+cosignatures prove which checkpoints of the leaked key are genuine.
 
 </p>
 

@@ -41,7 +41,9 @@ request proofs and receipts cross between two ledgers over HTTP.
 `PrincipalConsentE2ETest` starts a `StandaloneLedger` that trusts `FakeOidcProvider`, a small OpenID Connect provider
 on a random port that signs RS256 tokens for any principal.
 `KeyRotationE2ETest` restarts a `StandaloneLedger` against one PostgreSQL container with a new signing key, so the
-rotation happens at startup as it does in production.
+rotation happens at startup as it does in production. `VaultSigningE2ETest` adds a HashiCorp Vault container whose
+transit key signs, and `KeyRevocationE2ETest` adds a witness `StandaloneLedger` whose cosignatures prove which
+checkpoints of a revoked key came before its compromise.
 `WitnessE2ETest` starts two `StandaloneLedger`s with their own PostgreSQL containers: one is the log and asks the
 other, which watches it, to cosign its log checkpoints over the C2SP witness protocol.
 
@@ -120,6 +122,9 @@ other, which watches it, to cosign its log checkpoints over the C2SP witness pro
 | `KeyRotationE2ETest`      | An endorsed rotation keeps earlier checkpoints and mandates valid             |
 |                           | A new key without the previous key is refused unless the operator allows it   |
 |                           | A retired key cannot sign again                                               |
+| `VaultSigningE2ETest`     | A local key moves to Vault and a Vault rotation is followed                   |
+|                           | A wrong token or a key that is not Ed25519 is refused at startup              |
+| `KeyRevocationE2ETest`    | A revoked key stays valid only where witnesses prove the time                 |
 | `TransparencyLogE2ETest`  | The log checkpoint is a signed note over the Merkle root                      |
 |                           | An entry is proven in the signed tree                                         |
 |                           | A later tree is proven to extend an earlier one                               |

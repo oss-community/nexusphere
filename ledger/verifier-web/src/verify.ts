@@ -21,6 +21,7 @@ export interface Verification {
 export interface Input {
   packageText: string
   publicKey: string
+  keyListText?: string
   witnesses: string
   requiredWitnesses: string
 }
@@ -45,9 +46,22 @@ export async function verify(input: Input): Promise<Verification> {
   if (!Number.isInteger(requiredWitnesses) || requiredWitnesses < 0) {
     throw new Error('Required witnesses must be a whole number.')
   }
+  let keys: Record<string, unknown>[] | undefined
+  if (input.keyListText && input.keyListText.trim() !== '') {
+    let parsed: unknown
+    try {
+      parsed = JSON.parse(input.keyListText)
+    } catch {
+      throw new Error('The key list is not JSON.')
+    }
+    if (!Array.isArray(parsed)) {
+      throw new Error('The key list must be the array that GET /api/v1/keys returns.')
+    }
+    keys = parsed as Record<string, unknown>[]
+  }
   let report: PackageReport
   try {
-    report = await verifyPackage(pkg as Record<string, unknown>, publicKey, { witnesses, requiredWitnesses })
+    report = await verifyPackage(pkg as Record<string, unknown>, publicKey, { witnesses, requiredWitnesses, keys })
   } catch (e) {
     throw new Error(`The keys cannot be read: ${(e as Error).message}`)
   }

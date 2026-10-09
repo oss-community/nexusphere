@@ -7,6 +7,7 @@ import com.nexusphere.ledger.chain.EvidenceEntry;
 import com.nexusphere.ledger.chain.EvidenceLink;
 import com.nexusphere.ledger.chain.EvidenceStatement;
 import com.nexusphere.ledger.chain.Hashes;
+import com.nexusphere.ledger.chain.KeyRevocation;
 import com.nexusphere.ledger.chain.KeyRotation;
 import com.nexusphere.ledger.chain.LogCheckpoint;
 import com.nexusphere.ledger.chain.LogReceipt;
@@ -24,9 +25,11 @@ import java.util.Base64;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.HexFormat;
+import java.util.LinkedHashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.TreeMap;
 import java.util.UUID;
 
@@ -43,10 +46,15 @@ public final class PackageVerifier {
 
     public static PackageReport verify(JsonNode pkg, String pinnedPublicKey, List<NoteKey> witnessKeys,
                                        int requiredWitnesses) {
+        return verify(pkg, pinnedPublicKey, null, witnessKeys, requiredWitnesses);
+    }
+
+    public static PackageReport verify(JsonNode pkg, String pinnedPublicKey, JsonNode keyList,
+                                       List<NoteKey> witnessKeys, int requiredWitnesses) {
         List<String> problems = new ArrayList<>();
         if (!FORMAT.equals(text(pkg, "format"))) {
             problems.add("unknown package format " + text(pkg, "format"));
-            return report(false, null, null, null, 0, null, 0, 0, 0, pkg, LogResult.NONE, problems);
+            return report(false, null, null, null, 0, null, 0, 0, 0, pkg, LogResult.NONE, List.of(), problems);
         }
         SignedCheckpoint checkpoint;
         SignedCheckpoint anchor;
@@ -55,9 +63,10 @@ public final class PackageVerifier {
             anchor = pkg.path("anchor").isObject() ? checkpoint(pkg.path("anchor")) : null;
         } catch (RuntimeException e) {
             problems.add("the checkpoints cannot be read: " + e.getMessage());
-            return report(false, null, null, null, 0, null, 0, 0, 0, pkg, LogResult.NONE, problems);
+            return report(false, null, null, null, 0, null, 0, 0, 0, pkg, LogResult.NONE, List.of(), problems);
         }
-        Map<String, SigningKeys.PublicKeyInfo> keys = keys(pkg, pinnedPublicKey, problems);
+        TrustedKeys trusted = keys(pkg, keyList, pinnedPublicKey, problems);
+        Map<String, SigningKeys.PublicKeyInfo> keys = trusted == null ? null : byId(trusted.all());
         boolean pinned = pinnedPublicKey != null;
         SigningKeys.PublicKeyInfo key = keys == null ? null : key(keys, checkpoint, pinned, problems);
         if (key != null && !checkpoint.verify(key)) {
@@ -103,15 +112,50 @@ public final class PackageVerifier {
         }
         LogResult log = keys == null ? LogResult.NONE
                 : log(pkg, keys.values(), checkpoint.checkpoint().sequence(), witnessKeys, requiredWitnesses, problems);
+        Set<String> used = new LinkedHashSet<>();
+        used.add(checkpoint.checkpoint().keyId());
+        if (anchor != null) {
+            used.add(anchor.checkpoint().keyId());
+        }
+        used.addAll(log.signers());
+        List<String> revoked = trusted == null ? List.of()
+                : revoked(trusted, used, log, Math.max(1, requiredWitnesses), problems);
         return report(problems.isEmpty(), checkpoint.checkpoint().keyId(), pinnedKeyId(pinnedPublicKey),
                 anchor == null ? null : anchor.checkpoint().sequence(), checkpoint.checkpoint().sequence(),
                 checkpoint.checkpoint().createdAt().toString(), first, result.checkedEntries(), disclosed, pkg, log,
-                problems);
+                revoked, problems);
     }
 
-    private record LogResult(String origin, Long size, long proven, long receipted, List<String> witnesses) {
+    private static List<String> revoked(TrustedKeys trusted, Set<String> used, LogResult log, int required,
+                                        List<String> problems) {
+        List<String> revoked = new ArrayList<>();
+        for (String keyId : used) {
+            KeyRevocation revocation = trusted.revocation(keyId).orElse(null);
+            if (revocation == null) {
+                continue;
+            }
+            revoked.add(keyId);
+            long before = log.cosignedAt().values().stream()
+                    .filter(time -> time < revocation.compromisedAt().getEpochSecond()).count();
+            if (before < required) {
+                problems.add("key " + keyId + " was revoked as compromised from " + revocation.compromisedAt()
+                        + ", and " + before + " of the " + required
+                        + " required witness cosignatures prove that the log checkpoint was made before then");
+            }
+        }
+        return revoked;
+    }
 
-        static final LogResult NONE = new LogResult(null, null, 0, 0, List.of());
+    private static Map<String, SigningKeys.PublicKeyInfo> byId(Collection<SigningKeys.PublicKeyInfo> keys) {
+        Map<String, SigningKeys.PublicKeyInfo> byId = new LinkedHashMap<>();
+        keys.forEach(key -> byId.put(key.keyId(), key));
+        return byId;
+    }
+
+    private record LogResult(String origin, Long size, long proven, long receipted, List<String> witnesses,
+                             Map<String, Long> cosignedAt, Set<String> signers) {
+
+        static final LogResult NONE = new LogResult(null, null, 0, 0, List.of(), Map.of(), Set.of());
     }
 
     private static LogResult log(JsonNode pkg, Collection<SigningKeys.PublicKeyInfo> keys, long size,
@@ -131,9 +175,10 @@ public final class PackageVerifier {
             return LogResult.NONE;
         }
         LogCheckpoint checkpoint = note.checkpoint();
-        boolean signed = keys.stream().anyMatch(key -> note.signedBy(
-                new NoteKey(checkpoint.origin(), NoteKey.ED25519, key.publicKey())));
-        if (!signed) {
+        Set<String> signers = new LinkedHashSet<>();
+        keys.stream().filter(key -> note.signedBy(new NoteKey(checkpoint.origin(), NoteKey.ED25519, key.publicKey())))
+                .forEach(key -> signers.add(key.keyId()));
+        if (signers.isEmpty()) {
             problems.add("the log checkpoint is not signed by a trusted ledger key");
         }
         if (checkpoint.size() != size) {
@@ -165,7 +210,7 @@ public final class PackageVerifier {
             }
             JsonNode statement = scitt.get(sequence);
             if (statement != null && statement.has("statement")) {
-                String problem = scittProblem(statement, link(node), keys, checkpoint);
+                String problem = scittProblem(statement, link(node), keys, checkpoint, signers);
                 if (problem == null) {
                     receipted++;
                 } else {
@@ -173,17 +218,20 @@ public final class PackageVerifier {
                 }
             }
         }
-        List<String> cosigned = witnessKeys.stream().filter(key -> note.cosignedBy(key).isPresent())
-                .map(NoteKey::name).toList();
+        Map<String, Long> cosignedAt = new LinkedHashMap<>();
+        witnessKeys.forEach(key -> note.cosignedBy(key).ifPresent(time -> cosignedAt.put(key.name(), time)));
+        List<String> cosigned = List.copyOf(cosignedAt.keySet());
         if (cosigned.size() < requiredWitnesses) {
             problems.add("the log checkpoint is cosigned by " + cosigned.size() + " of the " + requiredWitnesses
                     + " required witnesses");
         }
-        return new LogResult(checkpoint.origin(), checkpoint.size(), proven, receipted, cosigned);
+        return new LogResult(checkpoint.origin(), checkpoint.size(), proven, receipted, cosigned, cosignedAt,
+                signers);
     }
 
     private static String scittProblem(JsonNode signed, EvidenceLink link,
-                                       Collection<SigningKeys.PublicKeyInfo> keys, LogCheckpoint checkpoint) {
+                                       Collection<SigningKeys.PublicKeyInfo> keys, LogCheckpoint checkpoint,
+                                       Set<String> signers) {
         EvidenceStatement statement;
         LogReceipt receipt;
         try {
@@ -199,12 +247,14 @@ public final class PackageVerifier {
         if (statementKey == null || !statement.verify(statementKey.publicKey())) {
             return "has a statement that is not signed by a trusted ledger key";
         }
+        signers.add(statementKey.keyId());
         if (!statement.describes(link)) {
             return "has a statement for different evidence";
         }
         if (receiptKey == null || !receipt.verify(statement.leafHash(), receiptKey.publicKey())) {
             return "has a receipt that does not prove its statement with a trusted ledger key";
         }
+        signers.add(receiptKey.keyId());
         if (receipt.treeSize() != checkpoint.size()
                 || !Arrays.equals(receipt.root(statement.leafHash()).orElseThrow(), checkpoint.root())) {
             return "has a receipt for a different log checkpoint";
@@ -254,11 +304,17 @@ public final class PackageVerifier {
         return null;
     }
 
-    private static Map<String, SigningKeys.PublicKeyInfo> keys(JsonNode pkg, String pinned, List<String> problems) {
+    private static TrustedKeys keys(JsonNode pkg, JsonNode keyList, String pinned, List<String> problems) {
         Map<String, SigningKeys.PublicKeyInfo> listed = new LinkedHashMap<>();
         List<KeyRotation> rotations = new ArrayList<>();
+        List<KeyRevocation> revocations = new ArrayList<>();
         try {
-            for (JsonNode node : pkg.path("keys")) {
+            List<JsonNode> nodes = new ArrayList<>();
+            pkg.path("keys").forEach(nodes::add);
+            if (keyList != null) {
+                keyList.forEach(nodes::add);
+            }
+            for (JsonNode node : nodes) {
                 String keyId = text(node, "keyId");
                 SigningKeys.PublicKeyInfo key = SigningKeys.PublicKeyInfo.of(
                         SigningKeys.decodePublic(text(node, "publicKey")));
@@ -273,15 +329,18 @@ public final class PackageVerifier {
                             Instant.parse(text(node, "activatedAt")), text(rotation, "keySignature"),
                             nullable(rotation, "previousKeySignature")));
                 }
+                JsonNode revocation = node.path("revocation");
+                if (revocation.isObject()) {
+                    revocations.add(new KeyRevocation(keyId, Instant.parse(text(revocation, "compromisedAt")),
+                            Instant.parse(text(revocation, "revokedAt")), text(revocation, "reason"),
+                            text(revocation, "revokerKeyId"), text(revocation, "signature")));
+                }
             }
             if (pinned == null) {
-                return listed;
+                return TrustedKeys.listed(listed.values(), revocations);
             }
             SigningKeys.PublicKeyInfo pinnedKey = SigningKeys.PublicKeyInfo.of(SigningKeys.decodePublic(pinned));
-            Map<String, SigningKeys.PublicKeyInfo> trusted = new LinkedHashMap<>();
-            TrustedKeys.from(pinnedKey, listed.values(), rotations).all()
-                    .forEach(key -> trusted.put(key.keyId(), key));
-            return trusted;
+            return TrustedKeys.from(pinnedKey, listed.values(), rotations, revocations);
         } catch (RuntimeException e) {
             problems.add("the public keys cannot be read: " + e.getMessage());
             return null;
@@ -316,10 +375,10 @@ public final class PackageVerifier {
 
     private static PackageReport report(boolean valid, String keyId, String pinnedKeyId, Long anchor, long checkpoint,
                                         String createdAt, long first, long checked, long disclosed, JsonNode pkg,
-                                        LogResult log, List<String> problems) {
+                                        LogResult log, List<String> revoked, List<String> problems) {
         return new PackageReport(valid, keyId, pinnedKeyId, anchor, checkpoint, createdAt, first, checked, disclosed,
                 nullable(pkg.path("scope"), "agentId"), nullable(pkg.path("scope"), "principalId"), log.origin(),
-                log.size(), log.proven(), log.receipted(), log.witnesses(), List.copyOf(problems));
+                log.size(), log.proven(), log.receipted(), log.witnesses(), List.copyOf(revoked), List.copyOf(problems));
     }
 
     private static String text(JsonNode node, String field) {

@@ -61,7 +61,7 @@ curl -s http://localhost:8090/api/v1/keys -H "Authorization: Bearer nexusphere-l
 Step 2. Open `ledger/verifier-web/dist/index.html` in a browser, from disk or any web server.
 
 Step 3. Choose or drop `package.json`, paste the public key, and add witness keys if the log must carry their
-cosignatures.
+cosignatures. To apply key revocations, also choose the key list saved from `GET /api/v1/keys`.
 
 Step 4. Press Verify; the page must show `VALID` with the signing key, the checkpoint, the log, the proofs and the
 disclosed entries. Change one character of an entry in the file and verify again; the page must show `INVALID` and
@@ -85,6 +85,7 @@ Crypto: Chrome or Edge 137, Firefox 129, Safari 17 or later.
 | Disclosed entries against their content hash and the scope      | Disclosed entries and scope   |
 | Merkle inclusion proofs and SCITT receipts of disclosed entries | Inclusion proofs and receipts |
 | Witness cosignatures on the log checkpoint                      | Witnesses                     |
+| Revoked keys, valid only where witnesses predate the compromise | Revoked keys                  |
 
 <p style="text-align: justify;">
 

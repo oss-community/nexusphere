@@ -5,12 +5,16 @@ import com.nexusphere.ledger.chain.Checkpoint;
 import com.nexusphere.ledger.chain.EvidenceEntry;
 import com.nexusphere.ledger.chain.EvidenceStatement;
 import com.nexusphere.ledger.chain.Hashes;
+import com.nexusphere.ledger.chain.KeyRevocation;
+import com.nexusphere.ledger.chain.KeyRotation;
 import com.nexusphere.ledger.chain.LogCheckpoint;
 import com.nexusphere.ledger.chain.LogReceipt;
 import com.nexusphere.ledger.chain.MerkleTree;
 import com.nexusphere.ledger.chain.NoteKey;
 import com.nexusphere.ledger.chain.SignedCheckpoint;
+import com.nexusphere.ledger.chain.Signer;
 import com.nexusphere.ledger.chain.SigningKeys;
+import com.nexusphere.ledger.chain.TrustedKeys;
 import com.nexusphere.ledger.mandate.KeyResolver;
 import com.nexusphere.ledger.mandate.MandateCheck;
 import com.nexusphere.ledger.mandate.MandateClaims;
@@ -228,6 +232,63 @@ class ConformanceVectorsTest {
         LogCheckpoint.Note parsed = LogCheckpoint.parse(stored.path("cosignedNote").asString());
         assertThat(parsed.signedBy(new NoteKey(ORIGIN, NoteKey.ED25519, LEDGER))).isTrue();
         assertThat(parsed.cosignedBy(witness)).contains(1_760_000_000L);
+    }
+
+    @Test
+    void keyHistory() throws IOException {
+        SigningKeys.PublicKeyInfo first = SigningKeys.PublicKeyInfo.of(LEDGER);
+        SigningKeys.PublicKeyInfo second = SigningKeys.PublicKeyInfo.of(WITNESS_PUBLIC_KEY);
+        Instant activatedAt = Instant.parse("2026-10-02T08:00:00Z");
+        Instant compromisedAt = Instant.parse("2026-10-03T12:00:00.5Z");
+        Instant revokedAt = Instant.parse("2026-10-04T09:30:00Z");
+        KeyRotation rotation = KeyRotation.issue(second, WITNESS_KEY, first.keyId(), LEDGER_KEY, activatedAt);
+        KeyRevocation revocation = KeyRevocation.issue(first.keyId(), compromisedAt, revokedAt, "backup copy leaked",
+                second.keyId(), Signer.of(WITNESS_KEY));
+        Map<String, Object> rotationContent = new LinkedHashMap<>();
+        rotationContent.put("format", KeyRotation.FORMAT);
+        rotationContent.put("keyId", second.keyId());
+        rotationContent.put("algorithm", SigningKeys.ALGORITHM);
+        rotationContent.put("publicKey", second.encoded());
+        rotationContent.put("previousKeyId", first.keyId());
+        rotationContent.put("activatedAt", "2026-10-02T08:00:00.000000Z");
+        Map<String, Object> revocationContent = new LinkedHashMap<>();
+        revocationContent.put("format", KeyRevocation.FORMAT);
+        revocationContent.put("keyId", first.keyId());
+        revocationContent.put("compromisedAt", "2026-10-03T12:00:00.500000Z");
+        revocationContent.put("revokedAt", "2026-10-04T09:30:00.000000Z");
+        revocationContent.put("reason", "backup copy leaked");
+        revocationContent.put("revokerKeyId", second.keyId());
+        Map<String, Object> rotationVector = new LinkedHashMap<>();
+        rotationVector.put("keyId", second.keyId());
+        rotationVector.put("publicKey", second.encoded());
+        rotationVector.put("previousKeyId", first.keyId());
+        rotationVector.put("activatedAt", "2026-10-02T08:00:00.000000Z");
+        rotationVector.put("signedContent", CanonicalJson.write(rotationContent));
+        rotationVector.put("keySignature", rotation.keySignature());
+        rotationVector.put("previousKeySignature", rotation.previousKeySignature());
+        Map<String, Object> revocationVector = new LinkedHashMap<>();
+        revocationVector.put("keyId", first.keyId());
+        revocationVector.put("compromisedAt", "2026-10-03T12:00:00.500000Z");
+        revocationVector.put("revokedAt", "2026-10-04T09:30:00.000000Z");
+        revocationVector.put("reason", "backup copy leaked");
+        revocationVector.put("revokerKeyId", second.keyId());
+        revocationVector.put("signedContent", CanonicalJson.write(revocationContent));
+        revocationVector.put("signature", revocation.signature());
+        Map<String, Object> vector = new LinkedHashMap<>();
+        vector.put("description", "Test key 2 replaces test key 1 with an endorsed rotation, then revokes it as "
+                + "compromised; a cosignature before compromisedAt proves a checkpoint of key 1");
+        vector.put("rotation", rotationVector);
+        vector.put("revocation", revocationVector);
+        vector.put("compromisedEpochSecond", compromisedAt.getEpochSecond());
+        JsonNode stored = check("key-history.json", vector);
+
+        assertThat(CanonicalJson.write(rotationContent)).isEqualTo(stored.path("rotation").path("signedContent")
+                .asString());
+        assertThat(rotation.verifiedByPrevious(first)).isTrue();
+        assertThat(revocation.verify(second)).isTrue();
+        TrustedKeys trusted = TrustedKeys.from(second, List.of(first, second), List.of(rotation),
+                List.of(revocation));
+        assertThat(trusted.revocation(first.keyId())).contains(revocation);
     }
 
     @Test

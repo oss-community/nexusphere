@@ -6,7 +6,8 @@ from nexusphere_ledger.canonical import canonical_json, sha256_hex
 from nexusphere_ledger.cose import EvidenceStatement, LogReceipt
 from nexusphere_ledger.evidence import (ChainVerifier, Checkpoint, EvidenceLink, canonical_content, content_hash,
                                         link_hash)
-from nexusphere_ledger.keys import PrivateKey, PublicKey
+from nexusphere_ledger.keys import (KeyRevocation, KeyRotation, PrivateKey, PublicKey, signed_revocation_bytes,
+                                    signed_rotation_bytes, trusted_and_revoked)
 from nexusphere_ledger.mandate import MandateVerifier, StaticKeys
 from nexusphere_ledger.note import COSIGNATURE, ED25519, LogCheckpoint, Note, NoteKey, cosign
 
@@ -175,6 +176,29 @@ class MandateVector(unittest.TestCase):
         self.assertEqual(v["claims"]["mandate"]["grant"], payload["mandate"]["grant"])
         self.assertNotIn("principal", payload["mandate"])
         self.assertNotIn("termsHash", payload["mandate"])
+
+
+class KeyHistoryVector(unittest.TestCase):
+
+    def test_rotation_and_revocation(self):
+        v = vector("key-history.json")
+        rotation = KeyRotation.issue(WITNESS_KEY, LEDGER_KEY.key_id, LEDGER_KEY, v["rotation"]["activatedAt"])
+        revocation = KeyRevocation.issue(LEDGER_KEY.key_id, v["revocation"]["compromisedAt"],
+                                         v["revocation"]["revokedAt"], v["revocation"]["reason"], WITNESS_KEY)
+        self.assertEqual(v["rotation"]["signedContent"].encode(),
+                         signed_rotation_bytes(WITNESS_KEY.key_id, WITNESS_KEY.public_key.encoded, LEDGER_KEY.key_id,
+                                               rotation.activated_at))
+        self.assertEqual(v["rotation"]["keySignature"], rotation.key_signature)
+        self.assertEqual(v["rotation"]["previousKeySignature"], rotation.previous_key_signature)
+        self.assertEqual(v["revocation"]["signedContent"].encode(),
+                         signed_revocation_bytes(LEDGER_KEY.key_id, revocation.compromised_at, revocation.revoked_at,
+                                                 revocation.reason, WITNESS_KEY.key_id))
+        self.assertEqual(v["revocation"]["signature"], revocation.signature)
+        self.assertEqual(v["compromisedEpochSecond"], revocation.compromised_epoch_second)
+        trusted, revoked = trusted_and_revoked(WITNESS_KEY.public_key, [LEDGER_KEY.public_key], [rotation],
+                                               [revocation])
+        self.assertIn(LEDGER_KEY.key_id, trusted)
+        self.assertIn(LEDGER_KEY.key_id, revoked)
 
 
 if __name__ == "__main__":

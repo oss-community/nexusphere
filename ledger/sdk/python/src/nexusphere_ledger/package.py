@@ -5,7 +5,7 @@ from typing import List, Optional
 from . import merkle
 from .cose import EvidenceStatement, LogReceipt
 from .evidence import GENESIS, ChainVerifier, Checkpoint, EvidenceLink, content_hash
-from .keys import KeyRotation, PublicKey, trusted_keys
+from .keys import KeyRevocation, KeyRotation, PublicKey, revoked_keys, trusted_and_revoked
 from .note import ED25519, Note, NoteKey
 
 FORMAT = "nexusphere-ledger/package/v1"
@@ -29,6 +29,7 @@ class PackageReport:
     proven_entries: int
     receipted_entries: int
     witnesses: List[str] = field(default_factory=list)
+    revoked_keys: List[str] = field(default_factory=list)
     problems: List[str] = field(default_factory=list)
 
     def to_dict(self) -> dict:
@@ -42,24 +43,27 @@ class _Log:
     proven: int = 0
     receipted: int = 0
     witnesses: tuple = ()
+    cosigned_at: tuple = ()
+    signers: tuple = ()
 
 
 def verify_package(pkg: dict, public_key: Optional[str] = None, witness_keys=(),
-                   required_witnesses: Optional[int] = None) -> PackageReport:
+                   required_witnesses: Optional[int] = None, key_list=None) -> PackageReport:
     witness_keys = [NoteKey.parse(key) if isinstance(key, str) else key for key in witness_keys]
     required = len(witness_keys) if required_witnesses is None else required_witnesses
     problems = []
     scope = pkg.get("scope") if isinstance(pkg.get("scope"), dict) else {}
     if pkg.get("format") != FORMAT:
         problems.append("unknown package format %s" % _show(pkg.get("format")))
-        return _report(False, None, None, None, 0, None, 0, 0, 0, scope, _Log(), problems)
+        return _report(False, None, None, None, 0, None, 0, 0, 0, scope, _Log(), [], problems)
     try:
         checkpoint = Checkpoint.of(_object(pkg.get("checkpoint")))
         anchor = Checkpoint.of(pkg["anchor"]) if isinstance(pkg.get("anchor"), dict) else None
     except (ValueError, KeyError, TypeError) as e:
         problems.append("the checkpoints cannot be read: %s" % e)
-        return _report(False, None, None, None, 0, None, 0, 0, 0, scope, _Log(), problems)
-    keys = _keys(pkg, public_key, problems)
+        return _report(False, None, None, None, 0, None, 0, 0, 0, scope, _Log(), [], problems)
+    found = _keys(pkg, key_list, public_key, problems)
+    keys, revoked = (None, {}) if found is None else found
     pinned = public_key is not None
     key = None if keys is None else _key(keys, checkpoint, pinned, problems)
     if key is not None and not checkpoint.verify(key):
@@ -101,9 +105,26 @@ def verify_package(pkg: dict, public_key: Optional[str] = None, witness_keys=(),
         problems.append("the package discloses no evidence")
     log = _Log() if keys is None else _log(pkg, list(keys.values()), checkpoint.sequence, witness_keys, required,
                                            problems)
+    used = [checkpoint.key_id] + ([] if anchor is None else [anchor.key_id]) + list(log.signers)
+    revoked_used = _revoked(revoked, used, log, max(1, required), problems)
     return _report(not problems, checkpoint.key_id, _pinned_key_id(public_key),
                    None if anchor is None else anchor.sequence, checkpoint.sequence, checkpoint.created_at, first,
-                   result.checked_entries, disclosed, scope, log, problems)
+                   result.checked_entries, disclosed, scope, log, revoked_used, problems)
+
+
+def _revoked(revoked, used, log, required, problems) -> list:
+    found = []
+    for key_id in dict.fromkeys(used):
+        revocation = revoked.get(key_id)
+        if revocation is None:
+            continue
+        found.append(key_id)
+        before = sum(1 for _, time in log.cosigned_at if time < revocation.compromised_epoch_second)
+        if before < required:
+            problems.append("key %s was revoked as compromised from %s, and %d of the %d required witness "
+                            "cosignatures prove that the log checkpoint was made before then"
+                            % (key_id, _java_instant(revocation.compromised_at), before, required))
+    return found
 
 
 def _log(pkg, keys, size, witness_keys, required, problems) -> _Log:
@@ -118,7 +139,8 @@ def _log(pkg, keys, size, witness_keys, required, problems) -> _Log:
         problems.append("the log checkpoint cannot be read: %s" % e)
         return _Log()
     checkpoint = note.checkpoint
-    if not any(note.signed_by(NoteKey(checkpoint.origin, ED25519, key)) for key in keys):
+    signers = [key.key_id for key in keys if note.signed_by(NoteKey(checkpoint.origin, ED25519, key))]
+    if not signers:
         problems.append("the log checkpoint is not signed by a trusted ledger key")
     if checkpoint.size != size:
         problems.append("the log checkpoint covers %d entries, not the %d of the signed checkpoint"
@@ -152,19 +174,25 @@ def _log(pkg, keys, size, witness_keys, required, problems) -> _Log:
             proven += 1
         statement = scitt.get(sequence)
         if statement is not None and "statement" in statement:
-            problem = _scitt_problem(statement, link, keys, checkpoint)
+            problem = _scitt_problem(statement, link, keys, checkpoint, signers)
             if problem is None:
                 receipted += 1
             else:
                 problems.append("sequence %d %s" % (sequence, problem))
-    cosigned = [key.name for key in witness_keys if note.cosigned_by(key) is not None]
+    cosigned_at = {}
+    for key in witness_keys:
+        time = note.cosigned_by(key)
+        if time is not None and key.name not in cosigned_at:
+            cosigned_at[key.name] = time
+    cosigned = list(cosigned_at)
     if len(cosigned) < required:
         problems.append("the log checkpoint is cosigned by %d of the %d required witnesses" % (len(cosigned),
                                                                                                required))
-    return _Log(checkpoint.origin, checkpoint.size, proven, receipted, tuple(cosigned))
+    return _Log(checkpoint.origin, checkpoint.size, proven, receipted, tuple(cosigned),
+                tuple(cosigned_at.items()), tuple(dict.fromkeys(signers)))
 
 
-def _scitt_problem(signed, link, keys, checkpoint) -> Optional[str]:
+def _scitt_problem(signed, link, keys, checkpoint, signers) -> Optional[str]:
     try:
         statement = EvidenceStatement.parse(base64.b64decode(_text(signed, "statement"), validate=True))
         receipt = LogReceipt.parse(base64.b64decode(_text(signed, "receipt"), validate=True))
@@ -174,10 +202,12 @@ def _scitt_problem(signed, link, keys, checkpoint) -> Optional[str]:
     receipt_key = next((key for key in keys if key.key_id == receipt.key_id), None)
     if statement_key is None or not statement.verify(statement_key):
         return "has a statement that is not signed by a trusted ledger key"
+    signers.append(statement_key.key_id)
     if not statement.describes(link):
         return "has a statement for different evidence"
     if receipt_key is None or not receipt.verify(statement.leaf_hash, receipt_key):
         return "has a receipt that does not prove its statement with a trusted ledger key"
+    signers.append(receipt_key.key_id)
     if receipt.tree_size != checkpoint.size or receipt.root(statement.leaf_hash) != checkpoint.root:
         return "has a receipt for a different log checkpoint"
     return None
@@ -202,11 +232,12 @@ def _disclosed_mismatch(entry, link, agent_id, principal_id, low, high) -> Optio
     return None
 
 
-def _keys(pkg, pinned, problems) -> Optional[dict]:
+def _keys(pkg, key_list, pinned, problems) -> Optional[tuple]:
     listed = {}
     rotations = []
+    revocations = []
     try:
-        for node in pkg.get("keys") or []:
+        for node in list(pkg.get("keys") or []) + list(key_list or []):
             key_id = _text(node, "keyId")
             key = PublicKey.from_base64(_text(node, "publicKey"))
             if key.key_id != key_id:
@@ -218,9 +249,14 @@ def _keys(pkg, pinned, problems) -> Optional[dict]:
                 rotations.append(KeyRotation(key_id, key.encoded, _text(rotation, "previousKeyId"),
                                              _text(node, "activatedAt"), _text(rotation, "keySignature"),
                                              _nullable(rotation, "previousKeySignature")))
+            revocation = node.get("revocation")
+            if isinstance(revocation, dict):
+                revocations.append(KeyRevocation(key_id, _text(revocation, "compromisedAt"),
+                                                 _text(revocation, "revokedAt"), _text(revocation, "reason"),
+                                                 _text(revocation, "revokerKeyId"), _text(revocation, "signature")))
         if pinned is None:
-            return listed
-        return trusted_keys(PublicKey.from_base64(pinned), listed.values(), rotations)
+            return listed, revoked_keys(listed, revocations)
+        return trusted_and_revoked(PublicKey.from_base64(pinned), listed.values(), rotations, revocations)
     except (ValueError, TypeError, AttributeError) as e:
         problems.append("the public keys cannot be read: %s" % e)
         return None
@@ -245,10 +281,10 @@ def _pinned_key_id(pinned) -> Optional[str]:
 
 
 def _report(valid, key_id, pinned_key_id, anchor, checkpoint, created_at, first, checked, disclosed, scope, log,
-            problems) -> PackageReport:
+            revoked, problems) -> PackageReport:
     return PackageReport(valid, key_id, pinned_key_id, anchor, checkpoint, created_at, first, checked, disclosed,
                          _nullable(scope, "agentId"), _nullable(scope, "principalId"), log.origin, log.size,
-                         log.proven, log.receipted, list(log.witnesses), list(problems))
+                         log.proven, log.receipted, list(log.witnesses), list(revoked), list(problems))
 
 
 def _object(node) -> dict:
@@ -273,6 +309,14 @@ def _long(value, default) -> int:
     if isinstance(value, bool) or not isinstance(value, (int, float)):
         return default
     return int(value)
+
+
+def _java_instant(text: str) -> str:
+    head, _, fraction = text.rstrip("Z").partition(".")
+    fraction = fraction.rstrip("0")
+    if fraction:
+        fraction = fraction.ljust(3 * ((len(fraction) + 2) // 3), "0")
+    return head + ("." + fraction if fraction else "") + "Z"
 
 
 def _show(value) -> str:

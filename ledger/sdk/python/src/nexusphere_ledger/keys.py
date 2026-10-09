@@ -6,10 +6,11 @@ from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey, Ed25519PublicKey
 
 from .canonical import canonical_bytes
-from .timestamps import format_instant
+from .timestamps import format_instant, parse_instant
 
 ALGORITHM = "Ed25519"
 ROTATION_FORMAT = "nexusphere-ledger/key-rotation/v1"
+REVOCATION_FORMAT = "nexusphere-ledger/key-revocation/v1"
 
 
 class PublicKey:
@@ -158,8 +159,73 @@ def signed_rotation_bytes(key_id, public_key, previous_key_id, activated_at) -> 
     })
 
 
-def trusted_keys(pinned: PublicKey, keys, rotations) -> dict:
+class KeyRevocation:
+
+    def __init__(self, key_id, compromised_at, revoked_at, reason, revoker_key_id, signature):
+        if None in (key_id, compromised_at, revoked_at, reason, revoker_key_id, signature):
+            raise ValueError("A key revocation needs keyId, compromisedAt, revokedAt, reason, revokerKeyId and "
+                             "signature")
+        self.key_id = key_id
+        self.compromised_at = format_instant(compromised_at)
+        self.revoked_at = format_instant(revoked_at)
+        self.reason = reason
+        self.revoker_key_id = revoker_key_id
+        self.signature = signature
+
+    @classmethod
+    def issue(cls, key_id: str, compromised_at, revoked_at, reason: str, revoker: PrivateKey) -> "KeyRevocation":
+        if key_id == revoker.key_id:
+            raise ValueError("A key cannot revoke itself")
+        content = signed_revocation_bytes(key_id, compromised_at, revoked_at, reason, revoker.key_id)
+        return cls(key_id, compromised_at, revoked_at, reason, revoker.key_id, revoker.sign_base64(content))
+
+    def verify(self, revoker: PublicKey) -> bool:
+        return (self.key_id != self.revoker_key_id and revoker.key_id == self.revoker_key_id
+                and revoker.verify_base64(signed_revocation_bytes(self.key_id, self.compromised_at, self.revoked_at,
+                                                                  self.reason, self.revoker_key_id), self.signature))
+
+    def covers(self, time) -> bool:
+        return parse_instant(time) >= parse_instant(self.compromised_at)
+
+    @property
+    def compromised_epoch_second(self) -> int:
+        return int(parse_instant(self.compromised_at).timestamp() // 1)
+
+
+def signed_revocation_bytes(key_id, compromised_at, revoked_at, reason, revoker_key_id) -> bytes:
+    return canonical_bytes({
+        "format": REVOCATION_FORMAT,
+        "keyId": key_id,
+        "compromisedAt": format_instant(compromised_at),
+        "revokedAt": format_instant(revoked_at),
+        "reason": reason,
+        "revokerKeyId": revoker_key_id,
+    })
+
+
+def trusted_keys(pinned: PublicKey, keys, rotations, revocations=()) -> dict:
+    return trusted_and_revoked(pinned, keys, rotations, revocations)[0]
+
+
+def trusted_and_revoked(pinned: PublicKey, keys, rotations, revocations=()) -> tuple:
     known = {key.key_id: key for key in keys}
+    revoked = revoked_keys(_walk(pinned, known, rotations, {}), revocations)
+    return _walk(pinned, known, rotations, revoked), revoked
+
+
+def revoked_keys(trusted: dict, revocations) -> dict:
+    revoked = {}
+    for revocation in revocations:
+        revoker = trusted.get(revocation.revoker_key_id)
+        if revocation.key_id not in trusted or revoker is None or not revocation.verify(revoker):
+            continue
+        known = revoked.get(revocation.key_id)
+        if known is None or parse_instant(revocation.compromised_at) < parse_instant(known.compromised_at):
+            revoked[revocation.key_id] = revocation
+    return revoked
+
+
+def _walk(pinned: PublicKey, known: dict, rotations, revoked: dict) -> dict:
     trusted = {pinned.key_id: pinned}
     changed = True
     while changed:
@@ -172,7 +238,10 @@ def trusted_keys(pinned: PublicKey, keys, rotations) -> dict:
                 trusted[previous.key_id] = previous
                 changed = True
             endorser = trusted.get(rotation.previous_key_id)
-            if endorser is not None and rotation.key_id not in trusted and rotation.verified_by_previous(endorser):
+            revocation = revoked.get(rotation.previous_key_id)
+            if (endorser is not None and rotation.key_id not in trusted
+                    and (revocation is None or not revocation.covers(rotation.activated_at))
+                    and rotation.verified_by_previous(endorser)):
                 trusted[rotation.key_id] = rotation.key()
                 changed = True
     return trusted

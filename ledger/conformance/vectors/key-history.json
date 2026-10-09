@@ -1,0 +1,22 @@
+{
+  "description" : "Test key 2 replaces test key 1 with an endorsed rotation, then revokes it as compromised; a cosignature before compromisedAt proves a checkpoint of key 1",
+  "rotation" : {
+    "keyId" : "deb2ded39dc26fce",
+    "publicKey" : "MCowBQYDK2VwAyEAPUAXw+hDiVqStwqnTRt+vJyYLM8uxJaMwM1V8Sr0Zgw=",
+    "previousKeyId" : "06e3fd8fda29bb60",
+    "activatedAt" : "2026-10-02T08:00:00.000000Z",
+    "signedContent" : "{\"activatedAt\":\"2026-10-02T08:00:00.000000Z\",\"algorithm\":\"Ed25519\",\"format\":\"nexusphere-ledger/key-rotation/v1\",\"keyId\":\"deb2ded39dc26fce\",\"previousKeyId\":\"06e3fd8fda29bb60\",\"publicKey\":\"MCowBQYDK2VwAyEAPUAXw+hDiVqStwqnTRt+vJyYLM8uxJaMwM1V8Sr0Zgw=\"}",
+    "keySignature" : "ICTjl3IPFKgfEMJFBslrG0VV3Jtv/Jygz6Lasjjk3sY7vpAZiiPlpw4D91Ge4Vx3QRvnlkr+j1mxMmpmgJQqAg==",
+    "previousKeySignature" : "1U6JRWPEB/AYEQTT1U0vxt6uRtPYXpKG9OzJWoFKH+pPlglfjoQnSYNl3ZXKjDwi/T9bsYe1g+rYnjXa28yWAQ=="
+  },
+  "revocation" : {
+    "keyId" : "06e3fd8fda29bb60",
+    "compromisedAt" : "2026-10-03T12:00:00.500000Z",
+    "revokedAt" : "2026-10-04T09:30:00.000000Z",
+    "reason" : "backup copy leaked",
+    "revokerKeyId" : "deb2ded39dc26fce",
+    "signedContent" : "{\"compromisedAt\":\"2026-10-03T12:00:00.500000Z\",\"format\":\"nexusphere-ledger/key-revocation/v1\",\"keyId\":\"06e3fd8fda29bb60\",\"reason\":\"backup copy leaked\",\"revokedAt\":\"2026-10-04T09:30:00.000000Z\",\"revokerKeyId\":\"deb2ded39dc26fce\"}",
+    "signature" : "twsRHVo0OsDzk5O//3PWQNYpp80H27kaJtn4zxAC9JgjY4g9+ResbyGm2RUe45ZEprX3ir092DXmG5gXvQIgBg=="
+  },
+  "compromisedEpochSecond" : 1791028800
+}

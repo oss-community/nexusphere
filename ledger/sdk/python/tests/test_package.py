@@ -3,7 +3,7 @@ import copy
 import unittest
 
 from nexusphere_ledger import verify_package
-from nexusphere_ledger.keys import KeyRotation, PrivateKey
+from nexusphere_ledger.keys import KeyRevocation, KeyRotation, PrivateKey
 
 from .support import LEDGER_KEY, entries, key_record, package, witness_note_key
 
@@ -114,6 +114,64 @@ class PackageVerification(unittest.TestCase):
         pkg = package(self.chain, {1})
         pkg["checkpoint"]["signature"] = base64.b64encode(b"x" * 64).decode()
         self.assertIn("the signature of checkpoint 6 is not valid", verify_package(pkg, PINNED).problems)
+
+
+class RevokedKeys(unittest.TestCase):
+
+    def setUp(self):
+        self.chain = entries(4)
+        self.next = PrivateKey.generate()
+        self.witness = [witness_note_key().vkey]
+
+    def key_list(self, compromised_at, revoker=None):
+        revoker = revoker or self.next
+        rotation = KeyRotation.issue(self.next, LEDGER_KEY.key_id, LEDGER_KEY, "2025-10-11T00:00:00Z")
+        revocation = KeyRevocation.issue(LEDGER_KEY.key_id, compromised_at, "2025-10-11T00:00:00Z", "key leaked",
+                                         revoker)
+        revoked = key_record(LEDGER_KEY, "REVOKED")
+        revoked["revocation"] = {"format": "nexusphere-ledger/key-revocation/v1",
+                                 "compromisedAt": revocation.compromised_at, "revokedAt": revocation.revoked_at,
+                                 "reason": revocation.reason, "revokerKeyId": revocation.revoker_key_id,
+                                 "signature": revocation.signature}
+        return [revoked, key_record(self.next, rotation=rotation)]
+
+    def verify(self, compromised_at, witness=True, witnesses=None, revoker=None):
+        pkg = package(self.chain, {2}, witness=witness)
+        return verify_package(pkg, self.next.public_key.encoded, self.witness if witnesses is None else witnesses,
+                              0, self.key_list(compromised_at, revoker))
+
+    def test_witnesses_before_the_compromise_keep_the_package_valid(self):
+        report = self.verify("2025-10-10T00:00:00Z")
+        self.assertTrue(report.valid, report.problems)
+        self.assertEqual([LEDGER_KEY.key_id], report.revoked_keys)
+        self.assertEqual("revokedKeys", list(report.to_dict())[16])
+
+    def test_witnesses_after_the_compromise_do_not(self):
+        report = self.verify("2025-10-01T00:00:00Z")
+        self.assertFalse(report.valid)
+        self.assertIn("key %s was revoked as compromised from 2025-10-01T00:00:00Z, and 0 of the 1 required witness "
+                      "cosignatures prove that the log checkpoint was made before then" % LEDGER_KEY.key_id,
+                      report.problems)
+
+    def test_no_witness_means_no_proof(self):
+        self.assertFalse(self.verify("2025-10-10T00:00:00Z", witness=False).valid)
+        self.assertFalse(self.verify("2025-10-10T00:00:00Z", witnesses=[]).valid)
+
+    def test_an_untrusted_revoker_is_ignored(self):
+        report = self.verify("2025-10-01T00:00:00Z", revoker=PrivateKey.generate())
+        self.assertTrue(report.valid, report.problems)
+        self.assertEqual([], report.revoked_keys)
+
+    def test_a_key_endorsed_after_the_compromise_is_not_reached(self):
+        keys = self.key_list("2025-10-01T00:00:00Z")
+        pkg = package(self.chain, {2}, key=self.next, keys=[keys[0]])
+        report = verify_package(pkg, PINNED, [], 0, keys)
+        self.assertFalse(report.valid)
+        self.assertTrue(any("does not reach" in problem for problem in report.problems), report.problems)
+
+    def test_a_key_cannot_revoke_itself(self):
+        with self.assertRaises(ValueError):
+            KeyRevocation.issue(LEDGER_KEY.key_id, "2025-10-01T00:00:00Z", "2025-10-01T00:00:00Z", "x", LEDGER_KEY)
 
 
 if __name__ == "__main__":

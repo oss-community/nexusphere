@@ -1,5 +1,6 @@
 package com.nexusphere.ledger.server.signing;
 
+import com.nexusphere.ledger.chain.KeyRevocation;
 import com.nexusphere.ledger.chain.KeyRotation;
 import com.nexusphere.ledger.chain.SigningKeys;
 import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
@@ -18,7 +19,8 @@ public class SigningKeyStore {
 
     private static final String SELECT = """
             select key_id, public_key, previous_key_id, activated_at, retired_at, key_signature,
-                   previous_key_signature, evidence_sequence
+                   previous_key_signature, evidence_sequence, compromised_at, revoked_at, revocation_reason,
+                   revoker_key_id, revocation_signature
             from ledger.signing_key
             """;
 
@@ -58,6 +60,21 @@ public class SigningKeyStore {
                 new MapSqlParameterSource().addValue("keyId", keyId).addValue("retiredAt", Timestamp.from(retiredAt)));
     }
 
+    void revoke(KeyRevocation revocation) {
+        jdbc.update("""
+                update ledger.signing_key
+                set compromised_at = :compromisedAt, revoked_at = :revokedAt, revocation_reason = :reason,
+                    revoker_key_id = :revokerKeyId, revocation_signature = :signature
+                where key_id = :keyId
+                """, new MapSqlParameterSource()
+                .addValue("keyId", revocation.keyId())
+                .addValue("compromisedAt", Timestamp.from(revocation.compromisedAt()))
+                .addValue("revokedAt", Timestamp.from(revocation.revokedAt()))
+                .addValue("reason", revocation.reason())
+                .addValue("revokerKeyId", revocation.revokerKeyId())
+                .addValue("signature", revocation.signature()));
+    }
+
     public void markRecorded(String keyId, long sequence) {
         jdbc.update("update ledger.signing_key set evidence_sequence = :sequence where key_id = :keyId",
                 Map.of("keyId", keyId, "sequence", sequence));
@@ -72,7 +89,13 @@ public class SigningKeyStore {
         KeyRotation rotation = previousKeyId == null ? null : new KeyRotation(publicKey.keyId(), publicKey.encoded(),
                 previousKeyId, activatedAt, rs.getString("key_signature"), rs.getString("previous_key_signature"));
         long sequence = rs.getLong("evidence_sequence");
+        Long evidenceSequence = rs.wasNull() ? null : sequence;
+        Timestamp compromisedAt = rs.getTimestamp("compromised_at");
+        KeyRevocation revocation = compromisedAt == null ? null : new KeyRevocation(publicKey.keyId(),
+                compromisedAt.toInstant(), rs.getTimestamp("revoked_at").toInstant(),
+                rs.getString("revocation_reason"), rs.getString("revoker_key_id"),
+                rs.getString("revocation_signature"));
         return new SigningKey(publicKey, activatedAt, retiredAt == null ? null : retiredAt.toInstant(), rotation,
-                rs.wasNull() ? null : sequence);
+                evidenceSequence, revocation);
     }
 }

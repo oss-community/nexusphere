@@ -46,7 +46,7 @@ class PublicController {
     @GetMapping("/keys")
     ResponseEntity<Map<String, Object>> keys() {
         return ResponseEntity.ok().contentType(JWK_SET).cacheControl(CacheControl.maxAge(Duration.ofHours(1)))
-                .body(Map.of("keys", signer.keys().stream().map(k -> Jwk.of(k.publicKey())).toList()));
+                .body(Map.of("keys", signer.trustedKeys().stream().map(k -> Jwk.of(k.publicKey())).toList()));
     }
 
     @GetMapping("/mandates/status")

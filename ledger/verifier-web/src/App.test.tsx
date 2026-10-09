@@ -1,7 +1,8 @@
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { App } from './App'
-import { LEDGER_KEY, buildPackage, entries, witnessNoteKey } from '../../sdk/typescript/test/support'
+import { KeyRevocation, KeyRotation, PrivateKey } from '@nexusphere/ledger'
+import { LEDGER_KEY, buildPackage, entries, keyRecord, witnessNoteKey } from '../../sdk/typescript/test/support'
 
 const PINNED = LEDGER_KEY.publicKey.encoded
 
@@ -51,6 +52,29 @@ describe('App', async () => {
     await user.type(screen.getByLabelText('Witness keys, one per line'), (await witnessNoteKey()).vkey)
     await user.click(screen.getByRole('button', { name: 'Verify' }))
     expect(await screen.findByTestId('verdict')).toHaveTextContent('INVALID')
+  })
+
+  it('applies a revocation from the key list', async () => {
+    const next = await PrivateKey.generate()
+    const rotation = await KeyRotation.issue(next, LEDGER_KEY.keyId, LEDGER_KEY, '2025-10-11T00:00:00Z')
+    const revocation = await KeyRevocation.issue(
+      LEDGER_KEY.keyId,
+      '2025-10-10T00:00:00Z',
+      '2025-10-11T00:00:00Z',
+      'key leaked',
+      next,
+    )
+    const revoked = keyRecord(LEDGER_KEY, 'REVOKED')
+    revoked.revocation = { ...revocation, format: 'nexusphere-ledger/key-revocation/v1' }
+    const keyList = [revoked, keyRecord(next, 'ACTIVE', rotation)]
+    const user = await upload(await buildPackage(chain, [2], { witness: true }))
+    await user.upload(screen.getByLabelText('Key list file'), new File([JSON.stringify(keyList)], 'keys.json'))
+    await user.type(screen.getByLabelText('Ledger public key'), next.publicKey.encoded)
+    await user.type(screen.getByLabelText('Witness keys, one per line'), (await witnessNoteKey()).vkey)
+    await user.click(screen.getByRole('button', { name: 'Verify' }))
+    expect(await screen.findByTestId('verdict')).toHaveTextContent('VALID')
+    expect(screen.getByText('keys.json')).toBeInTheDocument()
+    expect(screen.getByText(new RegExp(`^${LEDGER_KEY.keyId}, the witnesses prove`))).toBeInTheDocument()
   })
 
   it('reports files that are not packages', async () => {

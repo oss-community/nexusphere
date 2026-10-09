@@ -22,7 +22,7 @@ public final class VerifierCli {
 
     private static final String USAGE_TEXT = """
             Usage: nexusphere-ledger-verify [--public-key <base64 X.509 Ed25519 key> | --public-key-file <file>] \
-            [--witness <verifier key>]... [--witnesses-required <n>] [--json] <package.json>
+            [--keys <keys.json>] [--witness <verifier key>]... [--witnesses-required <n>] [--json] <package.json>
                    nexusphere-ledger-verify mandate --issuer <url> [--issuer <url>] [--audience <aud>] \
             [--action <action> --target <target>] [--public-key <key> | --public-key-file <file>] [--skip-status] \
             [--json] <token | token file | ->
@@ -48,6 +48,7 @@ public final class VerifierCli {
         String publicKey = null;
         List<NoteKey> witnesses = new ArrayList<>();
         Integer required = null;
+        Path keysFile = null;
         boolean json = false;
         Path file = null;
         try {
@@ -55,6 +56,7 @@ public final class VerifierCli {
                 switch (args[i]) {
                     case "--public-key" -> publicKey = args[++i].trim();
                     case "--public-key-file" -> publicKey = Files.readString(Path.of(args[++i])).trim();
+                    case "--keys" -> keysFile = Path.of(args[++i]);
                     case "--witness" -> witnesses.add(NoteKey.parse(args[++i]));
                     case "--witnesses-required" -> required = Integer.parseInt(args[++i]);
                     case "--json" -> json = true;
@@ -76,13 +78,19 @@ public final class VerifierCli {
             return USAGE;
         }
         JsonNode pkg;
+        JsonNode keys = null;
+        Path reading = file;
         try {
             pkg = JSON.readTree(Files.readAllBytes(file));
+            if (keysFile != null) {
+                reading = keysFile;
+                keys = JSON.readTree(Files.readAllBytes(keysFile));
+            }
         } catch (IOException | JacksonException e) {
-            err.println("Cannot read " + file + ": " + e.getMessage());
+            err.println("Cannot read " + reading + ": " + e.getMessage());
             return USAGE;
         }
-        PackageReport report = PackageVerifier.verify(pkg, publicKey, witnesses,
+        PackageReport report = PackageVerifier.verify(pkg, publicKey, keys, witnesses,
                 required == null ? witnesses.size() : required);
         if (json) {
             out.println(JSON.writeValueAsString(report));
@@ -109,6 +117,10 @@ public final class VerifierCli {
                     + r.provenEntries() + " disclosed entries proven");
             out.println("  Receipts    : " + r.receiptedEntries() + " SCITT statements with receipts");
             out.println("  Witnesses   : " + (r.witnesses().isEmpty() ? "none" : String.join(", ", r.witnesses())));
+        }
+        if (!r.revokedKeys().isEmpty()) {
+            out.println("  Revoked     : " + String.join(", ", r.revokedKeys())
+                    + (r.valid() ? " (witnesses prove the log checkpoint predates the compromise)" : ""));
         }
         if (r.valid()) {
             out.println("Result: VALID");
