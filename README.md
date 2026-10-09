@@ -36,7 +36,8 @@ rest are references to open when they are needed. All of them are also in one bo
 | 9    | [Ledger End-to-End Tests](ledger/ledger-e2e-tests/README.md) | What the end-to-end tests cover                                     |
 | 10   | [Conformance Vectors](ledger/conformance/README.md)          | Test data for another implementation of the formats                 |
 | 11   | [Python SDK](ledger/sdk/python/README.md)                    | Record evidence from Python and verify packages and mandates        |
-| 12   | [Changelog](ledger/CHANGELOG.md)                             | What each release contains                                          |
+| 12   | [TypeScript SDK](ledger/sdk/typescript/README.md)            | The same for Node and browsers                                      |
+| 13   | [Changelog](ledger/CHANGELOG.md)                             | What each release contains                                          |
 
 ## Nexusphere Ledger
 
@@ -156,7 +157,9 @@ mvn package -DskipTests=true
 
 <p style="text-align: justify;">
 
-The web UI is built and tested with npm, as described in [Nexusphere Frontend](frontend/README.md).
+The web UI is built and tested with npm, as described in [Nexusphere Frontend](frontend/README.md), and the SDKs
+with their own tools, as described in [Python SDK](ledger/sdk/python/README.md#test) and
+[TypeScript SDK](ledger/sdk/typescript/README.md#test).
 
 </p>
 

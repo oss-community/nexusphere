@@ -59,6 +59,7 @@ check, and receipts both sides of an exchange hold.
 | [`ledger/demo-mcp`](demo-mcp/README.md)                 | Demo MCP server with file and mail tools, and the demo script                                               |
 | [`ledger/ledger-e2e-tests`](ledger-e2e-tests/README.md) | End-to-end tests against the server and PostgreSQL                                                          |
 | [`ledger/sdk/python`](sdk/python/README.md)             | Python client and offline verifier for packages, statements, receipts and mandates                          |
+| [`ledger/sdk/typescript`](sdk/typescript/README.md)     | TypeScript client and offline verifier for Node and browsers, with no runtime dependencies                  |
 
 ## Getting Started
 
