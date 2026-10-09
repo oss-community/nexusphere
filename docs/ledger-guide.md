@@ -232,6 +232,15 @@ pass through the ledger's own gateway.
 curl -X POST http://localhost:8090/api/v1/evidence -H "Authorization: Bearer {agentApiKey}" -H "Content-Type: application/json" -d '{"agentId":"invoice-agent","principalId":"alice","action":"tools/call","target":"send_email","decision":"ALLOW","reason":"agentcore-policy","outcome":"SUCCEEDED","correlationId":"session-42","attributes":{"gateway":"agentcore"}}'
 ```
 
+<p style="text-align: justify;">
+
+When the platform already sends OpenTelemetry traces, nothing has to call the API: point its OTLP exporter at the
+Collector of the [OpenTelemetry Exporter](../ledger/otel-exporter/README.md), or add the `nexusphere` exporter to an
+existing Collector. Every `execute_tool`, `invoke_agent` and MCP `tools/call` span becomes an evidence entry, with
+the trace id as its correlation id, and other spans are ignored.
+
+</p>
+
 ## Present It
 
 | Step | Show                                                                  | Point                                               |

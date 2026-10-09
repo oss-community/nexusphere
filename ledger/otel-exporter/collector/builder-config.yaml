@@ -1,0 +1,22 @@
+dist:
+  name: nexusphere-otelcol
+  description: OpenTelemetry Collector with the Nexusphere Ledger exporter
+  version: 1.0.0
+  output_path: ./_build
+
+receivers:
+  - gomod: go.opentelemetry.io/collector/receiver/otlpreceiver v0.162.0
+
+processors:
+  - gomod: go.opentelemetry.io/collector/processor/batchprocessor v0.162.0
+
+exporters:
+  - gomod: github.com/oss-community/nexusphere/ledger/otel-exporter v1.0.0
+    name: nexusphereexporter
+    path: ..
+  - gomod: go.opentelemetry.io/collector/exporter/debugexporter v0.162.0
+
+providers:
+  - gomod: go.opentelemetry.io/collector/confmap/provider/envprovider v1.68.0
+  - gomod: go.opentelemetry.io/collector/confmap/provider/fileprovider v1.68.0
+  - gomod: go.opentelemetry.io/collector/confmap/provider/yamlprovider v1.68.0

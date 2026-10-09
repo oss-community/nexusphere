@@ -32,6 +32,8 @@ agent platforms and gateways.
   `nexusphere-ledger-verify` command
 * TypeScript SDK (`@nexusphere/ledger`): the same client and offline verifier for Node 20 and browsers on Web
   Crypto, with no runtime dependencies and the same `nexusphere-ledger-verify` command
+* OpenTelemetry Collector exporter `nexusphere`: agent tool call and agent invocation spans that follow the GenAI
+  semantic conventions become evidence in batches, with retries and a sending queue, plus a ready Collector image
 * Secrets and signing keys from files written by a secret manager, Prometheus metrics with alert rules, and a tested
   backup and restore procedure
 * Rate limit per caller with 429 and `Retry-After`, and alert delivery by email, Slack, Telegram or webhook, each
