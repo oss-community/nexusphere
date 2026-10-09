@@ -1,5 +1,6 @@
 package com.nexusphere.ledger.verifier;
 
+import com.nexusphere.ledger.chain.NoteKey;
 import tools.jackson.core.JacksonException;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.SerializationFeature;
@@ -9,7 +10,9 @@ import java.io.IOException;
 import java.io.PrintStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.List;
 
 public final class VerifierCli {
 
@@ -19,7 +22,7 @@ public final class VerifierCli {
 
     private static final String USAGE_TEXT = """
             Usage: nexusphere-ledger-verify [--public-key <base64 X.509 Ed25519 key> | --public-key-file <file>] \
-            [--json] <package.json>
+            [--witness <verifier key>]... [--witnesses-required <n>] [--json] <package.json>
                    nexusphere-ledger-verify mandate --issuer <url> [--issuer <url>] [--audience <aud>] \
             [--action <action> --target <target>] [--public-key <key> | --public-key-file <file>] [--skip-status] \
             [--json] <token | token file | ->""";
@@ -38,6 +41,8 @@ public final class VerifierCli {
             return MandateCli.run(Arrays.copyOfRange(args, 1, args.length), out, err, USAGE_TEXT);
         }
         String publicKey = null;
+        List<NoteKey> witnesses = new ArrayList<>();
+        Integer required = null;
         boolean json = false;
         Path file = null;
         try {
@@ -45,6 +50,8 @@ public final class VerifierCli {
                 switch (args[i]) {
                     case "--public-key" -> publicKey = args[++i].trim();
                     case "--public-key-file" -> publicKey = Files.readString(Path.of(args[++i])).trim();
+                    case "--witness" -> witnesses.add(NoteKey.parse(args[++i]));
+                    case "--witnesses-required" -> required = Integer.parseInt(args[++i]);
                     case "--json" -> json = true;
                     default -> {
                         if (file != null || args[i].startsWith("--")) {
@@ -55,7 +62,7 @@ public final class VerifierCli {
                     }
                 }
             }
-        } catch (ArrayIndexOutOfBoundsException | IOException e) {
+        } catch (ArrayIndexOutOfBoundsException | IOException | IllegalArgumentException e) {
             err.println(USAGE_TEXT);
             return USAGE;
         }
@@ -70,7 +77,8 @@ public final class VerifierCli {
             err.println("Cannot read " + file + ": " + e.getMessage());
             return USAGE;
         }
-        PackageReport report = PackageVerifier.verify(pkg, publicKey);
+        PackageReport report = PackageVerifier.verify(pkg, publicKey, witnesses,
+                required == null ? witnesses.size() : required);
         if (json) {
             out.println(JSON.writeValueAsString(report));
         } else {
@@ -91,6 +99,11 @@ public final class VerifierCli {
         out.println("  Disclosed   : " + r.disclosedEntries() + " entries"
                 + (r.agentId() == null ? "" : ", agent " + r.agentId())
                 + (r.principalId() == null ? "" : ", principal " + r.principalId()));
+        if (r.logTreeSize() != null) {
+            out.println("  Log         : " + r.logOrigin() + ", " + r.logTreeSize() + " entries, "
+                    + r.provenEntries() + " disclosed entries proven");
+            out.println("  Witnesses   : " + (r.witnesses().isEmpty() ? "none" : String.join(", ", r.witnesses())));
+        }
         if (r.valid()) {
             out.println("Result: VALID");
         } else {

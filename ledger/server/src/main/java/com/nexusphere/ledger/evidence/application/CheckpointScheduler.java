@@ -1,5 +1,6 @@
 package com.nexusphere.ledger.evidence.application;
 
+import com.nexusphere.ledger.transparency.application.WitnessCollector;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -11,9 +12,11 @@ class CheckpointScheduler {
     private static final Logger log = LoggerFactory.getLogger(CheckpointScheduler.class);
 
     private final CheckpointService checkpoints;
+    private final WitnessCollector witnesses;
 
-    CheckpointScheduler(CheckpointService checkpoints) {
+    CheckpointScheduler(CheckpointService checkpoints, WitnessCollector witnesses) {
         this.checkpoints = checkpoints;
+        this.witnesses = witnesses;
     }
 
     @Scheduled(fixedDelayString = "${ledger.checkpoint.interval}", initialDelayString = "${ledger.checkpoint.interval}")
@@ -24,5 +27,6 @@ class CheckpointScheduler {
         } catch (RuntimeException e) {
             log.warn("Scheduled checkpoint failed", e);
         }
+        witnesses.collect();
     }
 }

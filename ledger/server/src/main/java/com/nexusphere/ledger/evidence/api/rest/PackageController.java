@@ -20,6 +20,7 @@ import org.springframework.web.bind.annotation.RestController;
 import tools.jackson.databind.JsonNode;
 
 import java.time.Instant;
+import java.util.Base64;
 import java.util.List;
 
 @RestController
@@ -54,9 +55,22 @@ class PackageController {
         }
     }
 
+    record ProofResponse(long sequence, List<String> hashes) {
+    }
+
+    record LogResponse(String checkpoint, List<ProofResponse> proofs) {
+
+        static LogResponse of(EvidencePackage.Log log) {
+            return new LogResponse(log.checkpoint(), log.proofs().entrySet().stream()
+                    .map(e -> new ProofResponse(e.getKey(), e.getValue().stream()
+                            .map(hash -> Base64.getEncoder().encodeToString(hash)).toList()))
+                    .toList());
+        }
+    }
+
     record PackageResponse(String format, Instant createdAt, Scope scope, List<KeyController.KeyResponse> keys,
                            CheckpointResponse anchor, CheckpointResponse checkpoint, long disclosed,
-                           List<LinkResponse> links) {
+                           List<LinkResponse> links, LogResponse log) {
     }
 
     private final PackageService packages;
@@ -77,7 +91,7 @@ class PackageController {
                 new Scope(p.agentId(), p.principalId(), p.fromSequence(), p.toSequence()),
                 signer.keys().stream().map(KeyController.KeyResponse::of).toList(),
                 CheckpointResponse.of(p.anchor()), CheckpointResponse.of(p.checkpoint()), p.disclosed(),
-                p.items().stream().map(LinkResponse::of).toList());
+                p.items().stream().map(LinkResponse::of).toList(), LogResponse.of(p.log()));
         return ResponseEntity.ok()
                 .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"evidence-package-"
                         + p.checkpoint().checkpoint().sequence() + ".json\"")

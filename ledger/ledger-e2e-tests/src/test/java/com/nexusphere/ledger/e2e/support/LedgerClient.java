@@ -71,6 +71,11 @@ public final class LedgerClient {
         return send(builder);
     }
 
+    public Response postText(String path, String body) {
+        return send(request(path).header("Content-Type", "text/plain; charset=utf-8")
+                .POST(HttpRequest.BodyPublishers.ofString(body)));
+    }
+
     public Response delete(String path, Map<String, String> headers) {
         HttpRequest.Builder builder = request(path).DELETE();
         headers.forEach(builder::header);

@@ -7,6 +7,9 @@ import com.nexusphere.ledger.chain.EvidenceEntry;
 import com.nexusphere.ledger.chain.EvidenceLink;
 import com.nexusphere.ledger.chain.Hashes;
 import com.nexusphere.ledger.chain.KeyRotation;
+import com.nexusphere.ledger.chain.LogCheckpoint;
+import com.nexusphere.ledger.chain.MerkleTree;
+import com.nexusphere.ledger.chain.NoteKey;
 import com.nexusphere.ledger.chain.SignedCheckpoint;
 import com.nexusphere.ledger.chain.SigningKeys;
 import com.nexusphere.ledger.chain.TrustedKeys;
@@ -14,6 +17,10 @@ import tools.jackson.databind.JsonNode;
 
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Base64;
+import java.util.Collection;
+import java.util.HashMap;
+import java.util.HexFormat;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -28,10 +35,15 @@ public final class PackageVerifier {
     }
 
     public static PackageReport verify(JsonNode pkg, String pinnedPublicKey) {
+        return verify(pkg, pinnedPublicKey, List.of(), 0);
+    }
+
+    public static PackageReport verify(JsonNode pkg, String pinnedPublicKey, List<NoteKey> witnessKeys,
+                                       int requiredWitnesses) {
         List<String> problems = new ArrayList<>();
         if (!FORMAT.equals(text(pkg, "format"))) {
             problems.add("unknown package format " + text(pkg, "format"));
-            return report(false, null, null, null, 0, null, 0, 0, 0, pkg, problems);
+            return report(false, null, null, null, 0, null, 0, 0, 0, pkg, LogResult.NONE, problems);
         }
         SignedCheckpoint checkpoint;
         SignedCheckpoint anchor;
@@ -40,7 +52,7 @@ public final class PackageVerifier {
             anchor = pkg.path("anchor").isObject() ? checkpoint(pkg.path("anchor")) : null;
         } catch (RuntimeException e) {
             problems.add("the checkpoints cannot be read: " + e.getMessage());
-            return report(false, null, null, null, 0, null, 0, 0, 0, pkg, problems);
+            return report(false, null, null, null, 0, null, 0, 0, 0, pkg, LogResult.NONE, problems);
         }
         Map<String, SigningKeys.PublicKeyInfo> keys = keys(pkg, pinnedPublicKey, problems);
         boolean pinned = pinnedPublicKey != null;
@@ -86,10 +98,73 @@ public final class PackageVerifier {
         if (disclosed == 0) {
             problems.add("the package discloses no evidence");
         }
+        LogResult log = keys == null ? LogResult.NONE
+                : log(pkg, keys.values(), checkpoint.checkpoint().sequence(), witnessKeys, requiredWitnesses, problems);
         return report(problems.isEmpty(), checkpoint.checkpoint().keyId(), pinnedKeyId(pinnedPublicKey),
                 anchor == null ? null : anchor.checkpoint().sequence(), checkpoint.checkpoint().sequence(),
-                checkpoint.checkpoint().createdAt().toString(), first, result.checkedEntries(), disclosed, pkg,
+                checkpoint.checkpoint().createdAt().toString(), first, result.checkedEntries(), disclosed, pkg, log,
                 problems);
+    }
+
+    private record LogResult(String origin, Long size, long proven, List<String> witnesses) {
+
+        static final LogResult NONE = new LogResult(null, null, 0, List.of());
+    }
+
+    private static LogResult log(JsonNode pkg, Collection<SigningKeys.PublicKeyInfo> keys, long size,
+                                 List<NoteKey> witnessKeys, int requiredWitnesses, List<String> problems) {
+        JsonNode log = pkg.path("log");
+        if (!log.isObject()) {
+            if (requiredWitnesses > 0) {
+                problems.add("the package has no log checkpoint for witnesses to cosign");
+            }
+            return LogResult.NONE;
+        }
+        LogCheckpoint.Note note;
+        try {
+            note = LogCheckpoint.parse(text(log, "checkpoint"));
+        } catch (RuntimeException e) {
+            problems.add("the log checkpoint cannot be read: " + e.getMessage());
+            return LogResult.NONE;
+        }
+        LogCheckpoint checkpoint = note.checkpoint();
+        boolean signed = keys.stream().anyMatch(key -> note.signedBy(
+                new NoteKey(checkpoint.origin(), NoteKey.ED25519, key.publicKey())));
+        if (!signed) {
+            problems.add("the log checkpoint is not signed by a trusted ledger key");
+        }
+        if (checkpoint.size() != size) {
+            problems.add("the log checkpoint covers " + checkpoint.size() + " entries, not the " + size
+                    + " of the signed checkpoint");
+        }
+        Map<Long, List<byte[]>> proofs = new HashMap<>();
+        for (JsonNode proof : log.path("proofs")) {
+            List<byte[]> hashes = new ArrayList<>();
+            proof.path("hashes").forEach(hash -> hashes.add(Base64.getDecoder().decode(hash.asString())));
+            proofs.put(proof.path("sequence").asLong(), hashes);
+        }
+        long proven = 0;
+        for (JsonNode node : pkg.path("links")) {
+            if (!node.path("entry").isObject()) {
+                continue;
+            }
+            long sequence = node.path("sequence").asLong();
+            List<byte[]> proof = proofs.get(sequence);
+            byte[] leaf = MerkleTree.leafHash(HexFormat.of().parseHex(text(node, "hash")));
+            if (proof == null || !MerkleTree.verifyInclusion(leaf, sequence - 1, checkpoint.size(), proof,
+                    checkpoint.root())) {
+                problems.add("sequence " + sequence + " is not proven to be in the log checkpoint");
+            } else {
+                proven++;
+            }
+        }
+        List<String> cosigned = witnessKeys.stream().filter(key -> note.cosignedBy(key).isPresent())
+                .map(NoteKey::name).toList();
+        if (cosigned.size() < requiredWitnesses) {
+            problems.add("the log checkpoint is cosigned by " + cosigned.size() + " of the " + requiredWitnesses
+                    + " required witnesses");
+        }
+        return new LogResult(checkpoint.origin(), checkpoint.size(), proven, cosigned);
     }
 
     public static EvidenceEntry entry(JsonNode node) {
@@ -191,10 +266,10 @@ public final class PackageVerifier {
 
     private static PackageReport report(boolean valid, String keyId, String pinnedKeyId, Long anchor, long checkpoint,
                                         String createdAt, long first, long checked, long disclosed, JsonNode pkg,
-                                        List<String> problems) {
+                                        LogResult log, List<String> problems) {
         return new PackageReport(valid, keyId, pinnedKeyId, anchor, checkpoint, createdAt, first, checked, disclosed,
-                nullable(pkg.path("scope"), "agentId"), nullable(pkg.path("scope"), "principalId"),
-                List.copyOf(problems));
+                nullable(pkg.path("scope"), "agentId"), nullable(pkg.path("scope"), "principalId"), log.origin(),
+                log.size(), log.proven(), log.witnesses(), List.copyOf(problems));
     }
 
     private static String text(JsonNode node, String field) {

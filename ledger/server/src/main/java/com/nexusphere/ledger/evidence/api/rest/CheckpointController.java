@@ -4,6 +4,7 @@ import com.nexusphere.ledger.chain.Checkpoint;
 import com.nexusphere.ledger.chain.SignedCheckpoint;
 import com.nexusphere.ledger.evidence.application.CheckpointService;
 import com.nexusphere.ledger.server.security.Caller;
+import com.nexusphere.ledger.transparency.application.WitnessCollector;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -31,15 +32,19 @@ class CheckpointController {
     }
 
     private final CheckpointService checkpoints;
+    private final WitnessCollector witnesses;
 
-    CheckpointController(CheckpointService checkpoints) {
+    CheckpointController(CheckpointService checkpoints, WitnessCollector witnesses) {
         this.checkpoints = checkpoints;
+        this.witnesses = witnesses;
     }
 
     @PostMapping
     CheckpointResponse create(Caller caller) {
         caller.requireOperator();
-        return CheckpointResponse.of(checkpoints.create());
+        CheckpointResponse created = CheckpointResponse.of(checkpoints.create());
+        witnesses.collect();
+        return created;
     }
 
     @GetMapping("/latest")

@@ -26,6 +26,8 @@ to verify evidence on their own.
 * Ed25519 keys and signatures (`SigningKeys`) and signed checkpoints (`Checkpoint`, `SignedCheckpoint`)
 * Signed key rotations (`KeyRotation`) and the keys a pinned key reaches through them (`TrustedKeys`)
 * `GrantTerms`, the hashed terms of a grant
+* `MerkleTree`, the RFC 9162 tree hash with inclusion and consistency proofs and their verification
+* `LogCheckpoint` and `NoteKey`, C2SP signed-note checkpoints, `tlog-cosignature/v1` cosignatures and verifier keys
 
 ## Dependencies
 

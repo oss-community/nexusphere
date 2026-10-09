@@ -27,6 +27,8 @@ record.
 * Agents with their own API keys, grants from principals to agents, and ALLOW or DENY decisions with outcomes
 * MCP gateway that decides and records every tool call
 * Evidence packages with selective disclosure for auditors
+* Transparency log over the evidence with inclusion and consistency proofs, cosigned by witnesses, and a C2SP
+  witness endpoint so the ledger can witness other logs
 * Signed mandates, the revocation status list and the public keys as JWKS
 * Signing key history: rotation at startup with a cross-signed rotation record, retired keys kept for verification
 * A2A gateway that sends and receives requests between two ledgers with evidence and signed receipts on both sides
@@ -43,10 +45,10 @@ record.
 
 | Path                                 | Purpose                                                                            |
 |--------------------------------------|------------------------------------------------------------------------------------|
-| `/api/v1/**`                         | Evidence, checkpoints, packages, agents, grants, decisions, mandates and exchanges |
+| `/api/v1/**`                         | Evidence, checkpoints, log proofs, packages, agents, grants, decisions, mandates   |
 | `/mcp/{server}`                      | MCP gateway                                                                        |
 | `/a2a/out/{peer}`, `/a2a/in/{agent}` | A2A gateway                                                                        |
-| `/public/v1/**`                      | Public keys, the mandate status list and the OIDC sign-in settings                 |
+| `/public/v1/**`                      | Public keys, status list, OIDC settings, log checkpoint and witness endpoint       |
 
 ## Storage
 
