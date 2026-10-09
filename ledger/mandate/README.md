@@ -21,7 +21,8 @@ proof, its revocation list and the verifier the receiving side uses.
 ## Responsibilities
 
 * Compact JWS signing and parsing with EdDSA (`Jws`) and Ed25519 keys as JWK (`Jwk`)
-* `MandateClaims` and `Mandates`: the signed mandate issued from a grant
+* `MandateClaims` and `Mandates`: the mandate issued from a grant as an SD-JWT VC, and `SdJwt` to parse it, check
+  its disclosures and present it with fewer of them
 * `StatusList`: the signed revocation list in the IETF Token Status List format
 * `MandateVerifier`: trusted issuers, keys from the issuer's JWKS, signature, time, audience, coverage and revocation,
   failing closed

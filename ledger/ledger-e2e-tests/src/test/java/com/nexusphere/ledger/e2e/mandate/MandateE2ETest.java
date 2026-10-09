@@ -6,6 +6,8 @@ import com.nexusphere.ledger.e2e.support.LedgerE2ETestBase;
 import com.nexusphere.ledger.mandate.Jwk;
 import com.nexusphere.ledger.mandate.Jws;
 import com.nexusphere.ledger.mandate.MandateClaims;
+import com.nexusphere.ledger.mandate.Mandates;
+import com.nexusphere.ledger.mandate.SdJwt;
 import com.nexusphere.ledger.mandate.StatusList;
 import org.junit.jupiter.api.Test;
 import tools.jackson.databind.JsonNode;
@@ -30,8 +32,8 @@ class MandateE2ETest extends LedgerE2ETestBase {
         LedgerClient.Response issued = agent.client().post("/api/v1/mandates",
                 LedgerClient.json(Map.of("grantId", grantId, "audience", "https://supplier.test")));
         JsonNode mandate = issued.json();
-        Jws.Parsed parsed = Jws.parse(mandate.path("token").asString());
-        MandateClaims claims = MandateClaims.fromPayload(parsed.payload());
+        Jws.Parsed parsed = SdJwt.parse(mandate.path("token").asString()).jwt();
+        MandateClaims claims = Mandates.claims(mandate.path("token").asString());
         JsonNode grant = ledger().get("/api/v1/grants/" + grantId).json();
         JsonNode evidence = ledger().get("/api/v1/evidence?agentId=" + agent.agentId()).json().path("items").get(2);
 

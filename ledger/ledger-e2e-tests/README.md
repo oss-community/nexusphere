@@ -100,6 +100,7 @@ other, which watches it, to cosign its log checkpoints over the C2SP witness pro
 |                           | A mandate cannot outlive its grant                                            |
 |                           | The keys and status list are public and signed                                |
 | `MandateVerifierE2ETest`  | Another organization verifies a mandate from the public endpoints only        |
+|                           | An agent can present a mandate without revealing its principal                |
 |                           | The verifier sees a revocation as soon as the status list is refetched        |
 |                           | The verifier rejects what the mandate does not allow                          |
 | `A2aE2ETest`              | An allowed message carries a mandate and both ledgers hold matching evidence  |

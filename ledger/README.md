@@ -599,28 +599,42 @@ curl -X POST http://localhost:8090/mcp/files -H "Authorization: Bearer {agentApi
 <p style="text-align: justify;">
 
 A grant lives inside one ledger. When an agent acts for its principal at another organization, it carries a mandate:
-a signed, self-contained copy of the grant that the other side can check without calling back. A mandate is a compact
-JWS signed with the ledger's Ed25519 key (`alg` `EdDSA`, `typ` `nexusphere-mandate+jwt`, `kid` the ledger key ID).
+a signed, self-contained copy of the grant that the other side can check without calling back. A mandate is an IETF
+SD-JWT VC signed with the ledger's Ed25519 key (`alg` `EdDSA`, `typ` `dc+sd-jwt`, `kid` the ledger key ID,
+`vct` `urn:nexusphere:vct:agent-mandate:1`): the issuer-signed JWT followed by its disclosures, each ending in `~`.
 The operator, or the agent the grant was given to, asks for one with `POST /api/v1/mandates` and the grant ID, an
 optional `audience` (the organization that will receive it) and an optional `expiresAt` that may not be later than the
 grant's own expiry. Only an active or not-yet-valid grant can be turned into a mandate.
 
 </p>
 
-| Claim                | Meaning                                                                     |
-|----------------------|-----------------------------------------------------------------------------|
-| `iss`                | The ledger, `LEDGER_MANDATE_ISSUER`                                         |
-| `sub`                | The agent ID                                                                |
-| `aud`                | The receiving organization, when given                                      |
-| `jti`                | The mandate ID                                                              |
-| `iat`, `nbf`, `exp`  | Issued, valid from and expiry, in epoch seconds                             |
-| `mandate.principal`  | The person or organization the agent acts for                               |
-| `mandate.actions`    | Allowed actions, exact or with a trailing `*`                               |
-| `mandate.targets`    | Allowed targets, exact or with a trailing `*`                               |
-| `mandate.maxUses`    | The grant's use limit, when it has one                                      |
-| `mandate.grant`      | The grant ID                                                                |
-| `mandate.termsHash`  | The SHA-256 of the grant terms, the same hash the evidence of the grant has |
-| `status.status_list` | `idx` and `uri` of the mandate's bit in the status list                     |
+| Claim                | Meaning                                                                        |
+|----------------------|--------------------------------------------------------------------------------|
+| `iss`                | The ledger, `LEDGER_MANDATE_ISSUER`                                            |
+| `vct`                | `urn:nexusphere:vct:agent-mandate:1`                                           |
+| `sub`                | The agent ID                                                                   |
+| `aud`                | The receiving organization, when given                                         |
+| `jti`                | The mandate ID                                                                 |
+| `iat`, `nbf`, `exp`  | Issued, valid from and expiry, in epoch seconds                                |
+| `mandate.principal`  | The person or organization the agent acts for (selectively disclosable)        |
+| `mandate.actions`    | Allowed actions, exact or with a trailing `*`                                  |
+| `mandate.targets`    | Allowed targets, exact or with a trailing `*`                                  |
+| `mandate.maxUses`    | The grant's use limit, when it has one                                         |
+| `mandate.grant`      | The grant ID (selectively disclosable)                                         |
+| `mandate.termsHash`  | The grant terms' SHA-256, as in the grant's evidence (selectively disclosable) |
+| `status.status_list` | `idx` and `uri` of the mandate's bit in the status list                        |
+| `_sd_alg`            | `sha-256`, the hash of the disclosures listed in `mandate._sd`                 |
+
+<p style="text-align: justify;">
+
+The principal, grant and terms hash are disclosures, so an agent can hand a mandate on without them:
+`SdJwt.parse(token).present(Set.of("grant"))` keeps only the grant, and the receiver still checks the signature,
+time, audience, coverage and revocation. Actions, targets, the use limit, time and status are always in the signed
+JWT and cannot be withheld. The A2A gateway always sends the full mandate, because the receiving ledger records the
+principal. Agents hold API keys rather than key pairs, so mandates have no key binding; the audience and the A2A
+request proof take its place.
+
+</p>
 
 <p style="text-align: justify;">
 
@@ -679,6 +693,30 @@ for packages.
 ```shell
 java -jar ledger/verifier/target/verifier-1.0.0-SNAPSHOT-exec.jar mandate --issuer http://localhost:8090 --audience https://supplier.example --action a2a/send --target supplier/orders mandate.jwt
 ```
+
+### AP2 and Verifiable Intent
+
+<p style="text-align: justify;">
+
+AP2 and Mastercard's Verifiable Intent, now developed at the FIDO Alliance, carry payment mandates as SD-JWT
+credentials too. A Nexusphere mandate is not an AP2 mandate, but its parts line up, so a bridge can translate one
+into the other. AP2 signs with ES256 and binds mandates to the holder's key; Nexusphere signs with EdDSA and has no
+key binding.
+
+</p>
+
+| AP2 / Verifiable Intent                    | Nexusphere                                                                    |
+|--------------------------------------------|-------------------------------------------------------------------------------|
+| Intent mandate signed for the user         | Mandate issued from a grant the principal approved with their own sign-in     |
+| User authorization                         | The `grant/approve` evidence of the principal's consent, named by `termsHash` |
+| Merchants or payees the intent allows      | `aud` and `mandate.targets`                                                   |
+| What the agent may do                      | `mandate.actions`                                                             |
+| Intent expiry                              | `exp`, never later than the grant                                             |
+| Spending or use limit                      | `mandate.maxUses`, counted by both ledgers                                    |
+| Credential status                          | `status.status_list`, the IETF Token Status List                              |
+| Cart and payment mandates                  | No equivalent: Nexusphere does not handle payments                            |
+| `merchant_authorization` from the merchant | The receipt the receiving ledger signs for an A2A exchange                    |
+| Audit trail of the transaction             | Evidence on both ledgers, with SCITT statements and receipts                  |
 
 ## A2A Gateway
 

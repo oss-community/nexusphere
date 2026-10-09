@@ -48,8 +48,9 @@ public final class MandateVerifier {
         Jws.Parsed parsed;
         MandateClaims claims;
         try {
-            parsed = Jws.parse(token);
-            claims = MandateClaims.fromPayload(parsed.payload());
+            SdJwt sdJwt = SdJwt.parse(token);
+            parsed = sdJwt.jwt();
+            claims = MandateClaims.fromPayload(sdJwt.claims());
         } catch (IllegalArgumentException e) {
             return failed(null, MandateProblem.MALFORMED, e.getMessage());
         }

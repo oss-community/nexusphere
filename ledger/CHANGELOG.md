@@ -36,6 +36,8 @@ First release of the Nexusphere Ledger, a self-hosted evidence ledger for AI age
   checkpoint, any ledger can witness other logs, and the verifier can require cosignatures from given witnesses
 * IETF SCITT signed statements (COSE hash envelopes) for every entry and RFC 9942 receipts from the transparency
   log, served by the API, carried in evidence packages and checked by the verifier's `statement` command
+* Mandates are IETF SD-JWT VCs (`dc+sd-jwt`): the principal, grant and terms hash are selectively disclosable, the
+  limits are not, and the documentation maps them to AP2 and Verifiable Intent
 * Dockerfiles, compose file with Adminer, Keycloak, Prometheus, Alertmanager and the web UI, Kubernetes manifest, demo MCP server
   and demo script
 
