@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import type { ChangeEvent, DragEvent, FormEvent } from 'react'
 import { verify } from './verify'
-import type { Verification } from './verify'
+import type { IndexVerification, Verification } from './verify'
 
 export function App() {
   const [fileName, setFileName] = useState<string | null>(null)
@@ -16,7 +16,7 @@ export function App() {
   const [requireTimestamp, setRequireTimestamp] = useState(false)
   const [rekorKeys, setRekorKeys] = useState('')
   const [requireRekor, setRequireRekor] = useState(false)
-  const [result, setResult] = useState<Verification | null>(null)
+  const [result, setResult] = useState<Verification | IndexVerification | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
 
@@ -88,7 +88,8 @@ export function App() {
       <header>
         <h1>Package Verifier</h1>
         <p className="muted">
-          Checks a Nexusphere Ledger evidence package in this browser. The package and the keys never leave this page.
+          Checks a Nexusphere Ledger evidence package or index proof in this browser. The file and the keys never leave
+          this page.
         </p>
       </header>
       <form onSubmit={submit} className="panel">
@@ -97,7 +98,7 @@ export function App() {
           onDragOver={(event) => event.preventDefault()}
           onDrop={dropped}
         >
-          <span>{fileName ?? 'Choose or drop the package file (JSON)'}</span>
+          <span>{fileName ?? 'Choose or drop the package or index proof file (JSON)'}</span>
           <input type="file" accept="application/json,.json" aria-label="Package file" onChange={chosen} />
         </label>
         <label>
@@ -175,8 +176,48 @@ export function App() {
           {error}
         </p>
       )}
-      {result && <Result verification={result} />}
+      {result && ('index' in result ? <IndexResult verification={result} /> : <Result verification={result} />)}
     </main>
+  )
+}
+
+function IndexResult({ verification }: { verification: IndexVerification }) {
+  const { index, pinned } = verification
+  const rows: [string, string][] = [
+    ['Term', Object.values(index.term).join(' ') || 'unknown'],
+    ['Checkpoint', `${index.sequence ?? 'unknown'}, head ${index.headHash ?? 'unknown'}`],
+    ['Signed by', `${index.keyId ?? 'unknown'}${pinned ? '' : ', not pinned'}`],
+    ['Finding', index.present
+      ? `${index.count} entries, sequences ${index.firstSequence} to ${index.lastSequence}`
+      : `no entry up to sequence ${index.sequence ?? 'unknown'}`],
+  ]
+  return (
+    <section className="panel" aria-label="Result">
+      <p className={`badge ${index.valid ? 'good' : 'bad'}`} data-testid="verdict">
+        {index.valid ? 'VALID' : 'INVALID'}
+      </p>
+      {index.valid && !pinned && (
+        <p className="badge wait" role="note">
+          Not pinned: the index proof was checked only against the keys it carries. Anyone can build such a proof; paste
+          the ledger's public key to know who signed it.
+        </p>
+      )}
+      {index.problems.length > 0 && (
+        <ul className="problems">
+          {index.problems.map((problem) => (
+            <li key={problem}>{problem}</li>
+          ))}
+        </ul>
+      )}
+      <dl>
+        {rows.map(([name, value]) => (
+          <div key={name}>
+            <dt>{name}</dt>
+            <dd>{value}</dd>
+          </div>
+        ))}
+      </dl>
+    </section>
   )
 }
 

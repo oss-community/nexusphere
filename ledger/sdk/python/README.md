@@ -11,6 +11,7 @@
 * [Record the Model and Prompt](#record-the-model-and-prompt)
 * [Verify a Package](#verify-a-package)
 * [Verify a Statement and Receipt](#verify-a-statement-and-receipt)
+* [Prove That Something Never Happened](#prove-that-something-never-happened)
 * [Verify a Mandate](#verify-a-mandate)
 * [Present a Key-Bound Mandate](#present-a-key-bound-mandate)
 * [Check a Signed Request](#check-a-signed-request)
@@ -234,6 +235,50 @@ receipt = LogReceipt.parse(agent.receipt(entry["id"]))
 print(statement.verify(key), receipt.verify(statement.leaf_hash, key))
 ```
 
+## Prove That Something Never Happened
+
+<p style="text-align: justify;">
+
+An [index proof](../../README.md#index-proofs) shows how often a term occurs in the evidence up to a checkpoint, or
+that it never occurs. A term is an `agent` by `agentId`, an `action` by `agentId` and `action`, an `input` by
+`inputHash`, or a `grant` by `delegationId`. `verify_index_proof` follows the path of the proof to the root of the index
+and checks the ledger's signature on that root with the keys the proof carries, trusted from the pinned key as in a
+package. Pass `key_list` to apply key revocations and `package` to check that the index belongs to the checkpoint of
+that package.
+
+</p>
+
+Step 1. Record an action with a known input and sign a checkpoint, as in [Record Evidence](#record-evidence):
+
+```python
+from nexusphere_ledger import hash_of
+
+input_hash = hash_of({"invoice": 7})
+agent.record("invoice-agent", "acme", "tools/call", "SUCCEEDED", target="pay_invoice", input_hash=input_hash)
+checkpoint = operator.create_checkpoint()
+```
+
+Step 2. Ask, as the operator, for a proof that the input was recorded and for a proof that the agent never deleted
+anything; `sequence` picks the checkpoint and defaults to the latest:
+
+```python
+recorded = operator.index_proof({"type": "input", "inputHash": input_hash}, checkpoint["sequence"])
+never = operator.index_proof({"type": "action", "agentId": "invoice-agent", "action": "files/delete"})
+```
+
+Step 3. Verify both pinned to the ledger's key; it must print `True True` with a count of at least 1, then
+`True False`:
+
+```python
+from nexusphere_ledger import verify_index_proof
+
+public_key = operator.active_public_key()
+present = verify_index_proof(recorded, public_key)
+absent = verify_index_proof(never, public_key)
+print(present.valid, present.present, present.count, present.first_sequence, present.last_sequence)
+print(absent.valid, absent.present, absent.sequence, absent.problems)
+```
+
 ## Verify a Mandate
 
 <p style="text-align: justify;">
@@ -357,6 +402,14 @@ the output must show `Prompts     : 1 prompt texts match the hashes their entrie
 nexusphere-ledger-verify --public-key "$LEDGER_PUBLIC_KEY" package.json
 ```
 
+Step 9. Save the proof of absence from [Prove That Something Never Happened](#prove-that-something-never-happened)
+with `json.dump(never, open("proof.json", "w"))` and verify it; the output must show
+`Finding     : no entry up to sequence` and `Result: VALID`:
+
+```shell
+nexusphere-ledger-verify index --public-key "$LEDGER_PUBLIC_KEY" proof.json
+```
+
 ## Reference
 
 | Module      | Contents                                                                                         |
@@ -366,6 +419,7 @@ nexusphere-ledger-verify --public-key "$LEDGER_PUBLIC_KEY" package.json
 | `timestamp` | RFC 3161 `TimestampToken`, its verification against a pinned chain, and `read_certificates`      |
 | `rekor`     | Rekor v2 `hashedrekord` requests and `verify_rekor_entry` against a pinned log                   |
 | `report`    | Signed reports: `verify_report`, `ReportCheck`, `report_signed_bytes` and `entries_digest`       |
+| `index`     | Index proofs of presence and absence: `verify_index_proof`, `IndexCheck`, `index_signed_bytes`   |
 | `evidence`  | Content and link hashes, commitments, `ChainVerifier`, `Checkpoint` with its compliance profiles |
 | `merkle`    | RFC 9162 roots, inclusion and consistency proofs                                                 |
 | `note`      | C2SP signed notes, note keys and `tlog-cosignature/v1` cosignatures                              |
@@ -386,7 +440,7 @@ PYTHONPATH=src python3 -m unittest discover -s tests -t .
 ```
 
 Step 2. Run the same tests against a running ledger, as in the [Quick Start](../../../README.md#quick-start); the
-six `LiveLedger` tests must pass instead of being skipped:
+seven `LiveLedger` tests must pass instead of being skipped:
 
 ```shell
 NEXUSPHERE_LEDGER_URL=http://localhost:8090 PYTHONPATH=src python3 -m unittest discover -s tests -t . -v

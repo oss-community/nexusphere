@@ -13,6 +13,7 @@
 * [Transparency Log and Witnesses](#transparency-log-and-witnesses)
 * [SCITT Statements and Receipts](#scitt-statements-and-receipts)
 * [Evidence Packages](#evidence-packages)
+* [Index Proofs](#index-proofs)
 * [Key Rotation](#key-rotation)
 * [Key Revocation](#key-revocation)
 * [Agents, Grants and Decisions](#agents-grants-and-decisions)
@@ -563,6 +564,58 @@ Nexusphere Ledger evidence package
   Receipts    : 1 SCITT statements with receipts
   Witnesses   : partner.example
 Result: VALID
+```
+
+## Index Proofs
+
+<p style="text-align: justify;">
+
+A package shows what happened; an index proof shows that something did not. The ledger keeps an index of the evidence
+in a sparse Merkle tree keyed by four kinds of term: an `agent` by `agentId`, an `action` by `agentId` and `action`, an
+`input` by `inputHash`, and a `grant` by `delegationId`, counting only the actions the grant allowed. Each leaf holds
+how many entries name the term and the first and last sequence among them. For a checkpoint the ledger signs the root
+of the index with its key in the format `nexusphere-ledger/index/v1`, over `sequence`, `headHash`, `root`,
+`createdAt` and `keyId`, once, the first time someone asks, and keeps that signed root. `POST /api/v1/index/proofs`
+takes a `term` and an optional checkpoint `sequence`, by default the latest, and answers a proof that the term occurs
+with its count, or that no entry up to that checkpoint names it, with the path to the signed root and the ledger's
+keys. `nexusphere-ledger-verify index` checks it offline, and with `--package` that it belongs to the checkpoint of a
+package. The index uses no personal field, so a proof never discloses a principal, a target or a reason.
+
+</p>
+
+<p style="text-align: justify;">
+
+The root is a statement signed by the ledger, not a proof computed by the verifier: a false absence would be a signed
+statement the ledger cannot take back, which an auditor with the full evidence can expose by recomputing the index.
+
+</p>
+
+Step 1. Start the ledger as in [Run](#run), then record an action and sign a checkpoint:
+
+```shell
+curl -s -X POST http://localhost:8090/api/v1/evidence -H "Authorization: Bearer $LEDGER_API_KEY" -H "Content-Type: application/json" -d '{"agentId":"payments-agent","principalId":"alice","action":"tools/call","target":"bank/pay_invoice","inputHash":"9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08","decision":"ALLOW","outcome":"SUCCEEDED"}' | jq -c '{sequence}'
+curl -s -X POST http://localhost:8090/api/v1/checkpoints -H "Authorization: Bearer $LEDGER_API_KEY" | jq -c '{sequence}'
+```
+
+Step 2. Ask for a proof that the payment input was recorded; the answer must show a `count` of 1:
+
+```shell
+curl -s -X POST http://localhost:8090/api/v1/index/proofs -H "Authorization: Bearer $LEDGER_API_KEY" -H "Content-Type: application/json" -d '{"term":{"type":"input","inputHash":"9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08"}}' | jq -c .leaf
+```
+
+Step 3. Ask for a proof that the agent never deleted anything; the answer must show `null`:
+
+```shell
+curl -s -X POST http://localhost:8090/api/v1/index/proofs -H "Authorization: Bearer $LEDGER_API_KEY" -H "Content-Type: application/json" -d '{"term":{"type":"action","agentId":"payments-agent","action":"files/delete"}}' > proof.json
+jq -c .leaf proof.json
+```
+
+Step 4. Verify the proof with the ledger's key pinned; the output must show
+`Finding     : no entry up to sequence` and `Result: VALID`:
+
+```shell
+LEDGER_PUBLIC_KEY=$(curl -s http://localhost:8090/api/v1/keys -H "Authorization: Bearer $LEDGER_API_KEY" | jq -r '.[] | select(.status == "ACTIVE") | .publicKey')
+java -jar verifier/target/verifier-1.0.0-SNAPSHOT-exec.jar index --public-key "$LEDGER_PUBLIC_KEY" proof.json
 ```
 
 ## Key Rotation
@@ -1615,7 +1668,7 @@ java -jar verifier/target/verifier-1.0.0-SNAPSHOT-exec.jar dispute --public-key 
 with the published RFC 8032 test keys: canonical JSON, the evidence chain and checkpoints, Merkle roots and proofs,
 signed notes and cosignatures, SCITT statements and receipts, an SD-JWT VC mandate, a key-bound mandate with its
 KB-JWT, an HTTP message signature, a checkpoint that signs compliance profiles, an RFC 3161 token from a real
-timestamp authority, a Rekor entry from a real Rekor v2 log and a signed dispute report and an entry that names its model and prompt. Another implementation checks itself against them, and `ConformanceVectorsTest` in `ledger/verifier` fails when the ledger's own output changes.
+timestamp authority, a Rekor entry from a real Rekor v2 log and a signed dispute report, an entry that names its model and prompt, and index proofs of presence and absence. Another implementation checks itself against them, and `ConformanceVectorsTest` in `ledger/verifier` fails when the ledger's own output changes.
 
 </p>
 
@@ -1648,6 +1701,7 @@ API key, except `/api/v1/principal/**`, which requires a principal token from th
 | POST   | `/api/v1/disputes`                         | A ZIP dispute package for the scope, `title` and `description` in the body (operator)                   |
 | PUT    | `/api/v1/prompts`                          | Store a prompt or configuration `text` and answer its `hash`; `201` when new (agent or operator)        |
 | GET    | `/api/v1/prompts/{hash}`                   | A stored prompt text with when and by whom it was stored (operator)                                     |
+| POST   | `/api/v1/index/proofs`                     | A signed proof that a `term` occurs, with its count, or never does, up to a checkpoint (operator)       |
 | GET    | `/api/v1/verification`                     | Full verification report (operator)                                                                     |
 | POST   | `/api/v1/agents`                           | Register an agent and return its API key once (operator)                                                |
 | GET    | `/api/v1/agents`                           | List agents by `after` and `limit` (operator)                                                           |

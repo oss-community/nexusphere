@@ -15,6 +15,7 @@ import {
   PublicKey,
   SdJwt,
   presentBound,
+  verifyIndexProof,
   verifyPackage,
 } from "../src/index.js";
 
@@ -171,6 +172,22 @@ describe.skipIf(!URL)("a running ledger", async () => {
     const report = await verifyPackage(await operator.exportPackage({ agentId }), await operator.activePublicKey());
     expect(report.problems).toEqual([]);
     expect(await operator.erasePrincipal(principal).catch((e) => e)).toMatchObject({ status: 404 });
+  });
+
+  it("proves that a term occurs and that another never did", async () => {
+    await agent.record({ agentId, principalId: "alice", action: "files/read", outcome: "SUCCEEDED" });
+    const checkpoint = await operator.createCheckpoint();
+    const key = await operator.activePublicKey();
+    const present = await operator.indexProof({ type: "action", agentId, action: "files/read" });
+    const absent = await operator.indexProof({ type: "action", agentId, action: "files/delete" },
+      checkpoint.sequence as number);
+    const found = await verifyIndexProof(present, { pinnedPublicKey: key });
+    const missing = await verifyIndexProof(absent, { pinnedPublicKey: key });
+    expect(found.problems).toEqual([]);
+    expect(found).toMatchObject({ valid: true, present: true, count: 1 });
+    expect(found.sequence).toBeGreaterThanOrEqual(checkpoint.sequence as number);
+    expect(missing.problems).toEqual([]);
+    expect(missing).toMatchObject({ valid: true, present: false, sequence: checkpoint.sequence });
   });
 
   it("raises ledger errors", async () => {

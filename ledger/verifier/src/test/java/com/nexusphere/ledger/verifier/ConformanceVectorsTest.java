@@ -6,6 +6,7 @@ import com.nexusphere.ledger.chain.Checkpoint;
 import com.nexusphere.ledger.chain.EvidenceEntry;
 import com.nexusphere.ledger.chain.EvidenceStatement;
 import com.nexusphere.ledger.chain.Hashes;
+import com.nexusphere.ledger.chain.IndexRoot;
 import com.nexusphere.ledger.chain.KeyRevocation;
 import com.nexusphere.ledger.chain.KeyRotation;
 import com.nexusphere.ledger.chain.LogCheckpoint;
@@ -15,6 +16,7 @@ import com.nexusphere.ledger.chain.NoteKey;
 import com.nexusphere.ledger.chain.SignedCheckpoint;
 import com.nexusphere.ledger.chain.Signer;
 import com.nexusphere.ledger.chain.SigningKeys;
+import com.nexusphere.ledger.chain.SparseMerkleTree;
 import com.nexusphere.ledger.chain.TimestampToken;
 import com.nexusphere.ledger.chain.Timestamps;
 import com.nexusphere.ledger.chain.TrustedKeys;
@@ -57,6 +59,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
+import java.util.SortedMap;
 import java.util.TreeMap;
 import java.util.UUID;
 
@@ -96,7 +99,7 @@ class ConformanceVectorsTest {
         }
     }
 
-    private static List<EvidenceEntry> entries() {
+    static List<EvidenceEntry> entries() {
         List<EvidenceEntry> entries = new ArrayList<>();
         String previous = Hashes.GENESIS;
         String[][] actions = {
@@ -246,6 +249,88 @@ class ConformanceVectorsTest {
                 "conversation-1", new TreeMap<>(), salts, null, Hashes.GENESIS, null).sealed();
         assertThat(unnamed.contentHash()).isNotEqualTo(entry.contentHash());
         assertThat(unnamed.canonicalContent()).doesNotContainKey("model");
+    }
+
+    static Map<String, Object> indexProof(List<EvidenceEntry> entries, Map<String, Object> term, long sequence,
+                                          PrivateKey key, String keyId, PublicKey publicKey) {
+        Map<String, long[]> counts = new TreeMap<>();
+        for (EvidenceEntry entry : entries) {
+            if (entry.sequence() > sequence) {
+                continue;
+            }
+            for (Map<String, Object> t : IndexRoot.terms(entry.agentId(), entry.action(), entry.decision(), entry.inputHash(),
+                    entry.delegationId())) {
+                long[] leaf = counts.computeIfAbsent(HEX.formatHex(SparseMerkleTree.key(t)),
+                        k -> new long[]{0, entry.sequence(), entry.sequence()});
+                leaf[0]++;
+                leaf[2] = entry.sequence();
+            }
+        }
+        SortedMap<String, byte[]> values = new TreeMap<>();
+        counts.forEach((k, v) -> values.put(k, SparseMerkleTree.valueHash(IndexRoot.value(v[0], v[1], v[2]))));
+        String root = HEX.formatHex(SparseMerkleTree.root(values));
+        EvidenceEntry head = entries.stream().filter(e -> e.sequence() == sequence).findFirst().orElseThrow();
+        IndexRoot index = new IndexRoot(sequence, head.hash(), root, T0.plusSeconds(120), keyId);
+        byte[] termKey = SparseMerkleTree.key(term);
+        SparseMerkleTree.Proof proof = SparseMerkleTree.proof(values, termKey);
+        long[] leaf = counts.get(HEX.formatHex(termKey));
+        Map<String, Object> map = new LinkedHashMap<>();
+        map.put("format", IndexProofVerifier.FORMAT);
+        map.put("term", term);
+        map.put("key", HEX.formatHex(termKey));
+        map.put("leaf", leaf == null ? null : IndexRoot.value(leaf[0], leaf[1], leaf[2]));
+        map.put("siblings", proof.siblings().stream().map(HEX::formatHex).toList());
+        Map<String, Object> other = null;
+        if (proof.otherKey() != null) {
+            other = new LinkedHashMap<>();
+            other.put("key", HEX.formatHex(proof.otherKey()));
+            other.put("valueHash", HEX.formatHex(proof.otherValueHash()));
+        }
+        map.put("otherLeaf", other);
+        Map<String, Object> signed = new LinkedHashMap<>();
+        signed.put("format", IndexRoot.FORMAT);
+        signed.put("sequence", sequence);
+        signed.put("headHash", head.hash());
+        signed.put("root", root);
+        signed.put("createdAt", Timestamps.format(index.createdAt()));
+        signed.put("keyId", keyId);
+        signed.put("signature", SigningKeys.sign(key, index.signedBytes()));
+        map.put("index", signed);
+        Map<String, Object> listed = new LinkedHashMap<>();
+        listed.put("keyId", keyId);
+        listed.put("algorithm", "Ed25519");
+        listed.put("publicKey", SigningKeys.encode(publicKey));
+        map.put("keys", List.of(listed));
+        return map;
+    }
+
+    @Test
+    void indexProofs() throws IOException {
+        List<EvidenceEntry> entries = entries();
+        List<Map<String, Object>> terms = List.of(
+                IndexRoot.term(Map.of("type", "agent", "agentId", "invoice-agent")),
+                IndexRoot.term(Map.of("type", "action", "agentId", "sales-agent", "action", "a2a/send")),
+                IndexRoot.term(Map.of("type", "grant", "delegationId", "grant-never-used")),
+                IndexRoot.term(Map.of("type", "input", "inputHash",
+                        Hashes.sha256("delete_everything".getBytes(StandardCharsets.UTF_8)))));
+        List<Map<String, Object>> proofs = new ArrayList<>();
+        for (Map<String, Object> term : terms) {
+            Map<String, Object> proof = indexProof(entries, term, 3, LEDGER_KEY, KEY_ID, LEDGER);
+            proofs.add(proof);
+            IndexProofVerifier.IndexCheck check = IndexProofVerifier.verify(JSON.valueToTree(proof),
+                    SigningKeys.encode(LEDGER), null);
+            assertThat(check.problems()).as(term.toString()).isEmpty();
+        }
+        Map<String, Object> vector = new LinkedHashMap<>();
+        vector.put("signedBytes", new String(new IndexRoot(3, entries.getLast().hash(),
+                ((Map<?, ?>) proofs.getFirst().get("index")).get("root").toString(), T0.plusSeconds(120), KEY_ID)
+                .signedBytes(), StandardCharsets.UTF_8));
+        vector.put("proofs", proofs);
+        check("index-proof.json", vector);
+
+        assertThat(proofs.get(0).get("leaf")).isEqualTo(IndexRoot.value(2, 1, 2));
+        assertThat(proofs.get(2).get("leaf")).isNull();
+        assertThat(proofs.get(3).get("leaf")).isNull();
     }
 
     @Test

@@ -37,6 +37,8 @@ database, so an auditor, a court or a counterparty can verify what a ledger hand
 * Check the Rekor entry of the checkpoint and its inclusion proof, pin the log with `--rekor-key` and refuse a
   checkpoint without an entry with `--require-rekor`
 * Check a signed report against its package with `report --package`, and a whole dispute package with `dispute`
+* Check an index proof with `index`: the term, the path to the signed index root and, with `--package`, that the
+  index belongs to the package's checkpoint
 * Check entries in evidence format v2 from their personal values and salts, or from their commitments once erased
 * Check that the prompt texts of a package match their hashes and are named by the model of a disclosed entry
 * Run the [Conformance Vectors](../conformance/README.md) in `ConformanceVectorsTest`

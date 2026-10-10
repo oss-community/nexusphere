@@ -157,6 +157,44 @@ describe('App', async () => {
     expect(screen.queryByRole('columnheader', { name: 'Model' })).not.toBeInTheDocument()
   })
 
+  it('verifies an index proof pinned to the ledger key', async () => {
+    const proof = vector('index-proof.json').proofs[0]
+    const user = await upload(proof, 'proof.json')
+    await user.type(screen.getByLabelText('Ledger public key'), PINNED)
+    await user.click(screen.getByRole('button', { name: 'Verify' }))
+    expect(await screen.findByTestId('verdict')).toHaveTextContent('VALID')
+    expect(screen.queryByRole('note')).not.toBeInTheDocument()
+    expect(screen.getByText('agent invoice-agent')).toBeInTheDocument()
+    expect(screen.getByText(`3, head ${proof.index.headHash}`)).toBeInTheDocument()
+    expect(screen.getByText(LEDGER_KEY.keyId)).toBeInTheDocument()
+    expect(screen.getByText('2 entries, sequences 1 to 2')).toBeInTheDocument()
+    expect(screen.queryByRole('table')).not.toBeInTheDocument()
+  })
+
+  it('shows that a term never occurred and warns without a pinned key', async () => {
+    const user = await upload(vector('index-proof.json').proofs[2], 'proof.json')
+    await user.click(screen.getByRole('button', { name: 'Verify' }))
+    expect(await screen.findByTestId('verdict')).toHaveTextContent('VALID')
+    expect(screen.getByText('grant grant-never-used')).toBeInTheDocument()
+    expect(screen.getByText('no entry up to sequence 3')).toBeInTheDocument()
+    expect(screen.getByText(`${LEDGER_KEY.keyId}, not pinned`)).toBeInTheDocument()
+    expect(screen.getByRole('note')).toHaveTextContent('Not pinned')
+  })
+
+  it('shows the problems of a changed index proof and of another key', async () => {
+    const proof = structuredClone(vector('index-proof.json').proofs[0])
+    proof.leaf.count = 1
+    const user = await upload(proof, 'proof.json')
+    await user.type(screen.getByLabelText('Ledger public key'), PINNED)
+    await user.click(screen.getByRole('button', { name: 'Verify' }))
+    expect(await screen.findByTestId('verdict')).toHaveTextContent('INVALID')
+    expect(screen.getByText('the proof does not lead to the signed root')).toBeInTheDocument()
+    await user.clear(screen.getByLabelText('Ledger public key'))
+    await user.type(screen.getByLabelText('Ledger public key'), (await PrivateKey.generate()).publicKey.encoded)
+    await user.click(screen.getByRole('button', { name: 'Verify' }))
+    expect(await screen.findByText(/which the proof does not trust/)).toBeInTheDocument()
+  })
+
   it('reports files that are not packages', async () => {
     const user = userEvent.setup()
     render(<App />)

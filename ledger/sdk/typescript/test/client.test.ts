@@ -20,6 +20,9 @@ function fakeLedger() {
     if (path === "/api/v1/evidence" || path === "/api/v1/decisions" || path === "/api/v1/packages") {
       return Response.json({ ok: true });
     }
+    if (path === "/api/v1/index/proofs") {
+      return Response.json({ format: "nexusphere-ledger/index-proof/v1", term: (body as { term: unknown }).term });
+    }
     if (path === "/api/v1/reports") {
       return Response.json([{ id: "dispute", title: "Dispute package", profiles: ["baseline"] }]);
     }
@@ -121,5 +124,17 @@ describe("LedgerClient models and prompts", () => {
     expect(ledger.calls[1].body).toEqual({ includePrompts: true });
     await client.createDispute({ title: "Invoice 4711 paid twice", includePrompts: true });
     expect(ledger.calls[2].body).toEqual({ title: "Invoice 4711 paid twice", includePrompts: true });
+  });
+});
+
+describe("LedgerClient index proofs", () => {
+  it("asks for a proof of a term, at the latest or a given checkpoint", async () => {
+    const ledger = fakeLedger();
+    const client = new LedgerClient(URL, { apiKey: "operator", fetch: ledger.fetcher });
+    const term = { type: "grant", delegationId: "grant-1" };
+    expect(await client.indexProof(term)).toEqual({ format: "nexusphere-ledger/index-proof/v1", term });
+    expect(ledger.calls[0]).toMatchObject({ method: "POST", url: URL + "/api/v1/index/proofs", body: { term } });
+    await client.indexProof({ type: "agent", agentId: "invoice-agent" }, 7);
+    expect(ledger.calls[1].body).toEqual({ term: { type: "agent", agentId: "invoice-agent" }, sequence: 7 });
   });
 });

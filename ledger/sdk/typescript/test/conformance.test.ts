@@ -47,6 +47,8 @@ import {
   fromUtf8,
   reportSignedBytes,
   verifyReport,
+  indexSignedBytes,
+  verifyIndexProof,
 } from "../src/index.js";
 import { ISSUER, LEDGER_KEY, ORIGIN, WITNESS, WITNESS_KEY, buildPackage, vector } from "./support.js";
 
@@ -479,5 +481,35 @@ describe("report.json", () => {
       statuses: { PARTLY_SHOWN: 1, SHOWN: 1 },
       problems: [],
     });
+  });
+});
+
+describe("index-proof.json", () => {
+  it("rebuilds the signed bytes and verifies every proof against the ledger key", async () => {
+    const v = vector("index-proof.json");
+    expect(fromUtf8(indexSignedBytes(v.proofs[0].index))).toBe(v.signedBytes);
+    expect(await LEDGER_KEY.signBase64(utf8(v.signedBytes))).toBe(v.proofs[0].index.signature);
+    for (const proof of v.proofs) {
+      const check = await verifyIndexProof(proof, { pinnedPublicKey: LEDGER_KEY.publicKey.encoded });
+      expect(check.problems).toEqual([]);
+      expect(check.valid).toBe(true);
+      expect(check.term).toEqual(proof.term);
+      expect(check.present).toBe(proof.leaf !== null);
+      expect(check.sequence).toBe(3);
+      expect(check.keyId).toBe(LEDGER_KEY.keyId);
+    }
+    expect(await verifyIndexProof(v.proofs[0], { pinnedPublicKey: LEDGER_KEY.publicKey.encoded })).toEqual({
+      valid: true,
+      term: { type: "agent", agentId: "invoice-agent" },
+      present: true,
+      count: 2,
+      firstSequence: 1,
+      lastSequence: 2,
+      sequence: 3,
+      headHash: v.proofs[0].index.headHash,
+      keyId: LEDGER_KEY.keyId,
+      problems: [],
+    });
+    expect(v.proofs.slice(2).map((proof: Json) => proof.leaf)).toEqual([null, null]);
   });
 });

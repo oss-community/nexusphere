@@ -40,7 +40,9 @@ public final class VerifierCli {
                    nexusphere-ledger-verify statement [--public-key <key> | --public-key-file <file>] \
             [--receipt <receipt.cose>] <statement.cose>
                    nexusphere-ledger-verify report [package options] --package <package.json> <report.json>
-                   nexusphere-ledger-verify dispute [package options] <dispute.zip>""";
+                   nexusphere-ledger-verify dispute [package options] <dispute.zip>
+                   nexusphere-ledger-verify index [--public-key <key> | --public-key-file <file>] [--keys <keys.json>] \
+            [--package <package.json>] [--json] <proof.json>""";
 
     private static final int MAX_FILE = 256 * 1024 * 1024;
     private static final JsonMapper JSON = JsonMapper.builder().enable(SerializationFeature.INDENT_OUTPUT).build();
@@ -61,6 +63,9 @@ public final class VerifierCli {
         }
         if (args.length > 0 && "report".equals(args[0])) {
             return report(Arrays.copyOfRange(args, 1, args.length), out, err);
+        }
+        if (args.length > 0 && "index".equals(args[0])) {
+            return index(Arrays.copyOfRange(args, 1, args.length), out, err);
         }
         if (args.length > 0 && "dispute".equals(args[0])) {
             return dispute(Arrays.copyOfRange(args, 1, args.length), out, err);
@@ -181,6 +186,52 @@ public final class VerifierCli {
             return USAGE;
         }
         return finish(pkg, report, keys, certificates, options.rekorKeys(), options, List.of(), out);
+    }
+
+    private static int index(String[] args, PrintStream out, PrintStream err) {
+        Options options = Options.parse(args, true);
+        if (options == null) {
+            err.println(USAGE_TEXT);
+            return USAGE;
+        }
+        JsonNode proof;
+        JsonNode pkg;
+        JsonNode keys;
+        Path reading = options.file();
+        try {
+            proof = JSON.readTree(Files.readAllBytes(options.file()));
+            reading = options.packageFile();
+            pkg = options.packageFile() == null ? null : JSON.readTree(Files.readAllBytes(options.packageFile()));
+            reading = options.keysFile();
+            keys = options.keysFile() == null ? null : JSON.readTree(Files.readAllBytes(options.keysFile()));
+        } catch (IOException | JacksonException e) {
+            err.println("Cannot read " + reading + ": " + e.getMessage());
+            return USAGE;
+        }
+        IndexProofVerifier.IndexCheck check = IndexProofVerifier.verify(proof, options.publicKey(), keys, pkg);
+        if (options.json()) {
+            out.println(JSON.writeValueAsString(check));
+        } else {
+            out.println("Nexusphere Ledger index proof");
+            out.println("  Term        : " + check.term().entrySet().stream().map(e -> String.valueOf(e.getValue()))
+                    .collect(Collectors.joining(" ")));
+            out.println("  Index       : checkpoint " + check.sequence() + ", head " + check.headHash());
+            out.println("  Signed by   : " + check.keyId() + (options.publicKey() == null
+                    ? " (taken from the proof; pass --public-key to pin the ledger's key)" : ""));
+            out.println("  Finding     : " + (check.present()
+                    ? check.count() + " entries, sequences " + check.firstSequence() + " to " + check.lastSequence()
+                    : "no entry up to sequence " + check.sequence()));
+            if (pkg != null) {
+                out.println("  Package     : checkpoint " + pkg.path("checkpoint").path("sequence").asLong());
+            }
+            if (check.valid()) {
+                out.println("Result: VALID");
+            } else {
+                out.println("Result: INVALID");
+                check.problems().forEach(problem -> out.println("  - " + problem));
+            }
+        }
+        return check.valid() ? VALID : INVALID;
     }
 
     private static int dispute(String[] args, PrintStream out, PrintStream err) {
