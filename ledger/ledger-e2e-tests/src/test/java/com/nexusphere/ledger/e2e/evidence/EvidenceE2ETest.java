@@ -24,7 +24,7 @@ class EvidenceE2ETest extends LedgerE2ETestBase {
 
         assertThat(created.status()).isEqualTo(201);
         assertThat(created.header("Location")).hasValue("/api/v1/evidence/" + first.path("id").asString());
-        assertThat(first.path("format").asString()).isEqualTo("nexusphere-ledger/evidence/v1");
+        assertThat(first.path("format").asString()).isEqualTo("nexusphere-ledger/evidence/v2");
         assertThat(first.path("hash").asString()).hasSize(64);
         assertThat(second.path("sequence").asLong()).isGreaterThan(first.path("sequence").asLong());
         assertThat(LedgerClient.toEntry(first).computeHash()).isEqualTo(first.path("hash").asString());

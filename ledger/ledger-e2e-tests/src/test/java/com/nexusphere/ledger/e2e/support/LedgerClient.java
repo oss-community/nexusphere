@@ -1,6 +1,7 @@
 package com.nexusphere.ledger.e2e.support;
 
 import com.nexusphere.ledger.chain.EvidenceEntry;
+import com.nexusphere.ledger.verifier.PackageVerifier;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
 
@@ -9,12 +10,9 @@ import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
-import java.time.Instant;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Optional;
-import java.util.TreeMap;
-import java.util.UUID;
 
 public final class LedgerClient {
 
@@ -100,32 +98,7 @@ public final class LedgerClient {
     }
 
     public static EvidenceEntry toEntry(JsonNode node) {
-        TreeMap<String, String> attributes = new TreeMap<>();
-        node.path("attributes").properties().forEach(e -> attributes.put(e.getKey(), e.getValue().asString()));
-        return new EvidenceEntry(
-                UUID.fromString(node.path("id").asString()),
-                node.path("sequence").asLong(),
-                Instant.parse(node.path("occurredAt").asString()),
-                Instant.parse(node.path("recordedAt").asString()),
-                text(node, "agentId"),
-                text(node, "principalId"),
-                text(node, "action"),
-                text(node, "target"),
-                text(node, "decision"),
-                text(node, "reason"),
-                text(node, "delegationId"),
-                text(node, "inputHash"),
-                text(node, "outputHash"),
-                text(node, "outcome"),
-                text(node, "correlationId"),
-                attributes,
-                text(node, "previousHash"),
-                text(node, "hash"));
-    }
-
-    private static String text(JsonNode node, String field) {
-        JsonNode value = node.path(field);
-        return value.isNull() || value.isMissingNode() ? null : value.asString();
+        return PackageVerifier.entry(node);
     }
 
     private HttpRequest.Builder request(String path) {

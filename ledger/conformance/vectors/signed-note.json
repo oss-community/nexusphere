@@ -1,6 +1,6 @@
 {
   "description" : "Log checkpoint over the three evidence-chain entries, cosigned at time 1760000000",
-  "rootHash" : "90RRkUjPdhDtfUN4Wrq8Ov9MaYasc6xpVzjnZKeU58g=",
-  "note" : "ledger.example\n3\n90RRkUjPdhDtfUN4Wrq8Ov9MaYasc6xpVzjnZKeU58g=\n\n— ledger.example PZ1LMQPvrftAs+kIwtdBxqjzxn0EfwfA3HrfFGS0FIkAtk14lhFXOH2opNYYagbuWosQz6owqY3LPt/LjMGJNxwBvgI=\n",
-  "cosignedNote" : "ledger.example\n3\n90RRkUjPdhDtfUN4Wrq8Ov9MaYasc6xpVzjnZKeU58g=\n\n— ledger.example PZ1LMQPvrftAs+kIwtdBxqjzxn0EfwfA3HrfFGS0FIkAtk14lhFXOH2opNYYagbuWosQz6owqY3LPt/LjMGJNxwBvgI=\n— witness.example Z1UPTgAAAABo53gAuuWN5kTCbxrM20pX3kLwrkAPg8taAPtat1eWRr9KZEG+cpzRBHDZrJiiMsqe+lffhClwCF00s0fjonZQ0RrLCA==\n"
+  "rootHash" : "7ewpvrs7d87qDxJHi1aFXEEOcumwZEOE2kPmaxbNiz0=",
+  "note" : "ledger.example\n3\n7ewpvrs7d87qDxJHi1aFXEEOcumwZEOE2kPmaxbNiz0=\n\n— ledger.example PZ1LMSvC38YjZztV9p1Dtg7rbUpzM0XCPk4MbljK8REG8QyKQHqUuaT+yvnlrtWrN4lAkNabivNhHm1bKZR0hloddwM=\n",
+  "cosignedNote" : "ledger.example\n3\n7ewpvrs7d87qDxJHi1aFXEEOcumwZEOE2kPmaxbNiz0=\n\n— ledger.example PZ1LMSvC38YjZztV9p1Dtg7rbUpzM0XCPk4MbljK8REG8QyKQHqUuaT+yvnlrtWrN4lAkNabivNhHm1bKZR0hloddwM=\n— witness.example Z1UPTgAAAABo53gAc2tvqA0GIrcQmuKGBuhqWLgLJvwOZ+x0MRdSkdzQs+8xAhVEtHHVmgprRGy5cbXO9857VCuIPNDYOKbMaAwxDw==\n"
 }

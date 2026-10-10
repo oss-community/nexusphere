@@ -9,7 +9,7 @@ import {
   verifyPackage,
   utf8,
 } from "../src/index.js";
-import { LEDGER_KEY, buildPackage, entries, keyRecord, witnessNoteKey } from "./support.js";
+import { LEDGER_KEY, buildPackage, entries, erase, keyRecord, witnessNoteKey } from "./support.js";
 
 const PINNED = LEDGER_KEY.publicKey.encoded;
 
@@ -57,6 +57,20 @@ describe("verifyPackage", async () => {
     const outside = { agentId: "invoice-agent", principalId: null, fromSequence: 1, toSequence: 6 };
     expect((await verifyPackage(await buildPackage(chain, [2], { scope: outside }), PINNED)).problems).toContain(
       "sequence 2: the disclosed entry is outside the scope of the package",
+    );
+  });
+
+  it("proves the place of an erased entry", async () => {
+    const pkg = (await buildPackage(chain, [1, 3], {
+      scope: { agentId: null, principalId: "acme", fromSequence: 1, toSequence: 6 },
+    })) as any;
+    pkg.links[2].entry = await erase(chain[2]);
+    const report = await verifyPackage(pkg, PINNED);
+    expect(report.problems).toEqual([]);
+    expect(report.disclosedEntries).toBe(2);
+    pkg.links[2].entry.commitments.target = "00".repeat(32);
+    expect((await verifyPackage(pkg, PINNED)).problems).toContain(
+      "sequence 3: the disclosed entry does not match its content hash",
     );
   });
 

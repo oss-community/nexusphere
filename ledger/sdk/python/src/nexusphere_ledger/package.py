@@ -4,7 +4,7 @@ from typing import List, Optional
 
 from . import merkle
 from .cose import EvidenceStatement, LogReceipt
-from .evidence import GENESIS, ChainVerifier, Checkpoint, EvidenceLink, content_hash
+from .evidence import GENESIS, ChainVerifier, Checkpoint, EvidenceLink, content_hash, erased
 from .keys import KeyRevocation, KeyRotation, PublicKey, revoked_keys, trusted_and_revoked
 from .note import ED25519, Note, NoteKey
 
@@ -229,7 +229,7 @@ def _disclosed_mismatch(entry, link, agent_id, principal_id, low, high) -> Optio
         return "the disclosed entry does not match its content hash"
     if (sequence < low or sequence > high
             or agent_id is not None and agent_id != _nullable(entry, "agentId")
-            or principal_id is not None and principal_id != _nullable(entry, "principalId")):
+            or principal_id is not None and not erased(entry) and principal_id != _nullable(entry, "principalId")):
         return "the disclosed entry is outside the scope of the package"
     return None
 

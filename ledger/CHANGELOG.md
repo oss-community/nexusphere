@@ -55,6 +55,11 @@ agent platforms and gateways.
   directory; the strictest rule of the active profiles wins, required fields are enforced, a disallowed region stops
   the ledger, checkpoints sign the active profiles in format `checkpoint/v2`, and the verifiers report them, with a
   `compliance-checkpoint.json` conformance vector
+* Evidence format v2 with crypto-shredding: the hash covers salted commitments of the personal fields instead of
+  their values, which the ledger keeps encrypted under a key per principal; `POST /api/v1/principals/{id}/erasure`
+  deletes them past the retention of the active profiles and pseudonymizes the principal in grants, decisions,
+  mandates and exchanges, while the chain, log, checkpoints and packages stay valid; format v2 replaces v1, so a
+  ledger database with v1 evidence must be recreated
 * Browser verifier: one self-contained HTML page in React and TypeScript that verifies a package with the
   TypeScript SDK, pinned to the ledger key and optional witnesses, with a Content Security Policy that blocks every
   connection

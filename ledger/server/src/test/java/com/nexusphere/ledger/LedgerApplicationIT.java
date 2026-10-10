@@ -58,8 +58,8 @@ class LedgerApplicationIT {
         List<String> tables = jdbc.queryForList(
                 "select table_name from information_schema.tables where table_schema = 'ledger'", String.class);
 
-        assertThat(tables).contains("ledger_head", "evidence_record", "evidence_attribute", "checkpoint", "agent",
-                "grant_record", "decision", "signing_key", "flyway_schema_history");
+        assertThat(tables).contains("ledger_head", "evidence_record", "evidence_personal", "principal_key", "checkpoint",
+                "agent", "grant_record", "decision", "signing_key", "flyway_schema_history");
     }
 
     @Test
@@ -68,11 +68,7 @@ class LedgerApplicationIT {
 
         assertThatThrownBy(() -> jdbc.update("update ledger.evidence_record set agent_id = 'x' where id = ?",
                 entry.id())).hasMessageContaining("append-only");
-        assertThatThrownBy(() -> jdbc.update("delete from ledger.evidence_attribute where evidence_id = ?",
-                entry.id())).hasMessageContaining("append-only");
         assertThatThrownBy(() -> jdbc.update("truncate ledger.evidence_record cascade"))
-                .hasMessageContaining("append-only");
-        assertThatThrownBy(() -> jdbc.update("truncate ledger.evidence_attribute"))
                 .hasMessageContaining("append-only");
         assertThatThrownBy(() -> jdbc.update("truncate ledger.checkpoint"))
                 .hasMessageContaining("append-only");
@@ -103,11 +99,11 @@ class LedgerApplicationIT {
         EvidenceEntry entry = record("agent-tamper");
         record("agent-after-tamper");
 
-        bypassTriggers(() -> jdbc.update("update ledger.evidence_record set principal_id = 'someone-else' where id = ?",
+        bypassTriggers(() -> jdbc.update("update ledger.evidence_record set agent_id = 'someone-else' where id = ?",
                 entry.id()));
         VerificationReport tampered = verification.verify();
-        bypassTriggers(() -> jdbc.update("update ledger.evidence_record set principal_id = ? where id = ?",
-                entry.principalId(), entry.id()));
+        bypassTriggers(() -> jdbc.update("update ledger.evidence_record set agent_id = ? where id = ?",
+                entry.agentId(), entry.id()));
 
         assertThat(tampered.valid()).isFalse();
         assertThat(tampered.failedSequence()).isEqualTo(entry.sequence());

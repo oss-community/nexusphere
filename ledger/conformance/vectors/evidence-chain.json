@@ -1,88 +1,142 @@
 {
   "entries" : [ {
-    "content" : {
-      "format" : "nexusphere-ledger/evidence/v1",
-      "id" : "00000000-0000-4000-8000-000000000001",
-      "occurredAt" : "2026-10-01T08:00:00.123456Z",
-      "recordedAt" : "2026-10-01T08:00:00.128456Z",
-      "agentId" : "invoice-agent",
+    "values" : {
       "principalId" : "acme",
-      "action" : "tools/call",
       "target" : "read_invoice",
-      "decision" : "ALLOW",
       "reason" : null,
-      "delegationId" : null,
-      "inputHash" : "2b5d0b3f411d1034c27ebfe24ed50e9d476324550d5829590b09ed07a93003a5",
-      "outputHash" : null,
-      "outcome" : "SUCCEEDED",
       "correlationId" : "conversation-1",
       "attributes" : {
         "note" : "café ✓",
         "tool" : "read_invoice"
       }
     },
-    "canonicalContent" : "{\"action\":\"tools/call\",\"agentId\":\"invoice-agent\",\"attributes\":{\"note\":\"café ✓\",\"tool\":\"read_invoice\"},\"correlationId\":\"conversation-1\",\"decision\":\"ALLOW\",\"delegationId\":null,\"format\":\"nexusphere-ledger/evidence/v1\",\"id\":\"00000000-0000-4000-8000-000000000001\",\"inputHash\":\"2b5d0b3f411d1034c27ebfe24ed50e9d476324550d5829590b09ed07a93003a5\",\"occurredAt\":\"2026-10-01T08:00:00.123456Z\",\"outcome\":\"SUCCEEDED\",\"outputHash\":null,\"principalId\":\"acme\",\"reason\":null,\"recordedAt\":\"2026-10-01T08:00:00.128456Z\",\"target\":\"read_invoice\"}",
+    "salts" : {
+      "attributes.note" : "QICdm0Sp8zepGYYu_OAyPQ",
+      "attributes.tool" : "eYc57Jlh8bbvmryFDpf5Sw",
+      "correlationId" : "ep0ikLjfycvJWpfAgdn22Q",
+      "principalId" : "uZoRJT29qeaa7vFodDuRog",
+      "reason" : "ojyMwAxMpKJIHyPBh_3sYg",
+      "target" : "l-bylqu23ozZSycuiOf3Vw"
+    },
+    "content" : {
+      "format" : "nexusphere-ledger/evidence/v2",
+      "id" : "00000000-0000-4000-8000-000000000001",
+      "occurredAt" : "2026-10-01T08:00:00.123456Z",
+      "recordedAt" : "2026-10-01T08:00:00.128456Z",
+      "agentId" : "invoice-agent",
+      "action" : "tools/call",
+      "decision" : "ALLOW",
+      "delegationId" : null,
+      "inputHash" : "2b5d0b3f411d1034c27ebfe24ed50e9d476324550d5829590b09ed07a93003a5",
+      "outputHash" : null,
+      "outcome" : "SUCCEEDED",
+      "commitments" : {
+        "attributes.note" : "7677475087663042ad60b6c6a646f7666bc10de3ecf4da822f1212e1eef2a2e0",
+        "attributes.tool" : "e9ccc5056e39e625ea4263444985f3a14687e8ff54079b9c407525abd7296dd1",
+        "correlationId" : "f17a1287cc1b62712bc41274eb2425f2d5739f084054a390d12ea9d61f76fd87",
+        "principalId" : "fa2e26315b76a1682f920aba4846584fb2b830d70288190ecb5e274a5fd99ce5",
+        "reason" : "236a1a5c8971daa76cced0c8eb4c7dd5313136b1ab0e46b11614c99a309bcfed",
+        "target" : "aadc1bae97a8782e2575cfdbb2bc69b2f3d36e8a528799404d4f988d0ed69a05"
+      }
+    },
+    "canonicalContent" : "{\"action\":\"tools/call\",\"agentId\":\"invoice-agent\",\"commitments\":{\"attributes.note\":\"7677475087663042ad60b6c6a646f7666bc10de3ecf4da822f1212e1eef2a2e0\",\"attributes.tool\":\"e9ccc5056e39e625ea4263444985f3a14687e8ff54079b9c407525abd7296dd1\",\"correlationId\":\"f17a1287cc1b62712bc41274eb2425f2d5739f084054a390d12ea9d61f76fd87\",\"principalId\":\"fa2e26315b76a1682f920aba4846584fb2b830d70288190ecb5e274a5fd99ce5\",\"reason\":\"236a1a5c8971daa76cced0c8eb4c7dd5313136b1ab0e46b11614c99a309bcfed\",\"target\":\"aadc1bae97a8782e2575cfdbb2bc69b2f3d36e8a528799404d4f988d0ed69a05\"},\"decision\":\"ALLOW\",\"delegationId\":null,\"format\":\"nexusphere-ledger/evidence/v2\",\"id\":\"00000000-0000-4000-8000-000000000001\",\"inputHash\":\"2b5d0b3f411d1034c27ebfe24ed50e9d476324550d5829590b09ed07a93003a5\",\"occurredAt\":\"2026-10-01T08:00:00.123456Z\",\"outcome\":\"SUCCEEDED\",\"outputHash\":null,\"recordedAt\":\"2026-10-01T08:00:00.128456Z\"}",
     "sequence" : 1,
     "previousHash" : "0000000000000000000000000000000000000000000000000000000000000000",
-    "contentHash" : "0376dd988da7c6518a282687d3788641e4f5cdd6e2ac3c102dcf2e507149fb61",
-    "hash" : "53e4f51168f9350f9591d67e01d52504af41afc35a8a398a97eeee18af52f581"
+    "contentHash" : "d12bc11977f59cc20483a9f3488337148575165671f1a251cd4fe297e0a97eaa",
+    "hash" : "bbb7b3f48c786298b34ecb08dab9c7f2ae53b9121189c720f2478660d05ad302"
   }, {
-    "content" : {
-      "format" : "nexusphere-ledger/evidence/v1",
-      "id" : "00000000-0000-4000-8000-000000000002",
-      "occurredAt" : "2026-10-01T08:00:01.123456Z",
-      "recordedAt" : "2026-10-01T08:00:01.128456Z",
-      "agentId" : "invoice-agent",
+    "values" : {
       "principalId" : "acme",
-      "action" : "tools/call",
       "target" : "pay_invoice",
-      "decision" : "DENY",
       "reason" : "NOT_COVERED",
-      "delegationId" : null,
-      "inputHash" : "8e5a014d886c935a5d6061c7fb5d19f2036c72f8b0d60ab0ea08c8996a80bcb5",
-      "outputHash" : null,
-      "outcome" : "DENIED",
       "correlationId" : "conversation-1",
       "attributes" : {
         "note" : "café ✓",
         "tool" : "pay_invoice"
       }
     },
-    "canonicalContent" : "{\"action\":\"tools/call\",\"agentId\":\"invoice-agent\",\"attributes\":{\"note\":\"café ✓\",\"tool\":\"pay_invoice\"},\"correlationId\":\"conversation-1\",\"decision\":\"DENY\",\"delegationId\":null,\"format\":\"nexusphere-ledger/evidence/v1\",\"id\":\"00000000-0000-4000-8000-000000000002\",\"inputHash\":\"8e5a014d886c935a5d6061c7fb5d19f2036c72f8b0d60ab0ea08c8996a80bcb5\",\"occurredAt\":\"2026-10-01T08:00:01.123456Z\",\"outcome\":\"DENIED\",\"outputHash\":null,\"principalId\":\"acme\",\"reason\":\"NOT_COVERED\",\"recordedAt\":\"2026-10-01T08:00:01.128456Z\",\"target\":\"pay_invoice\"}",
-    "sequence" : 2,
-    "previousHash" : "53e4f51168f9350f9591d67e01d52504af41afc35a8a398a97eeee18af52f581",
-    "contentHash" : "2a104ba9db2b61afe08e66f717fff47fd11d66634499b313ff7ce40b3a3a0a23",
-    "hash" : "3079b54510e7e3da2650568420f29f96ac6241558fac858b8297d806c1ab1cf9"
-  }, {
+    "salts" : {
+      "attributes.note" : "flB4QVaGd0c1saC203Un6A",
+      "attributes.tool" : "qsSXshxya4SBkBOa4SRy7g",
+      "correlationId" : "0BCyLbp_sRjuoYQpmC7IvQ",
+      "principalId" : "-ht81Hp-XyrW_e8ehBsh2Q",
+      "reason" : "84oEfsEZcexldFQPnebpyg",
+      "target" : "wVCbSjDhJ5Jk-5UbbLzMnQ"
+    },
     "content" : {
-      "format" : "nexusphere-ledger/evidence/v1",
-      "id" : "00000000-0000-4000-8000-000000000003",
-      "occurredAt" : "2026-10-01T08:00:02.123456Z",
-      "recordedAt" : "2026-10-01T08:00:02.128456Z",
-      "agentId" : "sales-agent",
-      "principalId" : "globex",
-      "action" : "a2a/send",
-      "target" : "supplier/sales",
-      "decision" : "ALLOW",
-      "reason" : null,
+      "format" : "nexusphere-ledger/evidence/v2",
+      "id" : "00000000-0000-4000-8000-000000000002",
+      "occurredAt" : "2026-10-01T08:00:01.123456Z",
+      "recordedAt" : "2026-10-01T08:00:01.128456Z",
+      "agentId" : "invoice-agent",
+      "action" : "tools/call",
+      "decision" : "DENY",
       "delegationId" : null,
-      "inputHash" : "7b38d7219cce79daa4f4c8a2ffc974f6da330b6b79e346244428dfb3c570d1ce",
+      "inputHash" : "8e5a014d886c935a5d6061c7fb5d19f2036c72f8b0d60ab0ea08c8996a80bcb5",
       "outputHash" : null,
-      "outcome" : "PENDING",
+      "outcome" : "DENIED",
+      "commitments" : {
+        "attributes.note" : "d5621dae2e00e7c737e4bb767f867bb88248c0ee050cf10007e57fb8642e8766",
+        "attributes.tool" : "119c6e2e33482eea0922e488f0dcc57211b8361002d5adf0ffa42e5009b8820c",
+        "correlationId" : "9487b28b17ba06c143a3efb34eadd8c8d6a5bc5a5bf1b15fd834cde737906244",
+        "principalId" : "35b77f40057f0b06a5fa621e695c7b308c7fe04ff07c6b3a15a718c93b0e45c1",
+        "reason" : "c51337e48d9df8bb3f46a917f22838854b349ea0aa72f3481659f671232fb6d4",
+        "target" : "a6111992e07d9708e94411c25d039c353b4e0a2c503a38661cdb7d1c1cea3a75"
+      }
+    },
+    "canonicalContent" : "{\"action\":\"tools/call\",\"agentId\":\"invoice-agent\",\"commitments\":{\"attributes.note\":\"d5621dae2e00e7c737e4bb767f867bb88248c0ee050cf10007e57fb8642e8766\",\"attributes.tool\":\"119c6e2e33482eea0922e488f0dcc57211b8361002d5adf0ffa42e5009b8820c\",\"correlationId\":\"9487b28b17ba06c143a3efb34eadd8c8d6a5bc5a5bf1b15fd834cde737906244\",\"principalId\":\"35b77f40057f0b06a5fa621e695c7b308c7fe04ff07c6b3a15a718c93b0e45c1\",\"reason\":\"c51337e48d9df8bb3f46a917f22838854b349ea0aa72f3481659f671232fb6d4\",\"target\":\"a6111992e07d9708e94411c25d039c353b4e0a2c503a38661cdb7d1c1cea3a75\"},\"decision\":\"DENY\",\"delegationId\":null,\"format\":\"nexusphere-ledger/evidence/v2\",\"id\":\"00000000-0000-4000-8000-000000000002\",\"inputHash\":\"8e5a014d886c935a5d6061c7fb5d19f2036c72f8b0d60ab0ea08c8996a80bcb5\",\"occurredAt\":\"2026-10-01T08:00:01.123456Z\",\"outcome\":\"DENIED\",\"outputHash\":null,\"recordedAt\":\"2026-10-01T08:00:01.128456Z\"}",
+    "sequence" : 2,
+    "previousHash" : "bbb7b3f48c786298b34ecb08dab9c7f2ae53b9121189c720f2478660d05ad302",
+    "contentHash" : "49eb6055a528546432d21dc3faf86ee3d0ab73c32af2a807f0baa7db8e975012",
+    "hash" : "57897fef3977b07c81af53399d91740e87e089e7a76b8995f1f818356e61db06"
+  }, {
+    "values" : {
+      "principalId" : "globex",
+      "target" : "supplier/sales",
+      "reason" : null,
       "correlationId" : "conversation-1",
       "attributes" : {
         "note" : "café ✓",
         "tool" : "supplier/sales"
       }
     },
-    "canonicalContent" : "{\"action\":\"a2a/send\",\"agentId\":\"sales-agent\",\"attributes\":{\"note\":\"café ✓\",\"tool\":\"supplier/sales\"},\"correlationId\":\"conversation-1\",\"decision\":\"ALLOW\",\"delegationId\":null,\"format\":\"nexusphere-ledger/evidence/v1\",\"id\":\"00000000-0000-4000-8000-000000000003\",\"inputHash\":\"7b38d7219cce79daa4f4c8a2ffc974f6da330b6b79e346244428dfb3c570d1ce\",\"occurredAt\":\"2026-10-01T08:00:02.123456Z\",\"outcome\":\"PENDING\",\"outputHash\":null,\"principalId\":\"globex\",\"reason\":null,\"recordedAt\":\"2026-10-01T08:00:02.128456Z\",\"target\":\"supplier/sales\"}",
+    "salts" : {
+      "attributes.note" : "coLa8MVDGLyVDjsP4WWnvg",
+      "attributes.tool" : "S6VrKdPGonedkSpO9Rprdg",
+      "correlationId" : "aB2N01Um2E2WaqLhb__Csg",
+      "principalId" : "iu_DMyt4PzqW_LpRhIM-LQ",
+      "reason" : "tSqjEoj9ofer-Uz1wRpwFQ",
+      "target" : "bT9omxzr4ouPS42gYjtlCQ"
+    },
+    "content" : {
+      "format" : "nexusphere-ledger/evidence/v2",
+      "id" : "00000000-0000-4000-8000-000000000003",
+      "occurredAt" : "2026-10-01T08:00:02.123456Z",
+      "recordedAt" : "2026-10-01T08:00:02.128456Z",
+      "agentId" : "sales-agent",
+      "action" : "a2a/send",
+      "decision" : "ALLOW",
+      "delegationId" : null,
+      "inputHash" : "7b38d7219cce79daa4f4c8a2ffc974f6da330b6b79e346244428dfb3c570d1ce",
+      "outputHash" : null,
+      "outcome" : "PENDING",
+      "commitments" : {
+        "attributes.note" : "0b9298e43a8751df4d1d419efeaba2bfcc1df8b4984d9392e96ca4fceab01cac",
+        "attributes.tool" : "fe83e59a720a2e6b2a6ef7a81eb02807375d117bdf540e97ca7f80ca259c12c1",
+        "correlationId" : "7f2eb69120b190d6a321922e50830fc981977e45e573503b652d8b178edb9626",
+        "principalId" : "5b9499c1d5a9ee70f224735384c4a563e52bc5c1a062c874a2897bd770590633",
+        "reason" : "46973e7430af314b775037b45a4d1bdc34d2d0e22f2999e10119943ac87e7fcf",
+        "target" : "7aee818f0632a3c91ac3740fffd6905e5a8ff20636c5ba07ebe70631b30ae6bd"
+      }
+    },
+    "canonicalContent" : "{\"action\":\"a2a/send\",\"agentId\":\"sales-agent\",\"commitments\":{\"attributes.note\":\"0b9298e43a8751df4d1d419efeaba2bfcc1df8b4984d9392e96ca4fceab01cac\",\"attributes.tool\":\"fe83e59a720a2e6b2a6ef7a81eb02807375d117bdf540e97ca7f80ca259c12c1\",\"correlationId\":\"7f2eb69120b190d6a321922e50830fc981977e45e573503b652d8b178edb9626\",\"principalId\":\"5b9499c1d5a9ee70f224735384c4a563e52bc5c1a062c874a2897bd770590633\",\"reason\":\"46973e7430af314b775037b45a4d1bdc34d2d0e22f2999e10119943ac87e7fcf\",\"target\":\"7aee818f0632a3c91ac3740fffd6905e5a8ff20636c5ba07ebe70631b30ae6bd\"},\"decision\":\"ALLOW\",\"delegationId\":null,\"format\":\"nexusphere-ledger/evidence/v2\",\"id\":\"00000000-0000-4000-8000-000000000003\",\"inputHash\":\"7b38d7219cce79daa4f4c8a2ffc974f6da330b6b79e346244428dfb3c570d1ce\",\"occurredAt\":\"2026-10-01T08:00:02.123456Z\",\"outcome\":\"PENDING\",\"outputHash\":null,\"recordedAt\":\"2026-10-01T08:00:02.128456Z\"}",
     "sequence" : 3,
-    "previousHash" : "3079b54510e7e3da2650568420f29f96ac6241558fac858b8297d806c1ab1cf9",
-    "contentHash" : "dbe4223b7fda207367360c4bb39e6a5124536c5be00cf157664592ae739da028",
-    "hash" : "ca62ed950833916f1fc3b62fabae7fbc0e1498ac690c920a20a741926545177a"
+    "previousHash" : "57897fef3977b07c81af53399d91740e87e089e7a76b8995f1f818356e61db06",
+    "contentHash" : "b55646ae40c381e4da38c46721f566a3a5b63b8ca577c870b8d864febedca3fa",
+    "hash" : "bab1fd8734a3a6bb7bb7431c5b8f35e26640fc32106ab2054f8c27416e4c074b"
   } ],
   "checkpoint" : {
-    "signedBytes" : "{\"createdAt\":\"2026-10-01T08:01:00.123456Z\",\"format\":\"nexusphere-ledger/checkpoint/v1\",\"headHash\":\"ca62ed950833916f1fc3b62fabae7fbc0e1498ac690c920a20a741926545177a\",\"keyId\":\"06e3fd8fda29bb60\",\"sequence\":3}",
-    "signature" : "3kzbNTuhx4g84JCuQmvzU0xKKZGTRk9CvbTGdG+aI330L8621ChZwUkiou5l+IaO/RLcZ+DkM+CCP6p+hCBBAg=="
+    "signature" : "M7Ufy0v6qVfPofuE8EIP+4pCCszYP5vF/ej4cQ/ktPUaeDDhIf3uhHqtA7z9QGr01siJ/Pq3Sz2nQmArEelYDA==",
+    "signedBytes" : "{\"createdAt\":\"2026-10-01T08:01:00.123456Z\",\"format\":\"nexusphere-ledger/checkpoint/v1\",\"headHash\":\"bab1fd8734a3a6bb7bb7431c5b8f35e26640fc32106ab2054f8c27416e4c074b\",\"keyId\":\"06e3fd8fda29bb60\",\"sequence\":3}"
   }
 }

@@ -1,5 +1,6 @@
 package com.nexusphere.ledger.evidence.infrastructure.persistence;
 
+import com.nexusphere.ledger.chain.CanonicalJson;
 import com.nexusphere.ledger.chain.EvidenceEntry;
 import com.nexusphere.ledger.evidence.domain.model.EvidenceQuery;
 import com.nexusphere.ledger.evidence.domain.model.LedgerHead;
@@ -8,16 +9,18 @@ import com.nexusphere.ledger.evidence.domain.repository.EvidenceRepository;
 import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 import org.springframework.stereotype.Repository;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.json.JsonMapper;
 
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Timestamp;
 import java.time.Instant;
-import java.util.ArrayList;
-import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.SortedMap;
 import java.util.TreeMap;
 import java.util.UUID;
 
@@ -25,15 +28,22 @@ import java.util.UUID;
 class JdbcEvidenceRepository implements EvidenceRepository {
 
     private static final String SELECT = """
-            select id, sequence, occurred_at, recorded_at, agent_id, principal_id, action, target, decision, reason,
-                   delegation_id, input_hash, output_hash, outcome, correlation_id, previous_hash, hash
-            from ledger.evidence_record
+            select r.id, r.sequence, r.occurred_at, r.recorded_at, r.agent_id, r.action, r.decision, r.delegation_id,
+                   r.input_hash, r.output_hash, r.outcome, r.commitments, r.previous_hash, r.hash,
+                   p.nonce, p.ciphertext, k.data_key
+            from ledger.evidence_record r
+            left join ledger.evidence_personal p on p.evidence_id = r.id
+            left join ledger.principal_key k on k.principal_ref = p.principal_ref
             """;
+    private static final String PRINCIPAL = "(select principal_ref from ledger.principal_key"
+            + " where principal_id = :principalId)";
 
     private final NamedParameterJdbcTemplate jdbc;
+    private final JsonMapper json;
 
-    JdbcEvidenceRepository(NamedParameterJdbcTemplate jdbc) {
+    JdbcEvidenceRepository(NamedParameterJdbcTemplate jdbc, JsonMapper json) {
         this.jdbc = jdbc;
+        this.json = json;
     }
 
     @Override
@@ -50,69 +60,76 @@ class JdbcEvidenceRepository implements EvidenceRepository {
 
     @Override
     public void append(EvidenceEntry entry) {
+        PrincipalKey key = principalKey(entry.principalId());
         jdbc.update("""
-                insert into ledger.evidence_record (id, sequence, occurred_at, recorded_at, agent_id, principal_id,
-                    action, target, decision, reason, delegation_id, input_hash, output_hash, outcome, correlation_id,
-                    previous_hash, hash)
-                values (:id, :sequence, :occurredAt, :recordedAt, :agentId, :principalId, :action, :target, :decision,
-                    :reason, :delegationId, :inputHash, :outputHash, :outcome, :correlationId, :previousHash, :hash)
+                insert into ledger.evidence_record (id, sequence, occurred_at, recorded_at, agent_id, principal_ref,
+                    action, decision, delegation_id, input_hash, output_hash, outcome, commitments, previous_hash,
+                    hash)
+                values (:id, :sequence, :occurredAt, :recordedAt, :agentId, :principalRef, :action, :decision,
+                    :delegationId, :inputHash, :outputHash, :outcome, :commitments, :previousHash, :hash)
                 """, new MapSqlParameterSource()
                 .addValue("id", entry.id())
                 .addValue("sequence", entry.sequence())
                 .addValue("occurredAt", Timestamp.from(entry.occurredAt()))
                 .addValue("recordedAt", Timestamp.from(entry.recordedAt()))
                 .addValue("agentId", entry.agentId())
-                .addValue("principalId", entry.principalId())
+                .addValue("principalRef", key.ref())
                 .addValue("action", entry.action())
-                .addValue("target", entry.target())
                 .addValue("decision", entry.decision())
-                .addValue("reason", entry.reason())
                 .addValue("delegationId", entry.delegationId())
                 .addValue("inputHash", entry.inputHash())
                 .addValue("outputHash", entry.outputHash())
                 .addValue("outcome", entry.outcome())
-                .addValue("correlationId", entry.correlationId())
+                .addValue("commitments", CanonicalJson.write(entry.commitments()))
                 .addValue("previousHash", entry.previousHash())
                 .addValue("hash", entry.hash()));
-        entry.attributes().forEach((name, value) -> jdbc.update("""
-                insert into ledger.evidence_attribute (evidence_id, name, value) values (:id, :name, :value)
-                """, Map.of("id", entry.id(), "name", name, "value", value)));
+        PersonalCipher.Sealed sealed = PersonalCipher.seal(key.dataKey(), entry.id(), personal(entry));
+        jdbc.update("""
+                insert into ledger.evidence_personal (evidence_id, principal_ref, nonce, ciphertext)
+                values (:id, :principalRef, :nonce, :ciphertext)
+                """, new MapSqlParameterSource("id", entry.id()).addValue("principalRef", key.ref())
+                .addValue("nonce", sealed.nonce()).addValue("ciphertext", sealed.ciphertext()));
         jdbc.update("update ledger.ledger_head set sequence = :sequence, hash = :hash where id = 1",
                 Map.of("sequence", entry.sequence(), "hash", entry.hash()));
     }
 
     @Override
     public Optional<EvidenceEntry> findById(UUID id) {
-        return single(SELECT + " where id = :id", new MapSqlParameterSource("id", id));
+        return single(SELECT + " where r.id = :id", new MapSqlParameterSource("id", id));
     }
 
     @Override
     public Optional<EvidenceEntry> findBySequence(long sequence) {
-        return single(SELECT + " where sequence = :sequence", new MapSqlParameterSource("sequence", sequence));
+        return single(SELECT + " where r.sequence = :sequence", new MapSqlParameterSource("sequence", sequence));
+    }
+
+    @Override
+    public Optional<EvidenceEntry> latestByAction(String action) {
+        return single(SELECT + " where r.action = :action order by r.sequence desc limit 1",
+                new MapSqlParameterSource("action", action));
     }
 
     @Override
     public List<EvidenceEntry> find(EvidenceQuery query) {
-        StringBuilder sql = new StringBuilder(SELECT).append(" where sequence > :after");
+        StringBuilder sql = new StringBuilder(SELECT).append(" where r.sequence > :after");
         MapSqlParameterSource params = new MapSqlParameterSource("after", query.afterSequence())
                 .addValue("limit", query.limit());
         if (query.agentId() != null) {
-            sql.append(" and agent_id = :agentId");
+            sql.append(" and r.agent_id = :agentId");
             params.addValue("agentId", query.agentId());
         }
         if (query.principalId() != null) {
-            sql.append(" and principal_id = :principalId");
+            sql.append(" and r.principal_ref = ").append(PRINCIPAL);
             params.addValue("principalId", query.principalId());
         }
-        sql.append(" order by sequence limit :limit");
-        return withAttributes(jdbc.query(sql.toString(), params, JdbcEvidenceRepository::row));
+        sql.append(" order by r.sequence limit :limit");
+        return jdbc.query(sql.toString(), params, this::row);
     }
 
     @Override
     public List<EvidenceEntry> range(long afterSequence, int limit) {
-        return withAttributes(jdbc.query(SELECT + " where sequence > :after order by sequence limit :limit",
-                new MapSqlParameterSource("after", afterSequence).addValue("limit", limit),
-                JdbcEvidenceRepository::row));
+        return jdbc.query(SELECT + " where r.sequence > :after order by r.sequence limit :limit",
+                new MapSqlParameterSource("after", afterSequence).addValue("limit", limit), this::row);
     }
 
     @Override
@@ -127,58 +144,79 @@ class JdbcEvidenceRepository implements EvidenceRepository {
             params.addValue("agentId", agentId);
         }
         if (principalId != null) {
-            sql.append(" and principal_id = :principalId");
+            sql.append(" and principal_ref = ").append(PRINCIPAL);
             params.addValue("principalId", principalId);
         }
         return jdbc.queryForObject(sql.toString(), params, (rs, row) -> new Selection(rs.getLong("selected"),
                 rs.getLong("first"), rs.getLong("last")));
     }
 
+    private record PrincipalKey(UUID ref, byte[] dataKey) {
+    }
+
+    private PrincipalKey principalKey(String principalId) {
+        Map<String, Object> params = Map.of("principalId", principalId);
+        String select = "select principal_ref, data_key from ledger.principal_key where principal_id = :principalId";
+        List<PrincipalKey> found = jdbc.query(select, params,
+                (rs, row) -> new PrincipalKey(rs.getObject("principal_ref", UUID.class), rs.getBytes("data_key")));
+        if (!found.isEmpty()) {
+            return found.getFirst();
+        }
+        jdbc.update("""
+                insert into ledger.principal_key (principal_ref, principal_id, data_key, created_at)
+                values (:ref, :principalId, :key, now()) on conflict (principal_id) do nothing
+                """, new MapSqlParameterSource("ref", UUID.randomUUID()).addValue("principalId", principalId)
+                .addValue("key", PersonalCipher.newKey()));
+        return jdbc.queryForObject(select, params,
+                (rs, row) -> new PrincipalKey(rs.getObject("principal_ref", UUID.class), rs.getBytes("data_key")));
+    }
+
+    private byte[] personal(EvidenceEntry entry) {
+        Map<String, Object> personal = new LinkedHashMap<>();
+        personal.put("principalId", entry.principalId());
+        personal.put("target", entry.target());
+        personal.put("reason", entry.reason());
+        personal.put("correlationId", entry.correlationId());
+        personal.put("attributes", entry.attributes());
+        personal.put("salts", entry.salts());
+        return json.writeValueAsBytes(personal);
+    }
+
     private Optional<EvidenceEntry> single(String sql, MapSqlParameterSource params) {
-        return withAttributes(jdbc.query(sql, params, JdbcEvidenceRepository::row)).stream().findFirst();
+        return jdbc.query(sql, params, this::row).stream().findFirst();
     }
 
-    private List<EvidenceEntry> withAttributes(List<EvidenceEntry> entries) {
-        if (entries.isEmpty()) {
-            return entries;
+    private EvidenceEntry row(ResultSet rs, int row) throws SQLException {
+        UUID id = rs.getObject("id", UUID.class);
+        SortedMap<String, String> commitments = strings(json.readTree(rs.getString("commitments")));
+        byte[] key = rs.getBytes("data_key");
+        byte[] ciphertext = rs.getBytes("ciphertext");
+        if (key == null || ciphertext == null) {
+            return new EvidenceEntry(id, rs.getLong("sequence"), instant(rs, "occurred_at"),
+                    instant(rs, "recorded_at"), rs.getString("agent_id"), null, rs.getString("action"), null,
+                    rs.getString("decision"), null, rs.getString("delegation_id"), rs.getString("input_hash"),
+                    rs.getString("output_hash"), rs.getString("outcome"), null, null, null, commitments,
+                    rs.getString("previous_hash"), rs.getString("hash"));
         }
-        Map<UUID, TreeMap<String, String>> attributes = new HashMap<>();
-        jdbc.query("select evidence_id, name, value from ledger.evidence_attribute where evidence_id in (:ids)",
-                Map.of("ids", entries.stream().map(EvidenceEntry::id).toList()),
-                rs -> {
-                    attributes.computeIfAbsent(rs.getObject("evidence_id", UUID.class), id -> new TreeMap<>())
-                            .put(rs.getString("name"), rs.getString("value"));
-                });
-        List<EvidenceEntry> result = new ArrayList<>(entries.size());
-        for (EvidenceEntry e : entries) {
-            result.add(new EvidenceEntry(e.id(), e.sequence(), e.occurredAt(), e.recordedAt(), e.agentId(),
-                    e.principalId(), e.action(), e.target(), e.decision(), e.reason(), e.delegationId(),
-                    e.inputHash(), e.outputHash(), e.outcome(), e.correlationId(),
-                    attributes.getOrDefault(e.id(), new TreeMap<>()), e.previousHash(), e.hash()));
-        }
-        return result;
+        JsonNode personal = json.readTree(PersonalCipher.open(key, id, rs.getBytes("nonce"), ciphertext));
+        return new EvidenceEntry(id, rs.getLong("sequence"), instant(rs, "occurred_at"), instant(rs, "recorded_at"),
+                rs.getString("agent_id"), text(personal, "principalId"), rs.getString("action"),
+                text(personal, "target"), rs.getString("decision"), text(personal, "reason"),
+                rs.getString("delegation_id"), rs.getString("input_hash"), rs.getString("output_hash"),
+                rs.getString("outcome"), text(personal, "correlationId"), strings(personal.path("attributes")),
+                strings(personal.path("salts")), null, rs.getString("previous_hash"), rs.getString("hash"));
     }
 
-    private static EvidenceEntry row(ResultSet rs, int row) throws SQLException {
-        return new EvidenceEntry(
-                rs.getObject("id", UUID.class),
-                rs.getLong("sequence"),
-                instant(rs, "occurred_at"),
-                instant(rs, "recorded_at"),
-                rs.getString("agent_id"),
-                rs.getString("principal_id"),
-                rs.getString("action"),
-                rs.getString("target"),
-                rs.getString("decision"),
-                rs.getString("reason"),
-                rs.getString("delegation_id"),
-                rs.getString("input_hash"),
-                rs.getString("output_hash"),
-                rs.getString("outcome"),
-                rs.getString("correlation_id"),
-                new TreeMap<>(),
-                rs.getString("previous_hash"),
-                rs.getString("hash"));
+    private static SortedMap<String, String> strings(JsonNode node) {
+        SortedMap<String, String> map = new TreeMap<>();
+        node.propertyNames().forEach(name -> map.put(name, node.path(name).isNull() ? null
+                : node.path(name).asString()));
+        return map;
+    }
+
+    private static String text(JsonNode node, String field) {
+        JsonNode value = node.path(field);
+        return value.isNull() || value.isMissingNode() ? null : value.asString();
     }
 
     private static Instant instant(ResultSet rs, String column) throws SQLException {

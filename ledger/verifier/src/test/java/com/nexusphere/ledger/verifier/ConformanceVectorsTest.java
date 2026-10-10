@@ -45,6 +45,7 @@ import java.time.Instant;
 import java.time.ZoneOffset;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Base64;
 import java.util.HexFormat;
 import java.util.LinkedHashMap;
@@ -104,14 +105,31 @@ class ConformanceVectorsTest {
             TreeMap<String, String> attributes = new TreeMap<>();
             attributes.put("tool", a[3]);
             attributes.put("note", "café ✓");
+            TreeMap<String, String> salts = new TreeMap<>();
+            for (String field : List.of("principalId", "target", "reason", "correlationId", "attributes.tool",
+                    "attributes.note")) {
+                byte[] digest = HEX.parseHex(Hashes.sha256(("salt/" + (i + 1) + "/" + field)
+                        .getBytes(StandardCharsets.UTF_8)));
+                salts.put(field, Base64.getUrlEncoder().withoutPadding().encodeToString(Arrays.copyOf(digest, 16)));
+            }
             EvidenceEntry entry = new EvidenceEntry(UUID.fromString("00000000-0000-4000-8000-00000000000" + (i + 1)),
                     i + 1, T0.plusSeconds(i), T0.plusSeconds(i).plusMillis(5), a[0], a[1], a[2], a[3], a[4], a[5],
-                    null, Hashes.sha256(a[3].getBytes()), null, a[6], "conversation-1", attributes, previous, null)
-                    .sealed();
+                    null, Hashes.sha256(a[3].getBytes()), null, a[6], "conversation-1", attributes, salts, null,
+                    previous, null).sealed();
             entries.add(entry);
             previous = entry.hash();
         }
         return entries;
+    }
+
+    private static Map<String, Object> values(EvidenceEntry entry) {
+        Map<String, Object> values = new LinkedHashMap<>();
+        values.put("principalId", entry.principalId());
+        values.put("target", entry.target());
+        values.put("reason", entry.reason());
+        values.put("correlationId", entry.correlationId());
+        values.put("attributes", entry.attributes());
+        return values;
     }
 
     private static List<byte[]> leaves(List<EvidenceEntry> entries) {
@@ -169,6 +187,8 @@ class ConformanceVectorsTest {
         List<Map<String, Object>> v = new ArrayList<>();
         for (EvidenceEntry entry : entries()) {
             Map<String, Object> item = new LinkedHashMap<>();
+            item.put("values", values(entry));
+            item.put("salts", entry.salts());
             item.put("content", entry.canonicalContent());
             item.put("canonicalContent", CanonicalJson.write(entry.canonicalContent()));
             item.put("sequence", entry.sequence());

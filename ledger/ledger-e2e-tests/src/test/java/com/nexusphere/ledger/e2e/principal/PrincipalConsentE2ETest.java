@@ -250,7 +250,7 @@ class PrincipalConsentE2ETest {
         assertThat(listed.findValuesAsString("id")).doesNotContain(grantId);
         assertThat(malloryEvidence.findValuesAsString("target")).doesNotContain(grantId);
         assertThat(erinEvidence.findValuesAsString("target")).contains(grantId);
-        assertThat(erinEvidence.findValuesAsString("principalId")).containsOnly("erin");
+        assertThat(erinEvidence.valueStream().map(item -> item.path("principalId").asString())).containsOnly("erin");
         assertThat(as(erin).get("/api/v1/principal/grants/" + grantId).json().path("status").asString())
                 .isEqualTo("PENDING");
     }

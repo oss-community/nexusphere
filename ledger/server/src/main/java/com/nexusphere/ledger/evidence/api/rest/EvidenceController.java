@@ -68,14 +68,17 @@ class EvidenceController {
             String outcome,
             String correlationId,
             Map<String, String> attributes,
+            boolean erased,
+            Map<String, String> salts,
+            Map<String, String> commitments,
             String previousHash,
             String hash) {
 
         static EvidenceResponse of(EvidenceEntry e) {
             return new EvidenceResponse(EvidenceEntry.FORMAT, e.id(), e.sequence(), e.occurredAt(), e.recordedAt(),
                     e.agentId(), e.principalId(), e.action(), e.target(), e.decision(), e.reason(), e.delegationId(),
-                    e.inputHash(), e.outputHash(), e.outcome(), e.correlationId(), e.attributes(), e.previousHash(),
-                    e.hash());
+                    e.inputHash(), e.outputHash(), e.outcome(), e.correlationId(), e.attributes(), e.erased(),
+                    e.salts(), e.commitments(), e.previousHash(), e.hash());
         }
     }
 

@@ -8,6 +8,7 @@ import {
   GENESIS,
   Json,
   contentHash,
+  erased,
   long,
   nullable,
   required,
@@ -374,7 +375,7 @@ async function disclosedMismatch(
     sequence < low ||
     sequence > high ||
     (agentId !== null && agentId !== nullable(entry, "agentId")) ||
-    (principalId !== null && principalId !== nullable(entry, "principalId"))
+    (principalId !== null && !erased(entry) && principalId !== nullable(entry, "principalId"))
   ) {
     return "the disclosed entry is outside the scope of the package";
   }

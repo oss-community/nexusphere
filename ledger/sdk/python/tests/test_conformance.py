@@ -4,8 +4,8 @@ import unittest
 from nexusphere_ledger import merkle
 from nexusphere_ledger.canonical import canonical_json, sha256_hex
 from nexusphere_ledger.cose import EvidenceStatement, LogReceipt
-from nexusphere_ledger.evidence import (ChainVerifier, Checkpoint, EvidenceLink, canonical_content, content_hash,
-                                        link_hash)
+from nexusphere_ledger.evidence import (ChainVerifier, Checkpoint, EvidenceLink, canonical_content, commitments,
+                                        content_hash, link_hash)
 from nexusphere_ledger.keys import (KeyRevocation, KeyRotation, PrivateKey, PublicKey, signed_revocation_bytes,
                                     signed_rotation_bytes, trusted_and_revoked)
 from nexusphere_ledger.mandate import (KEY_BINDING_INVALID, KEY_BINDING_MISSING, MandateVerifier, StaticKeys,
@@ -16,8 +16,18 @@ from .support import ISSUER, LEDGER_KEY, ORIGIN, WITNESS, WITNESS_KEY, vector
 
 
 def chain_entries():
-    return [dict(item["content"], sequence=item["sequence"], previousHash=item["previousHash"], hash=item["hash"])
-            for item in vector("evidence-chain.json")["entries"]]
+    entries = []
+    for item in vector("evidence-chain.json")["entries"]:
+        entry = {key: value for key, value in item["content"].items() if key != "commitments"}
+        entry.update(item["values"], salts=item["salts"], sequence=item["sequence"],
+                     previousHash=item["previousHash"], hash=item["hash"])
+        entries.append(entry)
+    return entries
+
+
+def erased_entries():
+    return [dict(item["content"], sequence=item["sequence"], previousHash=item["previousHash"], hash=item["hash"],
+                 salts=None) for item in vector("evidence-chain.json")["entries"]]
 
 
 class KeysVector(unittest.TestCase):
@@ -75,6 +85,17 @@ class EvidenceChainVector(unittest.TestCase):
         self.assertFalse(verifier.accept(entries[1]))
         self.assertEqual(2, verifier.result().failed_sequence)
         self.assertEqual("content does not match its hash", verifier.result().failure)
+
+    def test_commitments(self):
+        for item, entry in zip(vector("evidence-chain.json")["entries"], chain_entries()):
+            self.assertEqual(item["content"]["commitments"], commitments(entry))
+
+    def test_erased_entries_keep_their_hashes(self):
+        verifier = ChainVerifier()
+        for item, entry in zip(vector("evidence-chain.json")["entries"], erased_entries()):
+            self.assertEqual(item["contentHash"], content_hash(entry))
+            self.assertTrue(verifier.accept(entry))
+        self.assertTrue(verifier.result().valid)
 
 
 class ComplianceCheckpointVector(unittest.TestCase):

@@ -10,6 +10,7 @@ export interface Entry {
   target: string | null
   decision: string | null
   outcome: string
+  erased: boolean
 }
 
 export interface Verification {
@@ -82,5 +83,6 @@ function entriesOf(pkg: Record<string, unknown>): Entry[] {
       target: entry.target == null ? null : String(entry.target),
       decision: entry.decision == null ? null : String(entry.decision),
       outcome: String(entry.outcome ?? ''),
+      erased: !entry.salts || typeof entry.salts !== 'object',
     }))
 }

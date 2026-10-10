@@ -148,7 +148,9 @@ the pinned key. Pass `key_list` with the list from `GET /api/v1/keys` to apply k
 [Ledger README](../../README.md#key-revocation) describes; the command takes it as `--keys keys.json`.
 `report.to_dict()` has the same fields as the Java `PackageReport`. `report.compliance_profiles` lists the id and
 digest of each [compliance profile](../../README.md#compliance-profiles) the checkpoint signs, and
-`client.compliance()` returns the active profiles and their combined rules from the ledger.
+`client.compliance()` returns the active profiles and their combined rules from the ledger. An entry whose personal
+fields were [erased](../../README.md#erasure) still verifies from its commitments, and
+`client.erase_principal(principal_id, reason)` asks the ledger to erase a principal.
 
 </p>
 
@@ -264,7 +266,7 @@ nexusphere-ledger-verify mandate --issuer http://localhost:8090 --audience https
 |-------------|--------------------------------------------------------------------------------------------------|
 | `client`    | `LedgerClient` for evidence, batches, decisions, `act`, grants, mandates, packages, keys, proofs |
 | `package`   | `verify_package` and `PackageReport`                                                             |
-| `evidence`  | Content and link hashes, `ChainVerifier`, `Checkpoint` with its compliance profiles              |
+| `evidence`  | Content and link hashes, commitments, `ChainVerifier`, `Checkpoint` with its compliance profiles |
 | `merkle`    | RFC 9162 roots, inclusion and consistency proofs                                                 |
 | `note`      | C2SP signed notes, note keys and `tlog-cosignature/v1` cosignatures                              |
 | `cose`      | `CoseSign1`, SCITT `EvidenceStatement` and RFC 9942 `LogReceipt`                                 |

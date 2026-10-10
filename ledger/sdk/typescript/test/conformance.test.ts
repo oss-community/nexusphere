@@ -19,6 +19,7 @@ import {
   StaticKeys,
   canonicalContent,
   canonicalJson,
+  commitments,
   contentHash,
   cosign,
   fromHex,
@@ -39,8 +40,23 @@ import {
 import { ISSUER, LEDGER_KEY, ORIGIN, WITNESS, WITNESS_KEY, vector } from "./support.js";
 
 function chainEntries(): Json[] {
+  return vector("evidence-chain.json").entries.map((item: any) => {
+    const { commitments: _, ...content } = item.content;
+    return {
+      ...content,
+      ...item.values,
+      salts: item.salts,
+      sequence: item.sequence,
+      previousHash: item.previousHash,
+      hash: item.hash,
+    };
+  });
+}
+
+function erasedEntries(): Json[] {
   return vector("evidence-chain.json").entries.map((item: any) => ({
     ...item.content,
+    salts: null,
     sequence: item.sequence,
     previousHash: item.previousHash,
     hash: item.hash,
@@ -80,7 +96,8 @@ describe("evidence-chain.json", () => {
     const entries = chainEntries();
     for (let i = 0; i < entries.length; i++) {
       const item = v.entries[i];
-      expect(canonicalJson(canonicalContent(entries[i]))).toBe(item.canonicalContent);
+      expect(canonicalJson(await canonicalContent(entries[i]))).toBe(item.canonicalContent);
+      expect(await commitments(entries[i])).toEqual(item.content.commitments);
       expect(await contentHash(entries[i])).toBe(item.contentHash);
       expect(await linkHash(item.sequence, item.previousHash, item.contentHash)).toBe(item.hash);
       expect(await verifier.accept(entries[i])).toBe(true);
@@ -117,6 +134,17 @@ describe("evidence-chain.json", () => {
     expect(await verifier.accept(entries[0])).toBe(true);
     expect(await verifier.accept(entries[1])).toBe(false);
     expect(verifier.result()).toMatchObject({ failedSequence: 2, failure: "content does not match its hash" });
+  });
+
+  it("keeps the hashes of erased entries", async () => {
+    const v = vector("evidence-chain.json");
+    const verifier = new ChainVerifier();
+    const entries = erasedEntries();
+    for (let i = 0; i < entries.length; i++) {
+      expect(await contentHash(entries[i])).toBe(v.entries[i].contentHash);
+      expect(await verifier.accept(entries[i])).toBe(true);
+    }
+    expect(verifier.result()).toMatchObject({ valid: true, checkedEntries: 3 });
   });
 });
 
