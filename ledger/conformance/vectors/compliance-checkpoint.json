@@ -1,0 +1,42 @@
+{
+  "description" : "A checkpoint that signs the active compliance profiles, signed with test key 1",
+  "profile" : {
+    "id" : "example",
+    "version" : 1,
+    "name" : "Example jurisdiction",
+    "description" : "A profile used only by the conformance vectors.",
+    "retention" : [ {
+      "actions" : "*",
+      "minimum" : "P6M"
+    }, {
+      "actions" : "mcp/*",
+      "minimum" : "P5Y"
+    } ],
+    "erasure" : {
+      "onRequest" : true,
+      "deadline" : "P1M"
+    },
+    "residency" : [ "eea" ],
+    "requiredFields" : [ "attributes.model", "target" ],
+    "timestampAuthorities" : [ "https://tsa.example" ],
+    "reports" : [ "dispute" ]
+  },
+  "canonicalProfile" : "{\"description\":\"A profile used only by the conformance vectors.\",\"erasure\":{\"deadline\":\"P1M\",\"onRequest\":true},\"id\":\"example\",\"name\":\"Example jurisdiction\",\"reports\":[\"dispute\"],\"requiredFields\":[\"attributes.model\",\"target\"],\"residency\":[\"eea\"],\"retention\":[{\"actions\":\"*\",\"minimum\":\"P6M\"},{\"actions\":\"mcp/*\",\"minimum\":\"P5Y\"}],\"timestampAuthorities\":[\"https://tsa.example\"],\"version\":1}",
+  "profileDigest" : "fa840ef2b17e66ebcb2078dcf32013aa9a6f8d270b380bcfad94e17468ce6dd6",
+  "checkpoint" : {
+    "format" : "nexusphere-ledger/checkpoint/v2",
+    "sequence" : 3,
+    "headHash" : "ca62ed950833916f1fc3b62fabae7fbc0e1498ac690c920a20a741926545177a",
+    "createdAt" : "2026-10-01T08:01:00.123456Z",
+    "keyId" : "06e3fd8fda29bb60",
+    "profiles" : [ {
+      "id" : "baseline",
+      "digest" : "8ba8496a2525ae171ffd104d632dede6ef418d9b95962a9d88e2fcdbc8d48d24"
+    }, {
+      "id" : "example",
+      "digest" : "fa840ef2b17e66ebcb2078dcf32013aa9a6f8d270b380bcfad94e17468ce6dd6"
+    } ],
+    "signedBytes" : "{\"createdAt\":\"2026-10-01T08:01:00.123456Z\",\"format\":\"nexusphere-ledger/checkpoint/v2\",\"headHash\":\"ca62ed950833916f1fc3b62fabae7fbc0e1498ac690c920a20a741926545177a\",\"keyId\":\"06e3fd8fda29bb60\",\"profiles\":[{\"digest\":\"8ba8496a2525ae171ffd104d632dede6ef418d9b95962a9d88e2fcdbc8d48d24\",\"id\":\"baseline\"},{\"digest\":\"fa840ef2b17e66ebcb2078dcf32013aa9a6f8d270b380bcfad94e17468ce6dd6\",\"id\":\"example\"}],\"sequence\":3}",
+    "signature" : "zQUgXuqR7KJlXpMgMyFSzl941+eqnBP8RAaAaStCfEj+e+2tWkn7VNf3oUkEHeB8iRLTXVdDlLah1R/ilbMbCw=="
+  }
+}

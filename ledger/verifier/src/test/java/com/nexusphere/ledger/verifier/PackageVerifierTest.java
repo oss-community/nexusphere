@@ -93,6 +93,29 @@ class PackageVerifierTest {
     }
 
     @Test
+    void theSignedComplianceProfilesAreReportedAndCannotBeChanged() {
+        ObjectNode pkg = pkg(3, 1);
+        String keyId = SigningKeys.keyIdOf(KEYS.getPublic());
+        String digest = Hashes.sha256(new byte[]{7});
+        Checkpoint checkpoint = new Checkpoint(3, pkg.path("checkpoint").path("headHash").asString(), NOW, keyId,
+                List.of(new Checkpoint.Profile("eu", digest)));
+        ObjectNode node = (ObjectNode) pkg.path("checkpoint");
+        node.put("format", checkpoint.format()).put("signature",
+                SigningKeys.sign(KEYS.getPrivate(), checkpoint.signedBytes()));
+        node.putArray("profiles").addObject().put("id", "eu").put("digest", digest);
+
+        PackageReport report = PackageVerifier.verify(pkg, SigningKeys.encode(KEYS.getPublic()));
+
+        assertThat(report.problems()).isEmpty();
+        assertThat(report.complianceProfiles()).containsExactly(new Checkpoint.Profile("eu", digest));
+
+        ((ObjectNode) node.path("profiles").get(0)).put("id", "us");
+
+        assertThat(PackageVerifier.verify(pkg, SigningKeys.encode(KEYS.getPublic())).problems())
+                .anyMatch(p -> p.contains("signature of checkpoint 3"));
+    }
+
+    @Test
     void aChangedDisclosedEntryIsInvalid() {
         ObjectNode pkg = pkg(4, 2);
         ((ObjectNode) pkg.path("links").get(1).path("entry")).put("target", "delete_repository");

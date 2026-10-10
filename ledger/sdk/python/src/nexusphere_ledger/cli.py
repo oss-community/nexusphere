@@ -100,6 +100,9 @@ def _print_package(r, out):
         note = " (reached from pinned key %s through signed key rotations)" % r.pinned_key_id
     out.write("  Signing key : %s%s\n" % (r.key_id, note))
     out.write("  Checkpoint  : sequence %d, signed at %s\n" % (r.checkpoint_sequence, r.checkpoint_created_at))
+    if r.compliance_profiles:
+        out.write("  Compliance  : %s, signed in the checkpoint\n"
+                  % ", ".join("%s (%s)" % (p["id"], p["digest"][:12]) for p in r.compliance_profiles))
     out.write("  Anchor      : %s\n" % ("genesis" if r.anchor_sequence is None
                                        else "checkpoint %d" % r.anchor_sequence))
     out.write("  Chain       : %d links from sequence %d\n" % (r.checked_links, r.first_sequence))

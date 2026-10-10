@@ -13,6 +13,7 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.stream.Collectors;
 
 public final class VerifierCli {
 
@@ -107,6 +108,11 @@ public final class VerifierCli {
                 : r.pinnedKeyId().equals(r.keyId()) ? " (pinned)"
                 : " (reached from pinned key " + r.pinnedKeyId() + " through signed key rotations)"));
         out.println("  Checkpoint  : sequence " + r.checkpointSequence() + ", signed at " + r.checkpointCreatedAt());
+        if (!r.complianceProfiles().isEmpty()) {
+            out.println("  Compliance  : " + r.complianceProfiles().stream()
+                    .map(p -> p.id() + " (" + p.digest().substring(0, 12) + ")").collect(Collectors.joining(", "))
+                    + ", signed in the checkpoint");
+        }
         out.println("  Anchor      : " + (r.anchorSequence() == null ? "genesis" : "checkpoint " + r.anchorSequence()));
         out.println("  Chain       : " + r.checkedLinks() + " links from sequence " + r.firstSequence());
         out.println("  Disclosed   : " + r.disclosedEntries() + " entries"

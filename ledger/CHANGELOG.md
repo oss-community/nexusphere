@@ -50,6 +50,11 @@ agent platforms and gateways.
 * RFC 9421 HTTP message signatures with an RFC 9530 `Content-Digest` on every request the ledger sends to MCP
   servers, peer ledgers and A2A agents; the receiving ledger requires them, and the Java, Python and TypeScript SDKs
   sign and verify them, with an `http-signature.json` conformance vector
+* Compliance profiles: retention, erasure, region, required evidence fields, accepted timestamp authorities and
+  report templates per jurisdiction in JSON files, with `baseline`, `eu` and `us` built in and your own added from a
+  directory; the strictest rule of the active profiles wins, required fields are enforced, a disallowed region stops
+  the ledger, checkpoints sign the active profiles in format `checkpoint/v2`, and the verifiers report them, with a
+  `compliance-checkpoint.json` conformance vector
 * Browser verifier: one self-contained HTML page in React and TypeScript that verifies a package with the
   TypeScript SDK, pinned to the ledger key and optional witnesses, with a Content Security Policy that blocks every
   connection

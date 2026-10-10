@@ -44,6 +44,8 @@ on a random port that signs RS256 tokens for any principal.
 rotation happens at startup as it does in production. `VaultSigningE2ETest` adds a HashiCorp Vault container whose
 transit key signs, and `KeyRevocationE2ETest` adds a witness `StandaloneLedger` whose cosignatures prove which
 checkpoints of a revoked key came before its compromise.
+`ComplianceE2ETest` restarts a `StandaloneLedger` with different compliance profiles and regions against one
+PostgreSQL container, so profile changes are recorded once and a disallowed region stops the start.
 `WitnessE2ETest` starts two `StandaloneLedger`s with their own PostgreSQL containers: one is the log and asks the
 other, which watches it, to cosign its log checkpoints over the C2SP witness protocol.
 
@@ -133,6 +135,8 @@ other, which watches it, to cosign its log checkpoints over the C2SP witness pro
 | `VaultSigningE2ETest`     | A local key moves to Vault and a Vault rotation is followed                   |
 |                           | A wrong token or a key that is not Ed25519 is refused at startup              |
 | `KeyRevocationE2ETest`    | A revoked key stays valid only where witnesses prove the time                 |
+| `ComplianceE2ETest`       | The active profiles are enforced, signed in checkpoints and recorded          |
+|                           | A ledger outside the allowed region does not start                            |
 | `TransparencyLogE2ETest`  | The log checkpoint is a signed note over the Merkle root                      |
 |                           | An entry is proven in the signed tree                                         |
 |                           | A later tree is proven to extend an earlier one                               |

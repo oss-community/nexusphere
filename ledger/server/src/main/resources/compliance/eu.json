@@ -1,0 +1,29 @@
+{
+  "id": "eu",
+  "version": 1,
+  "name": "European Union",
+  "description": "A starting point for GDPR, DORA and the EU AI Act, not legal advice. Logs are kept at least six months (AI Act Articles 19 and 26(6)), personal data can be erased on request within one month (GDPR Articles 12(3) and 17), the data stays in the EEA, and each action names its target and input.",
+  "retention": [
+    {
+      "actions": "*",
+      "minimum": "P6M"
+    }
+  ],
+  "erasure": {
+    "onRequest": true,
+    "deadline": "P1M"
+  },
+  "residency": [
+    "eea"
+  ],
+  "requiredFields": [
+    "inputHash",
+    "target"
+  ],
+  "timestampAuthorities": [],
+  "reports": [
+    "dispute",
+    "dora-ict-records",
+    "eu-ai-act-logging"
+  ]
+}

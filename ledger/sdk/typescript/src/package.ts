@@ -3,6 +3,7 @@ import { EvidenceStatement, LogReceipt } from "./cose.js";
 import {
   ChainVerifier,
   Checkpoint,
+  ComplianceProfileRef,
   EvidenceLink,
   GENESIS,
   Json,
@@ -24,6 +25,7 @@ export interface PackageReport {
   anchorSequence: number | null;
   checkpointSequence: number;
   checkpointCreatedAt: string | null;
+  complianceProfiles: ComplianceProfileRef[];
   firstSequence: number;
   checkedLinks: number;
   disclosedEntries: number;
@@ -75,7 +77,7 @@ export async function verifyPackage(
   const requiredWitnesses = options.requiredWitnesses ?? witnessKeys.length;
   const problems: string[] = [];
   const scope = isObject(pkg.scope) ? (pkg.scope as Json) : {};
-  const empty = (): PackageReport => report(false, null, null, null, 0, null, 0, 0, 0, scope, NO_LOG, [], problems);
+  const empty = (): PackageReport => report(false, null, null, null, 0, null, null, 0, 0, 0, scope, NO_LOG, [], problems);
   if (pkg.format !== PACKAGE_FORMAT) {
     problems.push(`unknown package format ${pkg.format ?? "null"}`);
     return empty();
@@ -163,6 +165,7 @@ export async function verifyPackage(
     anchor ? anchor.sequence : null,
     checkpoint.sequence,
     checkpoint.createdAt,
+    checkpoint.profiles,
     first,
     result.checkedEntries,
     disclosed,
@@ -468,6 +471,7 @@ function report(
   anchorSequence: number | null,
   checkpointSequence: number,
   checkpointCreatedAt: string | null,
+  profiles: ComplianceProfileRef[] | null,
   firstSequence: number,
   checkedLinks: number,
   disclosedEntries: number,
@@ -483,6 +487,7 @@ function report(
     anchorSequence,
     checkpointSequence,
     checkpointCreatedAt,
+    complianceProfiles: (profiles ?? []).map((p) => ({ id: p.id, digest: p.digest })),
     firstSequence,
     checkedLinks,
     disclosedEntries,

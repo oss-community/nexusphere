@@ -10,6 +10,9 @@ function Report({ report }: { report: PackageReport }) {
       <dl className="summary">
         <dt>Signing key</dt><dd><code>{report.keyId ?? '-'}</code>{report.pinnedKeyId && ' (pinned)'}</dd>
         <dt>Checkpoint</dt><dd>sequence {report.checkpointSequence}</dd>
+        {report.complianceProfiles?.length > 0 && (
+          <><dt>Compliance</dt><dd>{report.complianceProfiles.map((p) => p.id).join(', ')}</dd></>
+        )}
         <dt>Anchor</dt><dd>{report.anchorSequence === null ? 'genesis' : `checkpoint ${report.anchorSequence}`}</dd>
         <dt>Chain</dt><dd>{report.checkedLinks} links from sequence {report.firstSequence}</dd>
         <dt>Disclosed</dt><dd>{report.disclosedEntries} entries</dd>

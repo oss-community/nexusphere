@@ -1,0 +1,26 @@
+{
+  "id": "us",
+  "version": 1,
+  "name": "United States",
+  "description": "A starting point for FINRA Rule 3110, SEC Rule 17a-4 and the CCPA, not legal advice. Records are kept at least six years (SEC Rule 17a-4), personal data can be erased on request within 45 days (CCPA), and each action names its target.",
+  "retention": [
+    {
+      "actions": "*",
+      "minimum": "P6Y"
+    }
+  ],
+  "erasure": {
+    "onRequest": true,
+    "deadline": "P45D"
+  },
+  "residency": [],
+  "requiredFields": [
+    "target"
+  ],
+  "timestampAuthorities": [],
+  "reports": [
+    "dispute",
+    "finra-supervision",
+    "sec-17a-4-records"
+  ]
+}

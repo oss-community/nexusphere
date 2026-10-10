@@ -3,6 +3,7 @@ import copy
 import unittest
 
 from nexusphere_ledger import verify_package
+from nexusphere_ledger.evidence import Checkpoint
 from nexusphere_ledger.keys import KeyRevocation, KeyRotation, PrivateKey
 
 from .support import LEDGER_KEY, entries, key_record, package, witness_note_key
@@ -29,6 +30,19 @@ class PackageVerification(unittest.TestCase):
         self.assertEqual("ledger.example", report.log_origin)
         self.assertEqual(6, report.log_tree_size)
         self.assertEqual("checkpointSequence", list(report.to_dict())[4])
+
+    def test_signed_compliance_profiles_are_reported(self):
+        pkg = package(self.chain, {2})
+        node = pkg["checkpoint"]
+        digest = "ab" * 32
+        signed = Checkpoint(node["sequence"], node["headHash"], node["createdAt"], node["keyId"],
+                            profiles=(("eu", digest),)).sign(LEDGER_KEY)
+        node.update(format=signed.format, signature=signed.signature, profiles=[{"id": "eu", "digest": digest}])
+        report = verify_package(pkg, PINNED)
+        self.assertTrue(report.valid, report.problems)
+        self.assertEqual([{"id": "eu", "digest": digest}], report.compliance_profiles)
+        node["profiles"][0]["id"] = "us"
+        self.assertIn("the signature of checkpoint 6 is not valid", verify_package(pkg, PINNED).problems)
 
     def test_anchor_and_scope(self):
         scope = {"agentId": "invoice-agent", "principalId": None, "fromSequence": 3, "toSequence": 5}
@@ -144,7 +158,7 @@ class RevokedKeys(unittest.TestCase):
         report = self.verify("2025-10-10T00:00:00Z")
         self.assertTrue(report.valid, report.problems)
         self.assertEqual([LEDGER_KEY.key_id], report.revoked_keys)
-        self.assertEqual("revokedKeys", list(report.to_dict())[16])
+        self.assertEqual("revokedKeys", list(report.to_dict())[17])
 
     def test_witnesses_after_the_compromise_do_not(self):
         report = self.verify("2025-10-01T00:00:00Z")

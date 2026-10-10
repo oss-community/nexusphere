@@ -9,7 +9,8 @@ import java.util.Map;
 
 @ConfigurationProperties("ledger")
 public record LedgerProperties(Security security, Signing signing, Checkpoint checkpoint, Mcp mcp,
-                               Mandate mandate, A2a a2a, Oidc oidc, Log log) {
+                               Mandate mandate, A2a a2a, Oidc oidc, Log log,
+                               Compliance compliance) {
 
     public boolean consentRequired() {
         return oidc != null && oidc.enabled();
@@ -38,6 +39,9 @@ public record LedgerProperties(Security security, Signing signing, Checkpoint ch
     }
 
     public record Checkpoint(Duration interval) {
+    }
+
+    public record Compliance(List<String> profiles, String profileDirectory, String region) {
     }
 
     public record Log(String origin, Duration witnessTimeout, Map<String, Witness> witnesses,

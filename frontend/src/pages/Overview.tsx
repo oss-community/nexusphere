@@ -43,6 +43,10 @@ export function Overview() {
             <dt>Latest checkpoint</dt>
             <dd>{data.checkpoint ? <>#{data.checkpoint.sequence}, <Time value={data.checkpoint.createdAt} />, key{' '}
               <code>{data.checkpoint.keyId}</code></> : 'none yet'}</dd>
+            {data.checkpoint?.profiles && (
+              <><dt>Compliance profiles</dt>
+                <dd>{data.checkpoint.profiles.map((p) => p.id).join(', ')}, signed in the checkpoint</dd></>
+            )}
           </dl>
         )}
         {report && (

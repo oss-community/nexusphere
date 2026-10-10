@@ -296,6 +296,10 @@ export class LedgerClient {
     return new TextDecoder().decode(await this.bytes("/public/v1/witness/key")).trim();
   }
 
+  compliance(): Promise<Json> {
+    return this.get("/public/v1/compliance");
+  }
+
   health(): Promise<Json> {
     return this.get("/actuator/health");
   }

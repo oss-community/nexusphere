@@ -9,6 +9,7 @@ from .timestamps import format_instant
 
 FORMAT = "nexusphere-ledger/evidence/v1"
 CHECKPOINT_FORMAT = "nexusphere-ledger/checkpoint/v1"
+CHECKPOINT_FORMAT_WITH_PROFILES = "nexusphere-ledger/checkpoint/v2"
 GENESIS = "0" * 64
 
 _SHA256_HEX = re.compile(r"^[0-9a-f]{64}$")
@@ -135,24 +136,38 @@ class Checkpoint:
     created_at: str
     key_id: str
     signature: Optional[str] = None
+    profiles: Optional[tuple] = None
 
     @classmethod
     def of(cls, node: dict) -> "Checkpoint":
+        profiles = node.get("profiles")
+        if profiles is not None:
+            if not isinstance(profiles, list):
+                raise ValueError("profiles must be a list")
+            profiles = tuple((_required(p, "id"), _required(p, "digest")) for p in profiles)
         return cls(_long(node.get("sequence")), _required(node, "headHash"),
-                   format_instant(_required(node, "createdAt")), _required(node, "keyId"), node.get("signature"))
+                   format_instant(_required(node, "createdAt")), _required(node, "keyId"), node.get("signature"),
+                   profiles)
+
+    @property
+    def format(self) -> str:
+        return CHECKPOINT_FORMAT if self.profiles is None else CHECKPOINT_FORMAT_WITH_PROFILES
 
     def signed_bytes(self) -> bytes:
-        return canonical_bytes({
-            "format": CHECKPOINT_FORMAT,
+        content = {
+            "format": self.format,
             "sequence": self.sequence,
             "headHash": self.head_hash,
             "createdAt": format_instant(self.created_at),
             "keyId": self.key_id,
-        })
+        }
+        if self.profiles is not None:
+            content["profiles"] = [{"id": i, "digest": d} for i, d in sorted(self.profiles)]
+        return canonical_bytes(content)
 
     def sign(self, key: PrivateKey) -> "Checkpoint":
         return Checkpoint(self.sequence, self.head_hash, self.created_at, self.key_id,
-                          key.sign_base64(self.signed_bytes()))
+                          key.sign_base64(self.signed_bytes()), self.profiles)
 
     def verify(self, key: PublicKey) -> bool:
         return (self.signature is not None and key.key_id == self.key_id

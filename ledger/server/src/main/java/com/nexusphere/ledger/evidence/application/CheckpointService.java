@@ -1,6 +1,7 @@
 package com.nexusphere.ledger.evidence.application;
 
 import com.nexusphere.ledger.chain.SignedCheckpoint;
+import com.nexusphere.ledger.compliance.application.Compliance;
 import com.nexusphere.ledger.evidence.domain.model.LedgerHead;
 import com.nexusphere.ledger.evidence.domain.repository.CheckpointRepository;
 import com.nexusphere.ledger.evidence.domain.repository.EvidenceRepository;
@@ -25,10 +26,12 @@ public class CheckpointService {
     private final CheckpointRepository checkpoints;
     private final LedgerSigner signer;
     private final TransparencyLog log;
+    private final Compliance compliance;
     private final Clock clock;
 
     CheckpointService(EvidenceRepository evidence, CheckpointRepository checkpoints, LedgerSigner signer,
-                      TransparencyLog log, Clock clock) {
+                      TransparencyLog log, Compliance compliance, Clock clock) {
+        this.compliance = compliance;
         this.evidence = evidence;
         this.checkpoints = checkpoints;
         this.signer = signer;
@@ -47,7 +50,8 @@ public class CheckpointService {
         if (existing.isPresent()) {
             return existing;
         }
-        SignedCheckpoint signed = signer.sign(head.sequence(), head.hash(), clock.instant());
+        SignedCheckpoint signed = signer.sign(head.sequence(), head.hash(), clock.instant(),
+                compliance.references());
         checkpoints.append(signed);
         return Optional.of(signed);
     }

@@ -14,6 +14,7 @@ import com.nexusphere.ledger.chain.NoteKey;
 import com.nexusphere.ledger.chain.SignedCheckpoint;
 import com.nexusphere.ledger.chain.Signer;
 import com.nexusphere.ledger.chain.SigningKeys;
+import com.nexusphere.ledger.chain.Timestamps;
 import com.nexusphere.ledger.chain.TrustedKeys;
 import com.nexusphere.ledger.mandate.HttpSignatures;
 import com.nexusphere.ledger.mandate.KeyBinding;
@@ -437,6 +438,50 @@ class ConformanceVectorsTest {
                 Duration.ofSeconds(60));
 
         assertThat(verified.keyId()).isEqualTo(KEY_ID);
+    }
+
+    @Test
+    void complianceCheckpoint() throws IOException {
+        Map<String, Object> profile = new LinkedHashMap<>();
+        profile.put("id", "example");
+        profile.put("version", 1);
+        profile.put("name", "Example jurisdiction");
+        profile.put("description", "A profile used only by the conformance vectors.");
+        profile.put("retention", List.of(ordered("actions", "*", "minimum", "P6M"),
+                ordered("actions", "mcp/*", "minimum", "P5Y")));
+        profile.put("erasure", ordered("onRequest", true, "deadline", "P1M"));
+        profile.put("residency", List.of("eea"));
+        profile.put("requiredFields", List.of("attributes.model", "target"));
+        profile.put("timestampAuthorities", List.of("https://tsa.example"));
+        profile.put("reports", List.of("dispute"));
+        String digest = Hashes.sha256(CanonicalJson.bytes(profile));
+        String baseline = Hashes.sha256("baseline".getBytes(StandardCharsets.UTF_8));
+        Checkpoint checkpoint = new Checkpoint(3, entries().getLast().hash(), T0.plusSeconds(60), KEY_ID,
+                List.of(new Checkpoint.Profile("example", digest), new Checkpoint.Profile("baseline", baseline)));
+        SignedCheckpoint signed = new SignedCheckpoint(checkpoint,
+                SigningKeys.sign(LEDGER_KEY, checkpoint.signedBytes()));
+        Map<String, Object> vector = new LinkedHashMap<>();
+        vector.put("description", "A checkpoint that signs the active compliance profiles, signed with test key 1");
+        vector.put("profile", profile);
+        vector.put("canonicalProfile", CanonicalJson.write(profile));
+        vector.put("profileDigest", digest);
+        vector.put("checkpoint", ordered("format", checkpoint.format(), "sequence", 3,
+                "headHash", checkpoint.headHash(), "createdAt", Timestamps.format(checkpoint.createdAt()),
+                "keyId", KEY_ID, "profiles", checkpoint.profiles().stream().map(Checkpoint.Profile::toMap).toList(),
+                "signedBytes", new String(checkpoint.signedBytes(), StandardCharsets.UTF_8),
+                "signature", signed.signature()));
+        check("compliance-checkpoint.json", vector);
+
+        assertThat(signed.verify(SigningKeys.PublicKeyInfo.of(LEDGER))).isTrue();
+        assertThat(checkpoint.profiles()).extracting(Checkpoint.Profile::id).containsExactly("baseline", "example");
+    }
+
+    private static Map<String, Object> ordered(Object... pairs) {
+        Map<String, Object> map = new LinkedHashMap<>();
+        for (int i = 0; i < pairs.length; i += 2) {
+            map.put((String) pairs[i], pairs[i + 1]);
+        }
+        return map;
     }
 
     private static String header(JsonNode stored, String name) {

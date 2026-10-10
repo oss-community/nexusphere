@@ -22,6 +22,7 @@
 * [Agent Keys and Key Binding](#agent-keys-and-key-binding)
 * [A2A Gateway](#a2a-gateway)
 * [HTTP Message Signatures](#http-message-signatures)
+* [Compliance Profiles](#compliance-profiles)
 * [Conformance Vectors](#conformance-vectors)
 * [API](#api)
 * [End-to-End Tests](ledger-e2e-tests/README.md)
@@ -289,6 +290,9 @@ LEDGER_SIGNING_VAULT_MOUNT: transit
 LEDGER_SIGNING_VAULT_KEY: nexusphere-ledger
 LEDGER_SIGNING_VAULT_TIMEOUT: 10s
 LEDGER_CHECKPOINT_INTERVAL: 1m
+LEDGER_COMPLIANCE_PROFILES: baseline
+LEDGER_COMPLIANCE_PROFILE_DIRECTORY:
+LEDGER_COMPLIANCE_REGION:
 LEDGER_LOG_ORIGIN:
 LEDGER_LOG_WITNESS_TIMEOUT: 10s
 LEDGER_LOG_WITNESSES_{NAME}_URL:
@@ -370,7 +374,9 @@ The content hash is the SHA-256 of the canonical JSON of `format` and every fiel
 and `hash`. The link (`sequence`, `previousHash`, `contentHash`, `hash`) can be checked without the content, so a
 package can keep entries private and still prove the chain. Canonical JSON has sorted keys, no whitespace and `null` for absent fields. Timestamps are UTC with microseconds, for
 example `2026-10-01T08:00:00.123456Z`. A checkpoint signs the canonical JSON of `format`
-(`nexusphere-ledger/checkpoint/v1`), `sequence`, `headHash`, `createdAt` and `keyId`. The key ID is the first 16 hex
+(`nexusphere-ledger/checkpoint/v2`), `sequence`, `headHash`, `createdAt`, `keyId` and `profiles`, the `id` and
+`digest` of each active [compliance profile](#compliance-profiles) sorted by `id`. Checkpoints signed before the
+ledger had profiles keep `nexusphere-ledger/checkpoint/v1` without `profiles`, and still verify. The key ID is the first 16 hex
 characters of the SHA-256 of the X.509 public key.
 
 </p>
@@ -1101,6 +1107,86 @@ Step 3. Call a tool through the ledger with an agent that has a grant on `check/
 curl -s -X POST http://localhost:8090/mcp/check -H "Authorization: Bearer {agentApiKey}" -H "X-Ledger-Principal: alice" -H "Content-Type: application/json" -d '{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"echo","arguments":{}}}'
 ```
 
+## Compliance Profiles
+
+<p style="text-align: justify;">
+
+The ledger knows no law itself. The rules of a country or region live in a compliance profile, a JSON file that says
+how long each kind of evidence is kept at least, whether personal data can be erased on request and how fast, where
+the ledger data may be kept, which evidence fields are required, which RFC 3161 timestamp authorities are accepted and
+which report templates apply. `LEDGER_COMPLIANCE_PROFILES` lists the active profiles, `baseline` by default. When
+several are active the strictest rule wins: the longest retention, the shortest erasure deadline, the regions and
+timestamp authorities all of them allow, and every field any of them requires. A profile is a starting point for
+your own legal review, not legal advice. The ledger ships three:
+
+</p>
+
+| Profile    | Retention | Erasure on request | Region | Required fields       | Reports                                             |
+|------------|-----------|--------------------|--------|-----------------------|-----------------------------------------------------|
+| `baseline` | none      | no                 | any    | none                  | `dispute`                                           |
+| `eu`       | 6 months  | within 1 month     | `eea`  | `target`, `inputHash` | `dispute`, `dora-ict-records`, `eu-ai-act-logging`  |
+| `us`       | 6 years   | within 45 days     | any    | `target`              | `dispute`, `finra-supervision`, `sec-17a-4-records` |
+
+<p style="text-align: justify;">
+
+Your own profile is a file `{id}.json` in `LEDGER_COMPLIANCE_PROFILE_DIRECTORY`; adding a jurisdiction needs no change
+to the ledger. A required field is one of `target`, `reason`, `delegationId`, `inputHash`, `outputHash`,
+`correlationId` and `occurredAt`, or an attribute as `attributes.{name}`; evidence an agent records without it is
+refused with HTTP 400. When a profile limits the region, `LEDGER_COMPLIANCE_REGION` must name where the ledger and its
+database run, and the ledger does not start when it is missing or not allowed; the ledger trusts what it is told and
+cannot see where its servers really are. Every checkpoint signs the id and SHA-256 digest of the canonical JSON of each
+active profile, so a package shows which rules were in force, and each change of the active profiles or region is
+recorded as `compliance/activate` evidence by the agent `ledger`. `GET /public/v1/compliance` returns the active
+profiles with their digests and the combined rules.
+
+</p>
+
+Step 1. Save your own profile as `profiles/uk.json`:
+
+```json
+{
+  "id": "uk",
+  "version": 1,
+  "name": "United Kingdom",
+  "description": "Our own reading of UK GDPR and FCA record keeping.",
+  "retention": [{"actions": "*", "minimum": "P5Y"}],
+  "erasure": {"onRequest": true, "deadline": "P1M"},
+  "residency": ["uk", "eea"],
+  "requiredFields": ["target", "attributes.model"],
+  "timestampAuthorities": [],
+  "reports": ["dispute"]
+}
+```
+
+Step 2. Start the ledger with the EU profile and your own:
+
+```shell
+export LEDGER_COMPLIANCE_PROFILES=eu,uk
+export LEDGER_COMPLIANCE_PROFILE_DIRECTORY=$PWD/profiles
+export LEDGER_COMPLIANCE_REGION=eea
+```
+
+Step 3. Read the combined rules; the result must show `"residency":["eea"]`, retention `P5Y` and the required fields
+of both profiles:
+
+```shell
+curl -s http://localhost:8090/public/v1/compliance | jq -c .effective
+```
+
+Step 4. Record evidence without the required fields; the answer must be HTTP 400 naming `target`, `inputHash` and
+`attributes.model` with the profiles that require them:
+
+```shell
+curl -s -X POST http://localhost:8090/api/v1/evidence -H "Authorization: Bearer $LEDGER_API_KEY" -H "Content-Type: application/json" -d '{"agentId":"invoice-agent","principalId":"alice","action":"tools/call","outcome":"SUCCEEDED"}'
+```
+
+Step 5. Sign a checkpoint; the result must have `format` `nexusphere-ledger/checkpoint/v2` and the `eu` and `uk`
+profiles with the digests from Step 3:
+
+```shell
+curl -s -X POST http://localhost:8090/api/v1/checkpoints -H "Authorization: Bearer $LEDGER_API_KEY" | jq -c '{format, profiles}'
+```
+
 ## Conformance Vectors
 
 <p style="text-align: justify;">
@@ -1108,7 +1194,7 @@ curl -s -X POST http://localhost:8090/mcp/check -H "Authorization: Bearer {agent
 [Conformance Vectors](conformance/README.md) hold fixed inputs and outputs for every format the ledger produces, made
 with the published RFC 8032 test keys: canonical JSON, the evidence chain and checkpoints, Merkle roots and proofs,
 signed notes and cosignatures, SCITT statements and receipts, an SD-JWT VC mandate, a key-bound mandate with its
-KB-JWT and an HTTP message signature. Another implementation checks
+KB-JWT, an HTTP message signature and a checkpoint that signs compliance profiles. Another implementation checks
 itself against them, and `ConformanceVectorsTest` in `ledger/verifier` fails when the ledger's own output changes.
 
 </p>
@@ -1121,7 +1207,7 @@ API key, except `/api/v1/principal/**`, which requires a principal token from th
 
 | Method | Path                                    | Description                                                                                            |
 |--------|-----------------------------------------|--------------------------------------------------------------------------------------------------------|
-| POST   | `/api/v1/evidence`                      | Record an evidence entry; returns `201` with `Location`                                                |
+| POST   | `/api/v1/evidence`                      | Record an entry with the fields the compliance profiles require; `201` with `Location`                 |
 | POST   | `/api/v1/evidence/batch`                | Record up to 500 entries in order as one run, all or none; an item error names its `index`             |
 | GET    | `/api/v1/evidence/{id}`                 | Get an evidence entry                                                                                  |
 | GET    | `/api/v1/evidence/{id}/statement`       | The entry as a SCITT signed statement (`application/cose`)                                             |
@@ -1169,6 +1255,7 @@ API key, except `/api/v1/principal/**`, which requires a principal token from th
 | GET    | `/public/v1/log/key`                    | Verifier key of the log, no API key                                                                    |
 | GET    | `/public/v1/witness/key`                | Verifier key this ledger cosigns with as a witness, no API key                                         |
 | POST   | `/public/v1/witness/add-checkpoint`     | C2SP witness endpoint: cosign a watched log's checkpoint, `404` when it watches none, no API key       |
+| GET    | `/public/v1/compliance`                 | Active compliance profiles with their digests and the combined rules, no API key                       |
 | GET    | `/public/v1/oidc`                       | The OIDC issuer and client for principal sign-in, `404` without OIDC                                   |
 | POST   | `/mcp/{server}`                         | MCP gateway: decide, forward and record a `tools/call`; forward other messages                         |
 | GET    | `/mcp/{server}`                         | Relay the MCP server-to-client stream                                                                  |

@@ -131,6 +131,9 @@ function printPackage(r: PackageReport, io: Io) {
     "Nexusphere Ledger evidence package",
     `  Signing key : ${r.keyId}${note}`,
     `  Checkpoint  : sequence ${r.checkpointSequence}, signed at ${r.checkpointCreatedAt}`,
+    ...(r.complianceProfiles.length ? [`  Compliance  : ${
+      r.complianceProfiles.map((p) => `${p.id} (${p.digest.slice(0, 12)})`).join(", ")}, signed in the checkpoint`]
+      : []),
     `  Anchor      : ${r.anchorSequence === null ? "genesis" : "checkpoint " + r.anchorSequence}`,
     `  Chain       : ${r.checkedLinks} links from sequence ${r.firstSequence}`,
     `  Disclosed   : ${r.disclosedEntries} entries${r.agentId === null ? "" : ", agent " + r.agentId}${

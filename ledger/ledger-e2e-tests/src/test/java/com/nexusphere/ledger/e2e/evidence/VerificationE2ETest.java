@@ -43,9 +43,12 @@ class VerificationE2ETest extends LedgerE2ETestBase {
         LedgerClient.Response created = ledger.post("/api/v1/checkpoints");
         JsonNode checkpoint = created.json();
         JsonNode key = ledger.get("/api/v1/keys").json().get(0);
+        List<Checkpoint.Profile> profiles = new ArrayList<>();
+        checkpoint.path("profiles").forEach(p -> profiles.add(new Checkpoint.Profile(p.path("id").asString(),
+                p.path("digest").asString())));
         SignedCheckpoint signed = new SignedCheckpoint(new Checkpoint(checkpoint.path("sequence").asLong(),
                 checkpoint.path("headHash").asString(), Instant.parse(checkpoint.path("createdAt").asString()),
-                checkpoint.path("keyId").asString()), checkpoint.path("signature").asString());
+                checkpoint.path("keyId").asString(), profiles), checkpoint.path("signature").asString());
         SigningKeys.PublicKeyInfo publicKey =
                 SigningKeys.PublicKeyInfo.of(SigningKeys.decodePublic(key.path("publicKey").asString()));
 
@@ -53,6 +56,8 @@ class VerificationE2ETest extends LedgerE2ETestBase {
         assertThat(key.path("algorithm").asString()).isEqualTo("Ed25519");
         assertThat(publicKey.keyId()).isEqualTo(key.path("keyId").asString());
         assertThat(signed.verify(publicKey)).isTrue();
+        assertThat(checkpoint.path("format").asString()).isEqualTo(Checkpoint.FORMAT_WITH_PROFILES);
+        assertThat(profiles).extracting(Checkpoint.Profile::id).containsExactly("baseline");
         assertThat(ledger.get("/api/v1/checkpoints/latest").json().path("sequence").asLong())
                 .isGreaterThanOrEqualTo(checkpoint.path("sequence").asLong());
     }

@@ -12,7 +12,7 @@ describe('PackagesPage', () => {
       ] }),
       'POST /api/v1/packages/verify': () => ({ body: {
         valid: false, keyId: 'new', pinnedKeyId: 'new', anchorSequence: null, checkpointSequence: 9,
-        checkpointCreatedAt: '2026-10-08T10:00:00Z', firstSequence: 1, checkedLinks: 8, disclosedEntries: 8,
+        checkpointCreatedAt: '2026-10-08T10:00:00Z', complianceProfiles: [], firstSequence: 1, checkedLinks: 8, disclosedEntries: 8,
         agentId: 'invoice-agent', principalId: null, problems: ['sequence 6: the content hash does not match'],
       } }),
     })

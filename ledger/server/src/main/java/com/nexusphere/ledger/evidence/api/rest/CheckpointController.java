@@ -19,12 +19,12 @@ import java.util.List;
 class CheckpointController {
 
     record CheckpointResponse(String format, long sequence, String headHash, Instant createdAt, String keyId,
-                              String signature) {
+                              List<Checkpoint.Profile> profiles, String signature) {
 
         static CheckpointResponse of(SignedCheckpoint signed) {
             Checkpoint c = signed.checkpoint();
-            return new CheckpointResponse(Checkpoint.FORMAT, c.sequence(), c.headHash(), c.createdAt(), c.keyId(),
-                    signed.signature());
+            return new CheckpointResponse(c.format(), c.sequence(), c.headHash(), c.createdAt(), c.keyId(),
+                    c.profiles(), signed.signature());
         }
     }
 
