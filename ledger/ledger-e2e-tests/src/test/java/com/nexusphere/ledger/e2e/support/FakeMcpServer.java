@@ -9,6 +9,8 @@ import tools.jackson.databind.node.ObjectNode;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.nio.charset.StandardCharsets;
+import java.util.HashMap;
+import java.util.Locale;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -25,6 +27,10 @@ public final class FakeMcpServer {
     private volatile String lastSessionId;
     private volatile String lastAuthorization;
     private volatile String lastEventId;
+    private volatile Received lastRequest;
+
+    public record Received(String method, Map<String, String> headers, byte[] body) {
+    }
 
     private FakeMcpServer(HttpServer server) {
         this.server = server;
@@ -63,9 +69,18 @@ public final class FakeMcpServer {
         return lastEventId;
     }
 
+    public Received lastRequest() {
+        return lastRequest;
+    }
+
     private void handle(HttpExchange exchange) throws IOException {
         lastSessionId = exchange.getRequestHeaders().getFirst("Mcp-Session-Id");
         lastAuthorization = exchange.getRequestHeaders().getFirst("Authorization");
+        byte[] body = exchange.getRequestBody().readAllBytes();
+        Map<String, String> headers = new HashMap<>();
+        exchange.getRequestHeaders().forEach((name, values) -> headers.put(name.toLowerCase(Locale.ROOT),
+                values.getFirst()));
+        lastRequest = new Received(exchange.getRequestMethod(), headers, body);
         if ("DELETE".equals(exchange.getRequestMethod())) {
             send(exchange, 200, "application/json", new byte[0]);
             return;
@@ -76,7 +91,7 @@ public final class FakeMcpServer {
                     + "\"method\":\"notifications/tools/list_changed\"}\n\n").getBytes(StandardCharsets.UTF_8));
             return;
         }
-        JsonNode request = JSON.readTree(exchange.getRequestBody().readAllBytes());
+        JsonNode request = JSON.readTree(body);
         String method = request.path("method").asString();
         if (!request.has("id") || !request.has("method")) {
             send(exchange, 202, "application/json", new byte[0]);

@@ -199,7 +199,9 @@ such as Claude Desktop or an agent framework.
 
 Each upstream MCP server is configured on the ledger by name and served at `/mcp/{name}`. The server must speak
 Streamable HTTP; a stdio server needs an HTTP bridge in front of it. A key the upstream needs is sent by the ledger,
-so the agent never sees it.
+so the agent never sees it. Every request also carries the ledger's RFC 9421 HTTP message signature, so the server
+can refuse anything that did not come through the ledger; see
+[HTTP Message Signatures](../ledger/README.md#http-message-signatures).
 
 </p>
 

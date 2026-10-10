@@ -12,6 +12,7 @@
 * [Verify a Statement and Receipt](#verify-a-statement-and-receipt)
 * [Verify a Mandate](#verify-a-mandate)
 * [Present a Key-Bound Mandate](#present-a-key-bound-mandate)
+* [Check a Signed Request](#check-a-signed-request)
 * [Command Line](#command-line)
 * [Reference](#reference)
 * [Test](#test)
@@ -200,6 +201,27 @@ check = MandateVerifier("http://localhost:8090", audience="https://supplier.exam
 print(check.valid, check.claims.holder_key.key_id)
 ```
 
+## Check a Signed Request
+
+<p style="text-align: justify;">
+
+Every request the ledger forwards to an MCP server or an A2A agent carries an RFC 9421 HTTP message signature.
+`verify_request` checks it with the ledger's published keys and returns the key ID, `created` and `nonce`; it raises
+`InvalidHttpSignature` when the signature is missing, stale or does not match the method, address or body.
+`sign_request` makes the same headers.
+
+</p>
+
+```python
+from nexusphere_ledger import JwksKeys, verify_request
+from nexusphere_ledger.mandate import http_fetcher
+
+keys = JwksKeys(http_fetcher())
+verified = verify_request("POST", "http://files-mcp:3000/mcp", request_headers, body,
+                          lambda kid: keys.resolve("http://localhost:8090", kid))
+print(verified.key_id, verified.nonce)
+```
+
 ## Command Line
 
 <p style="text-align: justify;">
@@ -245,6 +267,7 @@ nexusphere-ledger-verify mandate --issuer http://localhost:8090 --audience https
 | `note`      | C2SP signed notes, note keys and `tlog-cosignature/v1` cosignatures                              |
 | `cose`      | `CoseSign1`, SCITT `EvidenceStatement` and RFC 9942 `LogReceipt`                                 |
 | `mandate`   | SD-JWT VC mandates, `MandateVerifier`, status lists and JWKs                                     |
+| `httpsig`   | RFC 9421 HTTP message signatures: `sign_request`, `verify_request`, `content_digest`             |
 | `keys`      | Ed25519 keys, key IDs, key rotations and trusted keys from a pinned key                          |
 | `canonical` | Canonical JSON                                                                                   |
 | `cbor`      | Deterministic CBOR                                                                               |

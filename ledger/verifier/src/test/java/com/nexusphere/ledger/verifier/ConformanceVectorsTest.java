@@ -15,6 +15,7 @@ import com.nexusphere.ledger.chain.SignedCheckpoint;
 import com.nexusphere.ledger.chain.Signer;
 import com.nexusphere.ledger.chain.SigningKeys;
 import com.nexusphere.ledger.chain.TrustedKeys;
+import com.nexusphere.ledger.mandate.HttpSignatures;
 import com.nexusphere.ledger.mandate.KeyBinding;
 import com.nexusphere.ledger.mandate.KeyResolver;
 import com.nexusphere.ledger.mandate.MandateCheck;
@@ -29,6 +30,8 @@ import tools.jackson.databind.SerializationFeature;
 import tools.jackson.databind.json.JsonMapper;
 
 import java.io.IOException;
+import java.net.URI;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.security.KeyFactory;
@@ -36,6 +39,7 @@ import java.security.PrivateKey;
 import java.security.PublicKey;
 import java.security.spec.PKCS8EncodedKeySpec;
 import java.time.Clock;
+import java.time.Duration;
 import java.time.Instant;
 import java.time.ZoneOffset;
 import java.time.temporal.ChronoUnit;
@@ -44,7 +48,9 @@ import java.util.Base64;
 import java.util.HexFormat;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.TreeMap;
 import java.util.UUID;
@@ -398,6 +404,48 @@ class ConformanceVectorsTest {
         assertThat(KeyBinding.sdHash(stored.path("token").asString())).isEqualTo(stored.path("sdHash").asString());
         assertThat(bare.has(MandateProblem.KEY_BINDING_MISSING)).isTrue();
         assertThat(replayed.has(MandateProblem.KEY_BINDING_INVALID)).isTrue();
+    }
+
+    @Test
+    void httpMessageSignature() throws IOException {
+        URI url = URI.create("https://ledger.supplier.example/a2a/in/sales");
+        byte[] body = "{\"jsonrpc\":\"2.0\",\"id\":\"1\",\"method\":\"message/send\"}"
+                .getBytes(StandardCharsets.UTF_8);
+        Instant created = T0.truncatedTo(ChronoUnit.SECONDS);
+        Map<String, String> headers = HttpSignatures.sign("POST", url, body, KEY_ID, Signer.of(LEDGER_KEY), created,
+                "c2lnbmF0dXJlLW5vbmNl");
+        Map<String, String> lower = new LinkedHashMap<>();
+        headers.forEach((name, value) -> lower.put(name.toLowerCase(Locale.ROOT), value));
+        String input = headers.get(HttpSignatures.SIGNATURE_INPUT);
+        String base = HttpSignatures.signatureBase("POST", url,
+                List.of("@method", "@authority", "@path", "content-digest"), lower::get,
+                input.substring(input.indexOf('=') + 1));
+        Map<String, Object> vector = new LinkedHashMap<>();
+        vector.put("description", "RFC 9421 HTTP message signature of an outbound request, signed with test key 1");
+        vector.put("method", "POST");
+        vector.put("url", url.toString());
+        vector.put("body", new String(body, StandardCharsets.UTF_8));
+        vector.put("keyId", KEY_ID);
+        vector.put("created", created.getEpochSecond());
+        vector.put("nonce", "c2lnbmF0dXJlLW5vbmNl");
+        vector.put("headers", headers);
+        vector.put("signatureBase", base);
+        JsonNode stored = check("http-signature.json", vector);
+        HttpSignatures.Verified verified = HttpSignatures.verify("POST", url,
+                name -> stored.path("headers").path(header(stored, name)).asString(null), body,
+                keyId -> KEY_ID.equals(keyId) ? Optional.of(LEDGER) : Optional.empty(), created.plusSeconds(10),
+                Duration.ofSeconds(60));
+
+        assertThat(verified.keyId()).isEqualTo(KEY_ID);
+    }
+
+    private static String header(JsonNode stored, String name) {
+        for (String field : stored.path("headers").propertyNames()) {
+            if (field.equalsIgnoreCase(name)) {
+                return field;
+            }
+        }
+        return name;
     }
 
     private static List<String> hex(List<byte[]> hashes) {

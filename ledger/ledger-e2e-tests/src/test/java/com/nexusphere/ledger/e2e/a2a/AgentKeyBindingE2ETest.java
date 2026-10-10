@@ -1,12 +1,14 @@
 package com.nexusphere.ledger.e2e.a2a;
 
 import com.nexusphere.ledger.chain.Hashes;
+import com.nexusphere.ledger.chain.Signer;
 import com.nexusphere.ledger.chain.SigningKeys;
 import com.nexusphere.ledger.e2e.support.FakeA2aAgent;
 import com.nexusphere.ledger.e2e.support.LedgerClient;
 import com.nexusphere.ledger.e2e.support.LedgerE2ETestBase;
 import com.nexusphere.ledger.e2e.support.SupplierLedger;
 import com.nexusphere.ledger.mandate.ExchangeRequest;
+import com.nexusphere.ledger.mandate.HttpSignatures;
 import com.nexusphere.ledger.mandate.Jws;
 import com.nexusphere.ledger.mandate.KeyBinding;
 import com.nexusphere.ledger.mandate.MandateClaims;
@@ -17,11 +19,13 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import tools.jackson.databind.JsonNode;
 
+import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.security.KeyPair;
 import java.security.PrivateKey;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -183,8 +187,13 @@ class AgentKeyBindingE2ETest extends LedgerE2ETestBase {
                         Instant.now().truncatedTo(ChronoUnit.SECONDS)).toPayload(), DEVELOPMENT_KEY);
         int before = sales.calls();
 
-        LedgerClient.Response response = supplier.client().withApiKey(null).post("/a2a/in/sales", body,
-                Map.of("X-Nexusphere-Mandate", token, "X-Nexusphere-Request", proof));
+        Map<String, String> headers = new HashMap<>(Map.of("X-Nexusphere-Mandate", token, "X-Nexusphere-Request",
+                proof));
+        headers.putAll(HttpSignatures.sign("POST", URI.create(SUPPLIER_ISSUER + "/a2a/in/sales"),
+                body.getBytes(StandardCharsets.UTF_8), SigningKeys.keyIdOf(SigningKeys.decodePublic(
+                        "MCowBQYDK2VwAyEAZAywHYwDVyxoGB6wLRHPgAv1MUe4LTjMnb7uYOZii3o=")), Signer.of(DEVELOPMENT_KEY),
+                Instant.now(), "kb-4"));
+        LedgerClient.Response response = supplier.client().withApiKey(null).post("/a2a/in/sales", body, headers);
 
         assertThat(response.status()).isEqualTo(401);
         assertThat(problems(response)).contains("KEY_BINDING_MISSING");

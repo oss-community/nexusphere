@@ -3,6 +3,7 @@ from .client import Action, Denied, LedgerClient, LedgerError, hash_of
 from .cose import CoseSign1, EvidenceStatement, LogReceipt
 from .evidence import (GENESIS, ChainVerification, ChainVerifier, Checkpoint, EvidenceLink, canonical_content,
                        content_hash, entry_hash, link_hash, verify_chain)
+from .httpsig import InvalidHttpSignature, VerifiedRequest, content_digest, sign_request, verify_request
 from .keys import KeyRevocation, KeyRotation, PrivateKey, PublicKey, trusted_keys
 from .mandate import (Disclosure, JwksKeys, Jws, MandateCheck, MandateClaims, MandateVerifier, Problem, SdJwt,
                       StaticKeys, StatusList, present_bound, sd_hash)
@@ -12,7 +13,8 @@ from .package import PackageReport, verify_package
 __version__ = "1.0.0"
 
 __all__ = [
-    "Action", "ChainVerification", "ChainVerifier", "Checkpoint", "CoseSign1", "Denied", "Disclosure",
+    "Action", "ChainVerification", "InvalidHttpSignature", "VerifiedRequest", "content_digest", "sign_request",
+    "verify_request", "ChainVerifier", "Checkpoint", "CoseSign1", "Denied", "Disclosure",
     "EvidenceLink", "EvidenceStatement", "GENESIS", "JwksKeys", "Jws", "KeyRevocation", "KeyRotation", "LedgerClient", "LedgerError",
     "LogCheckpoint", "LogReceipt", "MandateCheck", "MandateClaims", "MandateVerifier", "Note", "NoteKey",
     "PackageReport", "PrivateKey", "Problem", "PublicKey", "SdJwt", "StaticKeys", "StatusList", "canonical_bytes",

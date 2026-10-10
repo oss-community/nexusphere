@@ -1,6 +1,7 @@
 package com.nexusphere.ledger.e2e.a2a;
 
 import com.nexusphere.ledger.chain.Hashes;
+import com.nexusphere.ledger.chain.Signer;
 import com.nexusphere.ledger.chain.SigningKeys;
 import com.nexusphere.ledger.e2e.support.FakeA2aAgent;
 import com.nexusphere.ledger.e2e.support.LedgerClient;
@@ -8,6 +9,7 @@ import com.nexusphere.ledger.e2e.support.LedgerE2ETestBase;
 import com.nexusphere.ledger.e2e.support.SupplierLedger;
 import com.nexusphere.ledger.mandate.ExchangeReceipt;
 import com.nexusphere.ledger.mandate.ExchangeRequest;
+import com.nexusphere.ledger.mandate.HttpSignatures;
 import com.nexusphere.ledger.mandate.Jws;
 import com.nexusphere.ledger.mandate.MandateClaims;
 import com.nexusphere.ledger.mandate.Mandates;
@@ -17,6 +19,7 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import tools.jackson.databind.JsonNode;
 
+import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.security.KeyPair;
 import java.security.PrivateKey;
@@ -33,6 +36,9 @@ class A2aE2ETest extends LedgerE2ETestBase {
 
     private static final PrivateKey DEVELOPMENT_KEY =
             SigningKeys.decodePrivate("MC4CAQAwBQYDK2VwBCIEIDPXxsOX77t9k2XIr5aVh1AORIeW8w4rXooP+vMeOPKL");
+
+    private static final String DEVELOPMENT_KEY_ID = SigningKeys.keyIdOf(SigningKeys.decodePublic(
+            "MCowBQYDK2VwAyEAZAywHYwDVyxoGB6wLRHPgAv1MUe4LTjMnb7uYOZii3o="));
 
     private static FakeA2aAgent sales;
     private static SupplierLedger supplier;
@@ -201,6 +207,34 @@ class A2aE2ETest extends LedgerE2ETestBase {
     }
 
     @Test
+    void aRequestWithoutAValidHttpSignatureIsRejected() {
+        RegisteredAgent agent = agentWithGrant(List.of("supplier/*"));
+        String grantId = ledger().get("/api/v1/grants?agentId=" + agent.agentId()).json().path("items").get(0)
+                .path("id").asString();
+        JsonNode mandate = agent.client().post("/api/v1/mandates",
+                LedgerClient.json(Map.of("grantId", grantId, "audience", SUPPLIER_ISSUER))).json();
+        String token = mandate.path("token").asString();
+        String body = message("message/send", "m-sig");
+        String proof = proof(agent.agentId(), mandate.path("id").asString(), body, Instant.now());
+        Map<String, String> other = HttpSignatures.sign("POST", URI.create(SUPPLIER_ISSUER + "/a2a/in/sales"),
+                message("message/send", "m-other").getBytes(StandardCharsets.UTF_8), DEVELOPMENT_KEY_ID,
+                Signer.of(DEVELOPMENT_KEY), Instant.now(), "n");
+        Map<String, String> headers = new HashMap<>(Map.of("X-Nexusphere-Mandate", token,
+                "X-Nexusphere-Request", proof));
+        int before = sales.calls();
+
+        LedgerClient.Response unsigned = anonymousSupplier().post("/a2a/in/sales", body, headers);
+        headers.putAll(other);
+        LedgerClient.Response mismatched = anonymousSupplier().post("/a2a/in/sales", body, headers);
+
+        assertThat(unsigned.status()).isEqualTo(401);
+        assertThat(unsigned.json().path("error").path("data").path("problems").get(0).asString())
+                .isEqualTo("HTTP_SIGNATURE");
+        assertThat(mismatched.status()).isEqualTo(401);
+        assertThat(sales.calls()).isEqualTo(before);
+    }
+
+    @Test
     void theReceiverCountsTheUsesOfAMandateOnItsOwn() {
         RegisteredAgent agent = registerAgent("acme");
         Map<String, Object> body = grantBody("alice", agent.agentId(), List.of("a2a/send"), List.of("supplier/*"));
@@ -318,6 +352,9 @@ class A2aE2ETest extends LedgerE2ETestBase {
         if (proof != null) {
             headers.put("X-Nexusphere-Request", proof);
         }
+        headers.putAll(HttpSignatures.sign("POST", URI.create(SUPPLIER_ISSUER + "/a2a/in/sales"),
+                body.getBytes(StandardCharsets.UTF_8), DEVELOPMENT_KEY_ID, Signer.of(DEVELOPMENT_KEY), Instant.now(),
+                UUID.randomUUID().toString()));
         return anonymousSupplier().post("/a2a/in/sales", body, headers);
     }
 

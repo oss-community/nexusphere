@@ -2,6 +2,7 @@ package com.nexusphere.ledger.a2a;
 
 import com.nexusphere.ledger.server.security.Caller;
 import com.nexusphere.ledger.server.web.LedgerException;
+import jakarta.servlet.http.HttpServletRequest;
 import org.springframework.http.CacheControl;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
@@ -14,6 +15,7 @@ import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.servlet.mvc.method.annotation.StreamingResponseBody;
 
+import java.net.URI;
 import java.time.Instant;
 import java.util.UUID;
 
@@ -58,8 +60,9 @@ class A2aController {
             @PathVariable String agent,
             @RequestHeader(name = A2aOutbound.MANDATE_HEADER, required = false) String mandate,
             @RequestHeader(name = A2aOutbound.REQUEST_HEADER, required = false) String request,
-            @RequestBody byte[] body) {
-        return respond(inbound.receive(agent, mandate, request, body));
+            @RequestBody byte[] body, HttpServletRequest http) {
+        return respond(inbound.receive(agent, mandate, request, body, new A2aRequest(http.getMethod(),
+                URI.create(http.getRequestURL().toString()), http::getHeader)));
     }
 
     @GetMapping("/api/v1/a2a/exchanges/{id}")
