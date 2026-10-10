@@ -105,6 +105,48 @@ class EvidenceChainVector(unittest.TestCase):
         self.assertTrue(verifier.result().valid)
 
 
+def model_entry():
+    v = vector("evidence-model.json")
+    entry = {key: value for key, value in v["content"].items() if key != "commitments"}
+    entry.update(v["values"], salts=v["salts"], sequence=1, previousHash=v["previousHash"], hash=v["hash"])
+    return entry
+
+
+class EvidenceModelVector(unittest.TestCase):
+
+    def test_entry(self):
+        v = vector("evidence-model.json")
+        entry = model_entry()
+        self.assertEqual(v["model"], entry["model"])
+        self.assertEqual(v["content"], canonical_content(entry))
+        self.assertEqual(v["canonicalContent"], canonical_json(canonical_content(entry)))
+        self.assertEqual(v["contentHash"], content_hash(entry))
+        self.assertEqual(v["hash"], link_hash(1, v["previousHash"], v["contentHash"]))
+        self.assertTrue(ChainVerifier().accept(entry))
+
+    def test_prompts_match_the_hashes_the_model_names(self):
+        v = vector("evidence-model.json")
+        hashes = {prompt["hash"]: sha256_hex(prompt["text"]) for prompt in v["prompts"]}
+        self.assertEqual({v["model"]["promptHash"], v["model"]["configHash"]}, set(hashes))
+        self.assertTrue(all(name == computed for name, computed in hashes.items()))
+
+    def test_an_entry_without_a_model_hashes_as_before(self):
+        entry = model_entry()
+        unnamed = dict(entry, model=None)
+        self.assertNotIn("model", canonical_content(unnamed))
+        self.assertNotEqual(vector("evidence-model.json")["contentHash"], content_hash(unnamed))
+        self.assertEqual(content_hash(unnamed), content_hash(dict(entry, model={"name": None})))
+        self.assertEqual(content_hash(unnamed), content_hash({k: v for k, v in entry.items() if k != "model"}))
+
+    def test_a_changed_model_breaks_the_chain(self):
+        entry = model_entry()
+        entry["model"] = dict(entry["model"], version="2026-09-02")
+        self.assertFalse(ChainVerifier().accept(entry))
+        entry["model"] = dict(entry["model"], promptHash="ABC")
+        with self.assertRaises(ValueError):
+            content_hash(entry)
+
+
 class ComplianceCheckpointVector(unittest.TestCase):
 
     def test_profile_digest(self):
@@ -161,7 +203,7 @@ class TimestampVector(unittest.TestCase):
         self.assertTrue(report.valid, report.problems)
         self.assertEqual(self.v["genTime"], report.timestamped_at)
         self.assertEqual(self.v["authority"], report.timestamp_authority)
-        self.assertEqual(["timestampedAt", "timestampAuthority"], list(report.to_dict())[-5:-3])
+        self.assertEqual(["timestampedAt", "timestampAuthority"], list(report.to_dict())[-6:-4])
         pinned_root = verify_package(pkg, LEDGER_KEY.public_key.encoded, timestamp_certificates=self.chain[2:])
         self.assertIn("the timestamp of checkpoint 3: the timestamp authority is not trusted", pinned_root.problems)
 
@@ -211,7 +253,7 @@ class RekorVector(unittest.TestCase):
                                 require_rekor=True)
         self.assertTrue(report.valid, report.problems)
         self.assertEqual(self.v["origin"], report.rekor_origin)
-        self.assertEqual(["rekorLogIndex", "rekorOrigin", "problems"], list(report.to_dict())[-3:])
+        self.assertEqual(["rekorLogIndex", "rekorOrigin", "disclosedPrompts", "problems"], list(report.to_dict())[-4:])
 
 
 class ReportVector(unittest.TestCase):

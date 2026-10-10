@@ -22,6 +22,7 @@
 * [Agent Keys and Key Binding](#agent-keys-and-key-binding)
 * [A2A Gateway](#a2a-gateway)
 * [HTTP Message Signatures](#http-message-signatures)
+* [Model and Prompt](#model-and-prompt)
 * [Compliance Profiles](#compliance-profiles)
 * [Erasure](#erasure)
 * [Retention and Legal Holds](#retention-and-legal-holds)
@@ -375,6 +376,7 @@ export LEDGER_SIGNING_PUBLIC_KEY=$(openssl pkey -inform DER -in ledger-signing.d
 | `inputHash`     | Lowercase SHA-256 of the input                                                                                |
 | `outputHash`    | Lowercase SHA-256 of the output                                                                               |
 | `outcome`       | `SUCCEEDED`, `FAILED`, `DENIED` or `PENDING` (required); `DENY` requires `DENIED`, `PENDING` requires `ALLOW` |
+| `model`         | The model the agent ran: `name`, `version`, `promptHash` and `configHash`, each optional                      |
 | `correlationId` | Caller correlation, for example a conversation (personal)                                                     |
 | `attributes`    | Up to 32 string attributes (personal)                                                                         |
 | `salts`         | A random 16-byte base64url salt for each personal field; `null` once erased                                   |
@@ -389,7 +391,7 @@ The personal fields are `principalId`, `target`, `reason`, `correlationId` and e
 `attributes.{name}`. The hash never covers their values, only their commitments: the SHA-256 of the canonical JSON of
 `field`, `salt` and `value`, where an absent value is `null`. The content hash is the SHA-256 of the canonical JSON of
 `format`, `id`, `occurredAt`, `recordedAt`, `agentId`, `action`, `decision`, `delegationId`, `inputHash`,
-`outputHash`, `outcome` and `commitments`. Whoever holds an entry with its salts recomputes the commitments and
+`outputHash`, `outcome`, `model` when the entry names one, and `commitments`. Whoever holds an entry with its salts recomputes the commitments and
 the hash; once the salts and values are [erased](#erasure), the stored commitments still prove the entry's place in the
 chain. The link (`sequence`, `previousHash`, `contentHash`, `hash`) can be checked without the content, so a
 package can keep entries private and still prove the chain. Canonical JSON has sorted keys, no whitespace and `null`
@@ -1136,6 +1138,64 @@ Step 3. Call a tool through the ledger with an agent that has a grant on `check/
 curl -s -X POST http://localhost:8090/mcp/check -H "Authorization: Bearer {agentApiKey}" -H "X-Ledger-Principal: alice" -H "Content-Type: application/json" -d '{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"echo","arguments":{}}}'
 ```
 
+## Model and Prompt
+
+<p style="text-align: justify;">
+
+Evidence names the model the agent ran in `model`: its `name`, its `version`, the `promptHash` of its system prompt and
+the `configHash` of its configuration, such as temperature and tools, each a lowercase SHA-256. The content hash covers
+`model`, so the model of an action cannot change afterwards, and a change of model, version or prompt shows up
+between two entries. Entries without a model hash as they did before. A [compliance profile](#compliance-profiles) can
+require `model`, `modelVersion`, `promptHash` or `configHash`. Through the [MCP gateway](#mcp-gateway) and the
+[A2A gateway](#a2a-gateway) the agent sends the headers `X-Ledger-Model`, `X-Ledger-Model-Version`,
+`X-Ledger-Prompt-Hash` and `X-Ledger-Config-Hash`; `POST /api/v1/decisions` takes the same `model` object as
+evidence, and the ledger records it with the decision and its outcome.
+
+</p>
+
+<p style="text-align: justify;">
+
+The hash alone proves which prompt ran only to someone who has the text. `PUT /api/v1/prompts` stores a prompt or
+configuration text, addressed by the SHA-256 of its UTF-8 bytes, and answers its `hash`; storing the same text again
+changes nothing. An agent or the operator may store texts, only the operator reads them with
+`GET /api/v1/prompts/{hash}`, and the ledger never changes or deletes them. With `"includePrompts": true` a package,
+report or dispute carries `prompts`, the stored texts named by its disclosed entries, and the verifier checks that
+each text matches its hash and is named by a disclosed entry.
+
+</p>
+
+Step 1. Start the ledger as in [Run](#run).
+
+Step 2. Store the system prompt; the answer must show the same hash as `sha256sum`:
+
+```shell
+PROMPT='You pay approved invoices of Acme up to 500 EUR.'
+curl -s -X PUT http://localhost:8090/api/v1/prompts -H "Authorization: Bearer $LEDGER_API_KEY" -H "Content-Type: application/json" -d "{\"text\":\"$PROMPT\"}" | jq -r .hash
+printf '%s' "$PROMPT" | sha256sum
+```
+
+Step 3. Record an action with its model and sign a checkpoint; the answer must show the model:
+
+```shell
+PROMPT_HASH=$(printf '%s' "$PROMPT" | sha256sum | cut -d' ' -f1)
+curl -s -X POST http://localhost:8090/api/v1/evidence -H "Authorization: Bearer $LEDGER_API_KEY" -H "Content-Type: application/json" -d "{\"agentId\":\"payments-agent\",\"principalId\":\"alice\",\"action\":\"tools/call\",\"target\":\"bank/pay_invoice\",\"decision\":\"ALLOW\",\"outcome\":\"SUCCEEDED\",\"model\":{\"name\":\"claude-sonnet-5-5\",\"version\":\"2026-09-01\",\"promptHash\":\"$PROMPT_HASH\"}}" | jq -c '{sequence, model}'
+curl -s -X POST http://localhost:8090/api/v1/checkpoints -H "Authorization: Bearer $LEDGER_API_KEY" | jq -c '{sequence}'
+```
+
+Step 4. Export a package with the prompt texts; the answer must show the prompt:
+
+```shell
+curl -s -X POST http://localhost:8090/api/v1/packages -H "Authorization: Bearer $LEDGER_API_KEY" -H "Content-Type: application/json" -d '{"agentId":"payments-agent","includePrompts":true}' > package.json
+jq -c '.prompts' package.json
+```
+
+Step 5. Verify the package; the output must show
+`Prompts     : 1 prompt texts match the hashes their entries name` and `Result: VALID`:
+
+```shell
+java -jar verifier/target/verifier-1.0.0-SNAPSHOT-exec.jar package.json
+```
+
 ## Compliance Profiles
 
 <p style="text-align: justify;">
@@ -1161,7 +1221,8 @@ ledger ships three:
 
 Your own profile is a file `{id}.json` in `LEDGER_COMPLIANCE_PROFILE_DIRECTORY`; adding a jurisdiction needs no change
 to the ledger. A required field is one of `target`, `reason`, `delegationId`, `inputHash`, `outputHash`,
-`correlationId` and `occurredAt`, or an attribute as `attributes.{name}`; evidence an agent records without it is
+`correlationId`, `occurredAt`, `model`, `modelVersion`, `promptHash` and `configHash`, or an attribute as
+`attributes.{name}`; evidence an agent records without it is
 refused with HTTP 400. When a profile limits the region, `LEDGER_COMPLIANCE_REGION` must name where the ledger and its
 database run, and the ledger does not start when it is missing or not allowed; the ledger trusts what it is told and
 cannot see where its servers really are. Every checkpoint signs the id and SHA-256 digest of the canonical JSON of each
@@ -1474,13 +1535,13 @@ requirements; it is not legal advice and not a certification of compliance.
 
 </p>
 
-| Template            | Profiles | Sections                                                                            |
-|---------------------|----------|-------------------------------------------------------------------------------------|
-| `dispute`           | all      | Incident timeline, authority, outcomes, integrity, what the package shows and hides |
-| `eu-ai-act-logging` | `eu`     | EU AI Act Articles 12(1), 12(2), 12(3), 19(1) with 26(6), and the integrity of logs |
-| `dora-ict-records`  | `eu`     | DORA Articles 9(3), 9(4)(c), 17 and 28(3)                                           |
-| `finra-supervision` | `us`     | FINRA Rule 3110(a), 3110(b) and the exceptions for review                           |
-| `sec-17a-4-records` | `us`     | SEC Rule 17a-4(b), 17a-4(f)(2) for storage and time, and 17a-4(f)(3) for the copy   |
+| Template            | Profiles | Sections                                                                          |
+|---------------------|----------|-----------------------------------------------------------------------------------|
+| `dispute`           | all      | Incident timeline, authority, outcomes, model, integrity, what the package shows  |
+| `eu-ai-act-logging` | `eu`     | EU AI Act Articles 12(1), 12(2), 12(2)(a), 12(3), 19(1) with 26(6), and integrity |
+| `dora-ict-records`  | `eu`     | DORA Articles 9(3), 9(4)(c), 17 and 28(3)                                         |
+| `finra-supervision` | `us`     | FINRA Rule 3110(a), 3110(b) and the exceptions for review                         |
+| `sec-17a-4-records` | `us`     | SEC Rule 17a-4(b), 17a-4(f)(2) for storage and time, and 17a-4(f)(3) for the copy |
 
 <p style="text-align: justify;">
 
@@ -1554,7 +1615,7 @@ java -jar verifier/target/verifier-1.0.0-SNAPSHOT-exec.jar dispute --public-key 
 with the published RFC 8032 test keys: canonical JSON, the evidence chain and checkpoints, Merkle roots and proofs,
 signed notes and cosignatures, SCITT statements and receipts, an SD-JWT VC mandate, a key-bound mandate with its
 KB-JWT, an HTTP message signature, a checkpoint that signs compliance profiles, an RFC 3161 token from a real
-timestamp authority, a Rekor entry from a real Rekor v2 log and a signed dispute report. Another implementation checks itself against them, and `ConformanceVectorsTest` in `ledger/verifier` fails when the ledger's own output changes.
+timestamp authority, a Rekor entry from a real Rekor v2 log and a signed dispute report and an entry that names its model and prompt. Another implementation checks itself against them, and `ConformanceVectorsTest` in `ledger/verifier` fails when the ledger's own output changes.
 
 </p>
 
@@ -1564,76 +1625,78 @@ All `/api/**`, `/mcp/**` and `/a2a/out/**` endpoints require `Authorization: Bea
 API key, except `/api/v1/principal/**`, which requires a principal token from the OIDC provider and answers
 `403 FORBIDDEN` to everyone else. Operator-only endpoints answer `403 FORBIDDEN` to agents.
 
-| Method | Path                                       | Description                                                                                            |
-|--------|--------------------------------------------|--------------------------------------------------------------------------------------------------------|
-| POST   | `/api/v1/evidence`                         | Record an entry with the fields the compliance profiles require; `201` with `Location`                 |
-| POST   | `/api/v1/evidence/batch`                   | Record up to 500 entries in order as one run, all or none; an item error names its `index`             |
-| GET    | `/api/v1/evidence/{id}`                    | Get an evidence entry                                                                                  |
-| GET    | `/api/v1/evidence/{id}/statement`          | The entry as a SCITT signed statement (`application/cose`)                                             |
-| GET    | `/api/v1/evidence/{id}/receipt`            | RFC 9942 receipt for the entry at `treeSize`, by default the latest log checkpoint                     |
-| GET    | `/api/v1/evidence`                         | List entries by `agentId`, `principalId`, `after` and `limit` (max 500)                                |
-| GET    | `/api/v1/ledger/head`                      | Current sequence and hash                                                                              |
-| POST   | `/api/v1/checkpoints`                      | Sign the current head now; `409 LEDGER_EMPTY` when nothing is recorded (operator)                      |
-| GET    | `/api/v1/checkpoints/latest`               | Latest checkpoint, with its RFC 3161 `timestamp`, `timestampedAt` and Rekor `rekorLogIndex` when set   |
-| GET    | `/api/v1/checkpoints`                      | List checkpoints by `after` and `limit`                                                                |
-| GET    | `/api/v1/log/proofs/inclusion`             | Inclusion proof for a `sequence` in the log at `treeSize`, by default the latest log checkpoint        |
-| GET    | `/api/v1/log/proofs/consistency`           | Consistency proof from `firstSize` to `secondSize`, by default the latest log checkpoint               |
-| GET    | `/api/v1/keys`                             | Signing keys with their status, rotation and revocation records                                        |
-| POST   | `/api/v1/keys/{keyId}/revocation`          | Revoke a retired key as compromised from `compromisedAt`, with a `reason` (operator)                   |
-| POST   | `/api/v1/packages`                         | Export an evidence package by `agentId`, `principalId`, `fromSequence` and `toSequence` (operator)     |
-| POST   | `/api/v1/packages/verify`                  | Verify a package with the verifier library, pinned to `publicKey` when given (operator)                |
-| GET    | `/api/v1/reports`                          | The report templates of the active compliance profiles (operator)                                      |
-| POST   | `/api/v1/reports/{id}`                     | A signed report over the package for the scope in the body; HTML with `format=html` (operator)         |
-| POST   | `/api/v1/disputes`                         | A ZIP dispute package for the scope, `title` and `description` in the body (operator)                  |
-| GET    | `/api/v1/verification`                     | Full verification report (operator)                                                                    |
-| POST   | `/api/v1/agents`                           | Register an agent and return its API key once (operator)                                               |
-| GET    | `/api/v1/agents`                           | List agents by `after` and `limit` (operator)                                                          |
-| GET    | `/api/v1/agents/{agentId}`                 | Get an agent                                                                                           |
-| POST   | `/api/v1/agents/{agentId}/disable`         | Disable an agent and its key (operator)                                                                |
-| POST   | `/api/v1/agents/{agentId}/key`             | Issue a new API key; the old one stops working (operator)                                              |
-| PUT    | `/api/v1/agents/{agentId}/signing-key`     | Register the agent's Ed25519 `publicKey`; the agent sets it once, the operator can replace it          |
-| POST   | `/api/v1/grants`                           | Create a grant (operator), or ask for one for itself (agent, only with OIDC)                           |
-| GET    | `/api/v1/grants`                           | List grants by `agentId`, `principalId`, `after` and `limit`                                           |
-| GET    | `/api/v1/grants/{id}`                      | Get a grant with its status and uses                                                                   |
-| POST   | `/api/v1/grants/{id}/revoke`               | Revoke a grant with an optional `reason` (operator)                                                    |
-| POST   | `/api/v1/principals/{principalId}/erasure` | Erase the principal's personal data past retention, with an optional `reason` (operator)               |
-| POST   | `/api/v1/legal-holds`                      | Place a legal hold on a `principalId` with a `reason` (operator)                                       |
-| GET    | `/api/v1/legal-holds`                      | List legal holds, only the active ones with `active=true` (operator)                                   |
-| GET    | `/api/v1/legal-holds/{id}`                 | Get a legal hold (operator)                                                                            |
-| POST   | `/api/v1/legal-holds/{id}/release`         | Release a legal hold with a `reason` (operator)                                                        |
-| POST   | `/api/v1/retention/sweep`                  | Erase what the profiles no longer allow and continue pending erasures now (operator)                   |
-| GET    | `/api/v1/principal/evidence`               | The evidence about the principal by `after` and `limit`                                                |
-| GET    | `/api/v1/principal`                        | The signed-in principal                                                                                |
-| GET    | `/api/v1/principal/grants`                 | List the principal's grants by `state`, `after` and `limit`                                            |
-| GET    | `/api/v1/principal/grants/{id}`            | Get one of the principal's grants                                                                      |
-| POST   | `/api/v1/principal/grants`                 | Create a grant on the principal's own behalf; returns `201`                                            |
-| POST   | `/api/v1/principal/grants/{id}/approve`    | Approve a pending grant                                                                                |
-| POST   | `/api/v1/principal/grants/{id}/deny`       | Deny a pending grant with an optional `reason`                                                         |
-| POST   | `/api/v1/principal/grants/{id}/revoke`     | Revoke one of the principal's grants with an optional `reason`                                         |
-| POST   | `/api/v1/decisions`                        | Decide an action for an agent and record it; returns `201`                                             |
-| GET    | `/api/v1/decisions/{id}`                   | Get a decision and its outcome                                                                         |
-| POST   | `/api/v1/decisions/{id}/outcome`           | Report `SUCCEEDED` or `FAILED` once for an allowed decision                                            |
-| POST   | `/api/v1/mandates`                         | Issue a signed mandate from a grant; returns `201`                                                     |
-| GET    | `/api/v1/mandates`                         | List the mandates of a `grantId`                                                                       |
-| GET    | `/api/v1/mandates/{id}`                    | Get a mandate, its token and status                                                                    |
-| POST   | `/api/v1/mandates/{id}/revoke`             | Revoke a mandate with an optional `reason` (operator)                                                  |
-| GET    | `/public/v1/keys`                          | Active and retired signing keys as a JWK set, no API key                                               |
-| GET    | `/public/v1/mandates/status`               | Signed mandate status list, no API key                                                                 |
-| GET    | `/public/v1/log/checkpoint`                | Latest log checkpoint as a signed note with its cosignatures, no API key                               |
-| GET    | `/public/v1/log/key`                       | Verifier key of the log, no API key                                                                    |
-| GET    | `/public/v1/witness/key`                   | Verifier key this ledger cosigns with as a witness, no API key                                         |
-| POST   | `/public/v1/witness/add-checkpoint`        | C2SP witness endpoint: cosign a watched log's checkpoint, `404` when it watches none, no API key       |
-| GET    | `/public/v1/compliance`                    | Active compliance profiles with their digests and the combined rules, no API key                       |
-| GET    | `/public/v1/timestamp-authority`           | The RFC 3161 timestamp authority and its certificate chain in PEM, no API key                          |
-| GET    | `/public/v1/rekor`                         | The Rekor log the ledger anchors checkpoints in and its verifier key, no API key                       |
-| GET    | `/public/v1/oidc`                          | The OIDC issuer and client for principal sign-in, `404` without OIDC                                   |
-| POST   | `/mcp/{server}`                            | MCP gateway: decide, forward and record a `tools/call`; forward other messages                         |
-| GET    | `/mcp/{server}`                            | Relay the MCP server-to-client stream                                                                  |
-| DELETE | `/mcp/{server}`                            | Close an MCP session on the server                                                                     |
-| POST   | `/a2a/out/{peer}`                          | A2A gateway: decide, attach a mandate and request proof, forward and record with the peer's receipt    |
-| POST   | `/a2a/in/{agent}`                          | A2A inbound: verify the mandate and proof, forward to the agent, record and sign a receipt; no API key |
-| GET    | `/api/v1/a2a/exchanges/{id}`               | Get an A2A exchange with its mandate, request proof and receipt                                        |
-| GET    | `/actuator/health`                         | Health, open for probes                                                                                |
+| Method | Path                                       | Description                                                                                             |
+|--------|--------------------------------------------|---------------------------------------------------------------------------------------------------------|
+| POST   | `/api/v1/evidence`                         | Record an entry with the fields the compliance profiles require; `201` with `Location`                  |
+| POST   | `/api/v1/evidence/batch`                   | Record up to 500 entries in order as one run, all or none; an item error names its `index`              |
+| GET    | `/api/v1/evidence/{id}`                    | Get an evidence entry                                                                                   |
+| GET    | `/api/v1/evidence/{id}/statement`          | The entry as a SCITT signed statement (`application/cose`)                                              |
+| GET    | `/api/v1/evidence/{id}/receipt`            | RFC 9942 receipt for the entry at `treeSize`, by default the latest log checkpoint                      |
+| GET    | `/api/v1/evidence`                         | List entries by `agentId`, `principalId`, `after` and `limit` (max 500)                                 |
+| GET    | `/api/v1/ledger/head`                      | Current sequence and hash                                                                               |
+| POST   | `/api/v1/checkpoints`                      | Sign the current head now; `409 LEDGER_EMPTY` when nothing is recorded (operator)                       |
+| GET    | `/api/v1/checkpoints/latest`               | Latest checkpoint, with its RFC 3161 `timestamp`, `timestampedAt` and Rekor `rekorLogIndex` when set    |
+| GET    | `/api/v1/checkpoints`                      | List checkpoints by `after` and `limit`                                                                 |
+| GET    | `/api/v1/log/proofs/inclusion`             | Inclusion proof for a `sequence` in the log at `treeSize`, by default the latest log checkpoint         |
+| GET    | `/api/v1/log/proofs/consistency`           | Consistency proof from `firstSize` to `secondSize`, by default the latest log checkpoint                |
+| GET    | `/api/v1/keys`                             | Signing keys with their status, rotation and revocation records                                         |
+| POST   | `/api/v1/keys/{keyId}/revocation`          | Revoke a retired key as compromised from `compromisedAt`, with a `reason` (operator)                    |
+| POST   | `/api/v1/packages`                         | Export a package by `agentId`, `principalId`, `fromSequence`, `toSequence`; `includePrompts` (operator) |
+| POST   | `/api/v1/packages/verify`                  | Verify a package with the verifier library, pinned to `publicKey` when given (operator)                 |
+| GET    | `/api/v1/reports`                          | The report templates of the active compliance profiles (operator)                                       |
+| POST   | `/api/v1/reports/{id}`                     | A signed report over the package for the scope in the body; HTML with `format=html` (operator)          |
+| POST   | `/api/v1/disputes`                         | A ZIP dispute package for the scope, `title` and `description` in the body (operator)                   |
+| PUT    | `/api/v1/prompts`                          | Store a prompt or configuration `text` and answer its `hash`; `201` when new (agent or operator)        |
+| GET    | `/api/v1/prompts/{hash}`                   | A stored prompt text with when and by whom it was stored (operator)                                     |
+| GET    | `/api/v1/verification`                     | Full verification report (operator)                                                                     |
+| POST   | `/api/v1/agents`                           | Register an agent and return its API key once (operator)                                                |
+| GET    | `/api/v1/agents`                           | List agents by `after` and `limit` (operator)                                                           |
+| GET    | `/api/v1/agents/{agentId}`                 | Get an agent                                                                                            |
+| POST   | `/api/v1/agents/{agentId}/disable`         | Disable an agent and its key (operator)                                                                 |
+| POST   | `/api/v1/agents/{agentId}/key`             | Issue a new API key; the old one stops working (operator)                                               |
+| PUT    | `/api/v1/agents/{agentId}/signing-key`     | Register the agent's Ed25519 `publicKey`; the agent sets it once, the operator can replace it           |
+| POST   | `/api/v1/grants`                           | Create a grant (operator), or ask for one for itself (agent, only with OIDC)                            |
+| GET    | `/api/v1/grants`                           | List grants by `agentId`, `principalId`, `after` and `limit`                                            |
+| GET    | `/api/v1/grants/{id}`                      | Get a grant with its status and uses                                                                    |
+| POST   | `/api/v1/grants/{id}/revoke`               | Revoke a grant with an optional `reason` (operator)                                                     |
+| POST   | `/api/v1/principals/{principalId}/erasure` | Erase the principal's personal data past retention, with an optional `reason` (operator)                |
+| POST   | `/api/v1/legal-holds`                      | Place a legal hold on a `principalId` with a `reason` (operator)                                        |
+| GET    | `/api/v1/legal-holds`                      | List legal holds, only the active ones with `active=true` (operator)                                    |
+| GET    | `/api/v1/legal-holds/{id}`                 | Get a legal hold (operator)                                                                             |
+| POST   | `/api/v1/legal-holds/{id}/release`         | Release a legal hold with a `reason` (operator)                                                         |
+| POST   | `/api/v1/retention/sweep`                  | Erase what the profiles no longer allow and continue pending erasures now (operator)                    |
+| GET    | `/api/v1/principal/evidence`               | The evidence about the principal by `after` and `limit`                                                 |
+| GET    | `/api/v1/principal`                        | The signed-in principal                                                                                 |
+| GET    | `/api/v1/principal/grants`                 | List the principal's grants by `state`, `after` and `limit`                                             |
+| GET    | `/api/v1/principal/grants/{id}`            | Get one of the principal's grants                                                                       |
+| POST   | `/api/v1/principal/grants`                 | Create a grant on the principal's own behalf; returns `201`                                             |
+| POST   | `/api/v1/principal/grants/{id}/approve`    | Approve a pending grant                                                                                 |
+| POST   | `/api/v1/principal/grants/{id}/deny`       | Deny a pending grant with an optional `reason`                                                          |
+| POST   | `/api/v1/principal/grants/{id}/revoke`     | Revoke one of the principal's grants with an optional `reason`                                          |
+| POST   | `/api/v1/decisions`                        | Decide an action for an agent and record it; returns `201`                                              |
+| GET    | `/api/v1/decisions/{id}`                   | Get a decision and its outcome                                                                          |
+| POST   | `/api/v1/decisions/{id}/outcome`           | Report `SUCCEEDED` or `FAILED` once for an allowed decision                                             |
+| POST   | `/api/v1/mandates`                         | Issue a signed mandate from a grant; returns `201`                                                      |
+| GET    | `/api/v1/mandates`                         | List the mandates of a `grantId`                                                                        |
+| GET    | `/api/v1/mandates/{id}`                    | Get a mandate, its token and status                                                                     |
+| POST   | `/api/v1/mandates/{id}/revoke`             | Revoke a mandate with an optional `reason` (operator)                                                   |
+| GET    | `/public/v1/keys`                          | Active and retired signing keys as a JWK set, no API key                                                |
+| GET    | `/public/v1/mandates/status`               | Signed mandate status list, no API key                                                                  |
+| GET    | `/public/v1/log/checkpoint`                | Latest log checkpoint as a signed note with its cosignatures, no API key                                |
+| GET    | `/public/v1/log/key`                       | Verifier key of the log, no API key                                                                     |
+| GET    | `/public/v1/witness/key`                   | Verifier key this ledger cosigns with as a witness, no API key                                          |
+| POST   | `/public/v1/witness/add-checkpoint`        | C2SP witness endpoint: cosign a watched log's checkpoint, `404` when it watches none, no API key        |
+| GET    | `/public/v1/compliance`                    | Active compliance profiles with their digests and the combined rules, no API key                        |
+| GET    | `/public/v1/timestamp-authority`           | The RFC 3161 timestamp authority and its certificate chain in PEM, no API key                           |
+| GET    | `/public/v1/rekor`                         | The Rekor log the ledger anchors checkpoints in and its verifier key, no API key                        |
+| GET    | `/public/v1/oidc`                          | The OIDC issuer and client for principal sign-in, `404` without OIDC                                    |
+| POST   | `/mcp/{server}`                            | MCP gateway: decide, forward and record a `tools/call`; forward other messages                          |
+| GET    | `/mcp/{server}`                            | Relay the MCP server-to-client stream                                                                   |
+| DELETE | `/mcp/{server}`                            | Close an MCP session on the server                                                                      |
+| POST   | `/a2a/out/{peer}`                          | A2A gateway: decide, attach a mandate and request proof, forward and record with the peer's receipt     |
+| POST   | `/a2a/in/{agent}`                          | A2A inbound: verify the mandate and proof, forward to the agent, record and sign a receipt; no API key  |
+| GET    | `/api/v1/a2a/exchanges/{id}`               | Get an A2A exchange with its mandate, request proof and receipt                                         |
+| GET    | `/actuator/health`                         | Health, open for probes                                                                                 |
 
 ```json
 {

@@ -51,13 +51,13 @@ class EvidenceEntryTest {
     void aChangedValueOrSaltNoLongerMatchesTheHash() {
         EvidenceEntry entry = entry();
         EvidenceEntry otherPrincipal = new EvidenceEntry(entry.id(), 1, NOW, NOW, "agent-1", "bob", "tools/call",
-                "crm/lookup", "ALLOW", null, null, entry.inputHash(), null, "SUCCEEDED", "conversation-7",
-                entry.attributes(), entry.salts(), null, Hashes.GENESIS, entry.hash());
+                "crm/lookup", "ALLOW", null, null, entry.inputHash(), null, "SUCCEEDED", null,
+                "conversation-7", entry.attributes(), entry.salts(), null, Hashes.GENESIS, entry.hash());
         TreeMap<String, String> salts = new TreeMap<>(entry.salts());
         salts.put("principalId", "AAAAAAAAAAAAAAAAAAAAAA");
         EvidenceEntry otherSalt = new EvidenceEntry(entry.id(), 1, NOW, NOW, "agent-1", "alice", "tools/call",
-                "crm/lookup", "ALLOW", null, null, entry.inputHash(), null, "SUCCEEDED", "conversation-7",
-                entry.attributes(), salts, null, Hashes.GENESIS, entry.hash());
+                "crm/lookup", "ALLOW", null, null, entry.inputHash(), null, "SUCCEEDED", null,
+                "conversation-7", entry.attributes(), salts, null, Hashes.GENESIS, entry.hash());
 
         assertThat(otherPrincipal.computeHash()).isNotEqualTo(entry.hash());
         assertThat(otherSalt.computeHash()).isNotEqualTo(entry.hash());
@@ -70,10 +70,30 @@ class EvidenceEntryTest {
         salts.remove("attributes.customer");
 
         assertThatThrownBy(() -> new EvidenceEntry(entry.id(), 1, NOW, NOW, "agent-1", "alice", "tools/call",
-                "crm/lookup", "ALLOW", null, null, null, null, "SUCCEEDED", null, entry.attributes(), salts, null,
+                "crm/lookup", "ALLOW", null, null, null, null, "SUCCEEDED", null, null, entry.attributes(), salts, null,
                 Hashes.GENESIS, null)).isInstanceOf(IllegalArgumentException.class);
         assertThatThrownBy(() -> new EvidenceEntry(entry.id(), 1, NOW, NOW, "agent-1", "alice", "tools/call",
-                null, "ALLOW", null, null, null, null, "SUCCEEDED", null, null, null, entry.commitments(),
+                null, "ALLOW", null, null, null, null, "SUCCEEDED", null, null, null, null, entry.commitments(),
                 Hashes.GENESIS, null)).isInstanceOf(IllegalArgumentException.class);
+    }
+
+    @Test
+    void theModelIsHashedOnlyWhenNamed() {
+        EvidenceEntry plain = entry();
+        String prompt = Hashes.sha256("You pay invoices.".getBytes(java.nio.charset.StandardCharsets.UTF_8));
+        EvidenceEntry named = new EvidenceEntry(plain.id(), 1, NOW, NOW, "agent-1", "alice", "tools/call",
+                "crm/lookup", "ALLOW", null, null, plain.inputHash(), null, "SUCCEEDED",
+                AgentModel.of("claude-opus-5-5", "2026-09-01", prompt, null), "conversation-7", plain.attributes(),
+                plain.salts(), null, Hashes.GENESIS, null).sealed();
+
+        assertThat(CanonicalJson.write(plain.canonicalContent())).doesNotContain("model");
+        assertThat(CanonicalJson.write(named.canonicalContent()))
+                .contains("\"model\":{\"name\":\"claude-opus-5-5\",\"promptHash\":\"" + prompt
+                        + "\",\"version\":\"2026-09-01\"}");
+        assertThat(named.hash()).isNotEqualTo(plain.hash());
+        assertThat(named.erase().computeHash()).isEqualTo(named.hash());
+        assertThat(AgentModel.of(null, null, null, null)).isNull();
+        assertThatThrownBy(() -> AgentModel.of("m", null, "not-a-hash", null))
+                .isInstanceOf(IllegalArgumentException.class);
     }
 }

@@ -182,6 +182,7 @@ export function App() {
 
 function Result({ verification }: { verification: Verification }) {
   const { report, pinned, timestampPinned, rekorPinned, entries } = verification
+  const modelled = entries.some((entry) => entry.model !== null)
   const rows: [string, string][] = [
     ['Signing key', report.keyId ?? 'none'],
     ['Pinned key', report.pinnedKeyId ?? 'not pinned'],
@@ -199,6 +200,9 @@ function Result({ verification }: { verification: Verification }) {
     ['Anchor', report.anchorSequence === null ? 'none, the chain starts at entry 1' : String(report.anchorSequence)],
     ['Checked links', `${report.checkedLinks} from sequence ${report.firstSequence}`],
     ['Disclosed entries', String(report.disclosedEntries)],
+    ...(report.disclosedPrompts > 0
+      ? [['Prompts', `${report.disclosedPrompts} prompt texts match the hashes their entries name`] as [string, string]]
+      : []),
     ['Scope', `agent ${report.agentId ?? 'any'}, principal ${report.principalId ?? 'any'}`],
     ['Transparency log', report.logOrigin ? `${report.logOrigin}, tree size ${report.logTreeSize}` : 'none'],
     ['Inclusion proofs', String(report.provenEntries)],
@@ -251,6 +255,7 @@ function Result({ verification }: { verification: Verification }) {
                 <th>Target</th>
                 <th>Decision</th>
                 <th>Outcome</th>
+                {modelled && <th>Model</th>}
               </tr>
             </thead>
             <tbody>
@@ -264,6 +269,7 @@ function Result({ verification }: { verification: Verification }) {
                   <td>{entry.erased ? <em>erased</em> : (entry.target ?? '')}</td>
                   <td>{entry.decision ?? ''}</td>
                   <td>{entry.outcome}</td>
+                  {modelled && <td>{entry.model ?? ''}</td>}
                 </tr>
               ))}
             </tbody>

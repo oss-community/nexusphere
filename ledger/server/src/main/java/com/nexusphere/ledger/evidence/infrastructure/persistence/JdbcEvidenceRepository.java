@@ -1,5 +1,6 @@
 package com.nexusphere.ledger.evidence.infrastructure.persistence;
 
+import com.nexusphere.ledger.chain.AgentModel;
 import com.nexusphere.ledger.chain.CanonicalJson;
 import com.nexusphere.ledger.chain.EvidenceEntry;
 import com.nexusphere.ledger.evidence.domain.model.EvidenceQuery;
@@ -29,7 +30,7 @@ class JdbcEvidenceRepository implements EvidenceRepository {
 
     private static final String SELECT = """
             select r.id, r.sequence, r.occurred_at, r.recorded_at, r.agent_id, r.action, r.decision, r.delegation_id,
-                   r.input_hash, r.output_hash, r.outcome, r.commitments, r.previous_hash, r.hash,
+                   r.input_hash, r.output_hash, r.outcome, r.model, r.commitments, r.previous_hash, r.hash,
                    p.nonce, p.ciphertext, k.data_key
             from ledger.evidence_record r
             left join ledger.evidence_personal p on p.evidence_id = r.id
@@ -63,10 +64,10 @@ class JdbcEvidenceRepository implements EvidenceRepository {
         PrincipalKey key = principalKey(entry.principalId());
         jdbc.update("""
                 insert into ledger.evidence_record (id, sequence, occurred_at, recorded_at, agent_id, principal_ref,
-                    action, decision, delegation_id, input_hash, output_hash, outcome, commitments, previous_hash,
-                    hash)
+                    action, decision, delegation_id, input_hash, output_hash, outcome, model, commitments,
+                    previous_hash, hash)
                 values (:id, :sequence, :occurredAt, :recordedAt, :agentId, :principalRef, :action, :decision,
-                    :delegationId, :inputHash, :outputHash, :outcome, :commitments, :previousHash, :hash)
+                    :delegationId, :inputHash, :outputHash, :outcome, :model, :commitments, :previousHash, :hash)
                 """, new MapSqlParameterSource()
                 .addValue("id", entry.id())
                 .addValue("sequence", entry.sequence())
@@ -80,6 +81,7 @@ class JdbcEvidenceRepository implements EvidenceRepository {
                 .addValue("inputHash", entry.inputHash())
                 .addValue("outputHash", entry.outputHash())
                 .addValue("outcome", entry.outcome())
+                .addValue("model", entry.model() == null ? null : CanonicalJson.write(entry.model().toMap()))
                 .addValue("commitments", CanonicalJson.write(entry.commitments()))
                 .addValue("previousHash", entry.previousHash())
                 .addValue("hash", entry.hash()));
@@ -195,7 +197,7 @@ class JdbcEvidenceRepository implements EvidenceRepository {
             return new EvidenceEntry(id, rs.getLong("sequence"), instant(rs, "occurred_at"),
                     instant(rs, "recorded_at"), rs.getString("agent_id"), null, rs.getString("action"), null,
                     rs.getString("decision"), null, rs.getString("delegation_id"), rs.getString("input_hash"),
-                    rs.getString("output_hash"), rs.getString("outcome"), null, null, null, commitments,
+                    rs.getString("output_hash"), rs.getString("outcome"), model(rs), null, null, null, commitments,
                     rs.getString("previous_hash"), rs.getString("hash"));
         }
         JsonNode personal = json.readTree(PersonalCipher.open(key, id, rs.getBytes("nonce"), ciphertext));
@@ -203,8 +205,18 @@ class JdbcEvidenceRepository implements EvidenceRepository {
                 rs.getString("agent_id"), text(personal, "principalId"), rs.getString("action"),
                 text(personal, "target"), rs.getString("decision"), text(personal, "reason"),
                 rs.getString("delegation_id"), rs.getString("input_hash"), rs.getString("output_hash"),
-                rs.getString("outcome"), text(personal, "correlationId"), strings(personal.path("attributes")),
+                rs.getString("outcome"), model(rs), text(personal, "correlationId"), strings(personal.path("attributes")),
                 strings(personal.path("salts")), null, rs.getString("previous_hash"), rs.getString("hash"));
+    }
+
+    private AgentModel model(ResultSet rs) throws SQLException {
+        String model = rs.getString("model");
+        if (model == null) {
+            return null;
+        }
+        JsonNode node = json.readTree(model);
+        return AgentModel.of(text(node, "name"), text(node, "version"), text(node, "promptHash"),
+                text(node, "configHash"));
     }
 
     private static SortedMap<String, String> strings(JsonNode node) {

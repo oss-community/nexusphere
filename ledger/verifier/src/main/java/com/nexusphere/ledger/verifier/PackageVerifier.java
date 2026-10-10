@@ -1,5 +1,6 @@
 package com.nexusphere.ledger.verifier;
 
+import com.nexusphere.ledger.chain.AgentModel;
 import com.nexusphere.ledger.chain.ChainVerification;
 import com.nexusphere.ledger.chain.ChainVerifier;
 import com.nexusphere.ledger.chain.Checkpoint;
@@ -19,6 +20,7 @@ import com.nexusphere.ledger.chain.TimestampToken;
 import com.nexusphere.ledger.chain.TrustedKeys;
 import tools.jackson.databind.JsonNode;
 
+import java.nio.charset.StandardCharsets;
 import java.security.cert.X509Certificate;
 import java.time.Duration;
 import java.time.Instant;
@@ -115,6 +117,7 @@ public final class PackageVerifier {
         long first = anchor == null ? 1 : anchor.checkpoint().sequence() + 1;
         ChainVerifier chain = new ChainVerifier(first, anchor == null ? Hashes.GENESIS : anchor.checkpoint().headHash());
         long disclosed = 0;
+        Set<String> named = new LinkedHashSet<>();
         String agentId = nullable(pkg.path("scope"), "agentId");
         String principalId = nullable(pkg.path("scope"), "principalId");
         long from = pkg.path("scope").path("fromSequence").asLong(1);
@@ -124,6 +127,12 @@ public final class PackageVerifier {
                     text(node, "contentHash"), text(node, "hash"));
             if (node.path("entry").isObject()) {
                 disclosed++;
+                JsonNode model = node.path("entry").path("model");
+                for (String field : List.of("promptHash", "configHash")) {
+                    if (model.path(field).isString()) {
+                        named.add(model.path(field).asString());
+                    }
+                }
                 String mismatch = disclosedMismatch(node.path("entry"), link, agentId, principalId, from, to);
                 if (mismatch != null) {
                     problems.add("sequence " + link.sequence() + ": " + mismatch);
@@ -145,6 +154,7 @@ public final class PackageVerifier {
         if (disclosed == 0) {
             problems.add("the package discloses no evidence");
         }
+        long prompts = prompts(pkg, named, problems);
         LogResult log = keys == null ? LogResult.NONE
                 : log(pkg, keys.values(), checkpoint.checkpoint().sequence(), witnessKeys, requiredWitnesses, problems);
         Set<String> used = new LinkedHashSet<>();
@@ -158,7 +168,7 @@ public final class PackageVerifier {
         return report(problems.isEmpty(), checkpoint.checkpoint().keyId(), pinnedKeyId(pinnedPublicKey),
                 anchor == null ? null : anchor.checkpoint().sequence(), checkpoint.checkpoint().sequence(),
                 checkpoint.checkpoint().createdAt().toString(), checkpoint.checkpoint().profiles(), first,
-                result.checkedEntries(), disclosed, pkg, log, revoked, stamp, anchored, problems);
+                result.checkedEntries(), disclosed, pkg, log, revoked, stamp, anchored, prompts, problems);
     }
 
     private static RekorEntry.Verification rekor(JsonNode node, SignedCheckpoint checkpoint,
@@ -359,8 +369,29 @@ public final class PackageVerifier {
                 nullable(node, "agentId"), nullable(node, "principalId"), nullable(node, "action"),
                 nullable(node, "target"), nullable(node, "decision"), nullable(node, "reason"),
                 nullable(node, "delegationId"), nullable(node, "inputHash"), nullable(node, "outputHash"),
-                nullable(node, "outcome"), nullable(node, "correlationId"), strings(node.path("attributes")), salts,
-                commitments, text(node, "previousHash"), text(node, "hash"));
+                nullable(node, "outcome"), model(node.path("model")), nullable(node, "correlationId"),
+                strings(node.path("attributes")), salts, commitments, text(node, "previousHash"), text(node, "hash"));
+    }
+
+    private static AgentModel model(JsonNode node) {
+        return node.isObject() ? AgentModel.of(nullable(node, "name"), nullable(node, "version"),
+                nullable(node, "promptHash"), nullable(node, "configHash")) : null;
+    }
+
+    private static long prompts(JsonNode pkg, Set<String> named, List<String> problems) {
+        long verified = 0;
+        for (JsonNode prompt : pkg.path("prompts")) {
+            String hash = prompt.path("hash").asString(null);
+            String text = prompt.path("text").asString(null);
+            if (hash == null || text == null || !Hashes.sha256(text.getBytes(StandardCharsets.UTF_8)).equals(hash)) {
+                problems.add("prompt " + hash + " does not match its text");
+            } else if (!named.contains(hash)) {
+                problems.add("prompt " + hash + " is not named by a disclosed entry");
+            } else {
+                verified++;
+            }
+        }
+        return verified;
     }
 
     private static TreeMap<String, String> strings(JsonNode node) {
@@ -482,20 +513,20 @@ public final class PackageVerifier {
                                         long disclosed, JsonNode pkg,
                                         LogResult log, List<String> revoked, List<String> problems) {
         return report(valid, keyId, pinnedKeyId, anchor, checkpoint, createdAt, profiles, first, checked, disclosed,
-                pkg, log, revoked, null, null, problems);
+                pkg, log, revoked, null, null, 0, problems);
     }
 
     private static PackageReport report(boolean valid, String keyId, String pinnedKeyId, Long anchor, long checkpoint,
                                         String createdAt, List<Checkpoint.Profile> profiles, long first, long checked,
                                         long disclosed, JsonNode pkg, LogResult log, List<String> revoked,
                                         TimestampToken.Verification stamp, RekorEntry.Verification anchored,
-                                        List<String> problems) {
+                                        long prompts, List<String> problems) {
         return new PackageReport(valid, keyId, pinnedKeyId, anchor, checkpoint, createdAt,
                 profiles == null ? List.of() : profiles, first, checked, disclosed,
                 nullable(pkg.path("scope"), "agentId"), nullable(pkg.path("scope"), "principalId"), log.origin(),
                 log.size(), log.proven(), log.receipted(), log.witnesses(), List.copyOf(revoked),
                 stamp == null ? null : stamp.genTime().toString(), stamp == null ? null : stamp.authority(),
-                anchored == null ? null : anchored.logIndex(), anchored == null ? null : anchored.origin(),
+                anchored == null ? null : anchored.logIndex(), anchored == null ? null : anchored.origin(), prompts,
                 List.copyOf(problems));
     }
 

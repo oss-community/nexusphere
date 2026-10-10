@@ -19,6 +19,7 @@ _SHA256_HEX = re.compile(r"^[0-9a-f]{64}$")
 
 CONTENT_FIELDS = ("agentId", "action", "decision", "delegationId", "inputHash", "outputHash", "outcome")
 PERSONAL_FIELDS = ("principalId", "target", "reason", "correlationId")
+MODEL_FIELDS = ("name", "version", "promptHash", "configHash")
 ATTRIBUTE = "attributes."
 
 
@@ -36,8 +37,21 @@ def canonical_content(entry: dict) -> dict:
     for field in CONTENT_FIELDS:
         value = entry.get(field)
         content[field] = value if isinstance(value, str) else None
+    model = agent_model(entry.get("model"))
+    if model:
+        content["model"] = model
     content["commitments"] = commitments(entry)
     return content
+
+
+def agent_model(node) -> Optional[dict]:
+    if not isinstance(node, dict):
+        return None
+    model = {field: node[field] for field in MODEL_FIELDS if isinstance(node.get(field), str)}
+    for field in ("promptHash", "configHash"):
+        if field in model and not is_sha256(model[field]):
+            raise ValueError(field + " must be a lowercase hex SHA-256 digest")
+    return model or None
 
 
 def personal_values(entry: dict) -> dict:

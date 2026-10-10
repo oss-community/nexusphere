@@ -2,7 +2,7 @@ import base64
 import copy
 import unittest
 
-from nexusphere_ledger import verify_package
+from nexusphere_ledger import sha256_hex, verify_package
 from nexusphere_ledger.evidence import Checkpoint
 from nexusphere_ledger.keys import KeyRevocation, KeyRotation, PrivateKey
 
@@ -163,6 +163,49 @@ class PackageVerification(unittest.TestCase):
         pkg = package(self.chain, {1})
         pkg["checkpoint"]["signature"] = base64.b64encode(b"x" * 64).decode()
         self.assertIn("the signature of checkpoint 6 is not valid", verify_package(pkg, PINNED).problems)
+
+
+class Prompts(unittest.TestCase):
+
+    PROMPT = "Pay approved invoices only."
+
+    def setUp(self):
+        self.prompt_hash = sha256_hex(self.PROMPT)
+        self.chain = entries(3, models={2: {"name": "model-a", "version": "1", "promptHash": self.prompt_hash}})
+
+    def test_prompt_texts_match_the_hashes_their_entries_name(self):
+        pkg = package(self.chain, {2})
+        pkg["prompts"] = [{"hash": self.prompt_hash, "text": self.PROMPT}]
+        report = verify_package(pkg, PINNED)
+        self.assertTrue(report.valid, report.problems)
+        self.assertEqual(1, report.disclosed_prompts)
+        self.assertEqual("disclosedPrompts", list(report.to_dict())[22])
+        pkg["links"][1]["entry"]["model"]["version"] = "2"
+        self.assertIn("sequence 2: the disclosed entry does not match its content hash",
+                      verify_package(pkg, PINNED).problems)
+
+    def test_a_prompt_must_match_its_text_and_be_named_by_an_entry(self):
+        other = sha256_hex("Something else.")
+        pkg = package(self.chain, {2})
+        pkg["prompts"] = [{"hash": self.prompt_hash, "text": "Pay every invoice."},
+                          {"hash": other, "text": "Something else."},
+                          {"text": "No hash."}]
+        report = verify_package(pkg, PINNED)
+        self.assertEqual(["prompt %s does not match its text" % self.prompt_hash,
+                          "prompt %s is not named by a disclosed entry" % other,
+                          "prompt null does not match its text"], report.problems)
+        self.assertEqual(0, report.disclosed_prompts)
+
+    def test_a_prompt_of_an_undisclosed_entry_is_not_named(self):
+        pkg = package(self.chain, {1, 3})
+        pkg["prompts"] = [{"hash": self.prompt_hash, "text": self.PROMPT}]
+        self.assertEqual(["prompt %s is not named by a disclosed entry" % self.prompt_hash],
+                         verify_package(pkg, PINNED).problems)
+
+    def test_an_invalid_prompt_hash_makes_the_entry_unreadable(self):
+        pkg = package(self.chain, {2})
+        pkg["links"][1]["entry"]["model"]["promptHash"] = self.prompt_hash.upper()
+        self.assertIn("sequence 2: the disclosed entry cannot be read", verify_package(pkg, PINNED).problems)
 
 
 class RevokedKeys(unittest.TestCase):

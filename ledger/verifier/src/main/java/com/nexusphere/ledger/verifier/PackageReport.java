@@ -27,5 +27,6 @@ public record PackageReport(
         String timestampAuthority,
         Long rekorLogIndex,
         String rekorOrigin,
+        long disclosedPrompts,
         List<String> problems) {
 }

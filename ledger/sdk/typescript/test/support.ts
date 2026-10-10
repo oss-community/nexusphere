@@ -71,7 +71,12 @@ export function witnessNoteKey(): Promise<NoteKey> {
   return NoteKey.of(WITNESS, COSIGNATURE, WITNESS_KEY.publicKey);
 }
 
-export async function entries(count: number, agents = ["invoice-agent", "sales-agent"], principals = ["acme", "globex"]) {
+export async function entries(
+  count: number,
+  agents = ["invoice-agent", "sales-agent"],
+  principals = ["acme", "globex"],
+  models: Record<number, Json> = {},
+) {
   const chain: Json[] = [];
   let previous = GENESIS;
   for (let index = 0; index < count; index++) {
@@ -96,6 +101,9 @@ export async function entries(count: number, agents = ["invoice-agent", "sales-a
       attributes: { tool: "read_invoice" },
       previousHash: previous,
     };
+    if (models[sequence]) {
+      entry.model = models[sequence];
+    }
     entry.salts = await salts(sequence, ["principalId", "target", "reason", "correlationId", "attributes.tool"]);
     entry.hash = await linkHash(sequence, previous, await contentHash(entry));
     previous = entry.hash as string;

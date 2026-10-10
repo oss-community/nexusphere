@@ -115,7 +115,7 @@ public class DecisionService {
         EvidenceEntry entry = evidence.record(new EvidenceSubmission(clock.instant(), decision.agentId(),
                 decision.principalId(), decision.action(), decision.target(), Decision.ALLOW, report.reason(),
                 decided.delegationId(), decided.inputHash(), report.outputHash(), report.outcome(),
-                decided.correlationId(), attributes));
+                decided.correlationId(), attributes, decided.model()));
         decisions.recordOutcome(decisionId, report.outcome(), entry.id());
         return new DecisionResult(get(decisionId, callerAgentId), report.reason(), entry);
     }
@@ -171,7 +171,7 @@ public class DecisionService {
                                                  String reason, String grantId, Instant now) {
         return new EvidenceSubmission(now, r.agentId(), r.principalId(), r.action(), r.target(), decision,
                 reason == null ? null : truncate(reason), grantId, r.inputHash(), null, outcome, r.correlationId(),
-                r.attributes());
+                r.attributes(), r.model());
     }
 
     private static String truncate(String reason) {

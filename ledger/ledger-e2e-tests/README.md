@@ -101,6 +101,7 @@ other, which watches it, to cosign its log checkpoints over the C2SP witness pro
 |                           | Outcomes are reported once by the deciding agent for allowed actions only     |
 |                           | An agent cannot ask for another agent's decision and the chain stays valid    |
 | `McpGatewayE2ETest`       | An allowed tool call is forwarded and recorded with its outcome               |
+|                           | The model headers are recorded with the decision and its outcome              |
 |                           | A denied tool call never reaches the server                                   |
 |                           | Tool errors are recorded as failed outcomes                                   |
 |                           | Streamed responses are returned as JSON                                       |
@@ -173,6 +174,7 @@ other, which watches it, to cosign its log checkpoints over the C2SP witness pro
 |                           | Only the reports of the active profiles are offered                           |
 |                           | A profile can name only the reports the ledger has templates for              |
 |                           | A dispute package holds everything needed to check it                         |
+| `ModelE2ETest`            | The model and prompt are recorded, required and disclosed with their texts    |
 
 ##
 

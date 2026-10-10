@@ -51,8 +51,8 @@ class A2aController {
             Caller caller, @PathVariable String peer,
             @RequestHeader(name = PRINCIPAL_HEADER, required = false) String principalId,
             @RequestHeader(name = A2aOutbound.MANDATE_HEADER, required = false) String mandate,
-            @RequestBody byte[] body) {
-        return respond(outbound.send(caller, peer, principalId, mandate, body));
+            @RequestHeader HttpHeaders headers, @RequestBody byte[] body) {
+        return respond(outbound.send(caller, peer, principalId, mandate, headers, body));
     }
 
     @PostMapping("/a2a/in/{agent}")

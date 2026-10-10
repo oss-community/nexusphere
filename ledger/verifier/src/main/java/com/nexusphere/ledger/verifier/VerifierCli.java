@@ -308,6 +308,9 @@ public final class VerifierCli {
         out.println("  Disclosed   : " + r.disclosedEntries() + " entries"
                 + (r.agentId() == null ? "" : ", agent " + r.agentId())
                 + (r.principalId() == null ? "" : ", principal " + r.principalId()));
+        if (r.disclosedPrompts() > 0) {
+            out.println("  Prompts     : " + r.disclosedPrompts() + " prompt texts match the hashes their entries name");
+        }
         if (r.logTreeSize() != null) {
             out.println("  Log         : " + r.logOrigin() + ", " + r.logTreeSize() + " entries, "
                     + r.provenEntries() + " disclosed entries proven");

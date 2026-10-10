@@ -23,7 +23,7 @@ public record ComplianceProfile(String id, int version, String name, String desc
                                 List<String> timestampAuthorities, List<String> reports) {
 
     public static final Set<String> FIELDS = Set.of("target", "reason", "delegationId", "inputHash", "outputHash",
-            "correlationId", "occurredAt");
+            "correlationId", "occurredAt", "model", "modelVersion", "promptHash", "configHash");
     public static final String ATTRIBUTE_FIELD = "attributes.";
 
     private static final Set<String> KEYS = Set.of("id", "version", "name", "description", "retention", "erasure",

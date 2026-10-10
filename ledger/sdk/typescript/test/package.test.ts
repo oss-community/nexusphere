@@ -8,6 +8,7 @@ import {
   NoteKey,
   PrivateKey,
   readCertificates,
+  sha256Hex,
   toBase64,
   verifyPackage,
   utf8,
@@ -46,6 +47,46 @@ describe("verifyPackage", async () => {
       logOrigin: "ledger.example",
       logTreeSize: 6,
     });
+  });
+
+  it("checks the prompt texts against the hashes their entries name", async () => {
+    const prompt = "Pay approved invoices only.";
+    const promptHash = await sha256Hex(prompt);
+    const modelled = await entries(3, undefined, undefined, { 2: { name: "model-a", version: "1", promptHash } });
+    const pkg = (await buildPackage(modelled, [2])) as any;
+    pkg.prompts = [{ hash: promptHash, text: prompt }];
+    const report = await verifyPackage(pkg, PINNED);
+    expect(report.problems).toEqual([]);
+    expect(report.disclosedPrompts).toBe(1);
+    pkg.links[1].entry.model.version = "2";
+    expect((await verifyPackage(pkg, PINNED)).valid).toBe(false);
+  });
+
+  it("finds prompt texts that do not match or are not named", async () => {
+    const promptHash = await sha256Hex("Pay approved invoices only.");
+    const other = await sha256Hex("Something else.");
+    const modelled = await entries(3, undefined, undefined, { 2: { name: "model-a", version: "1", promptHash } });
+    const pkg = (await buildPackage(modelled, [2])) as any;
+    pkg.prompts = [
+      { hash: promptHash, text: "Pay every invoice." },
+      { hash: other, text: "Something else." },
+      { text: "No hash." },
+    ];
+    const report = await verifyPackage(pkg, PINNED);
+    expect(report.problems).toEqual([
+      `prompt ${promptHash} does not match its text`,
+      `prompt ${other} is not named by a disclosed entry`,
+      "prompt null does not match its text",
+    ]);
+    expect(report.disclosedPrompts).toBe(0);
+    expect((await verifyPackage(await buildPackage(chain, [2]), PINNED)).disclosedPrompts).toBe(0);
+  });
+
+  it("reads a disclosed entry with a malformed model as unreadable", async () => {
+    const modelled = await entries(3, undefined, undefined, { 2: { name: "model-a" } });
+    const pkg = (await buildPackage(modelled, [2])) as any;
+    pkg.links[1].entry.model.promptHash = "not-a-hash";
+    expect((await verifyPackage(pkg, PINNED)).problems).toContain("sequence 2: the disclosed entry cannot be read");
   });
 
   it("reports the compliance profiles the checkpoint signs", async () => {
@@ -166,7 +207,7 @@ describe("verifyPackage", async () => {
       requiredWitnesses: 0 });
     expect(report.problems).toEqual([]);
     expect(report).toMatchObject({ timestampedAt: v.genTime, timestampAuthority: v.authority });
-    expect(Object.keys(report).slice(-5, -2)).toEqual(["timestampedAt", "timestampAuthority", "rekorLogIndex"]);
+    expect(Object.keys(report).slice(-6, -3)).toEqual(["timestampedAt", "timestampAuthority", "rekorLogIndex"]);
     expect((await verifyPackage(pkg, PINNED, { timestampCertificates: chain.slice(2) })).problems).toContain(
       "the timestamp of checkpoint 3: the timestamp authority is not trusted",
     );
@@ -186,8 +227,8 @@ describe("verifyPackage", async () => {
       requiredWitnesses: 0 });
     expect(report.problems).toEqual([]);
     expect(report).toMatchObject({ valid: true, rekorLogIndex: Number(v.entry.logIndex), rekorOrigin: "rekor.local" });
-    expect(Object.keys(report).slice(-5)).toEqual([
-      "timestampedAt", "timestampAuthority", "rekorLogIndex", "rekorOrigin", "problems",
+    expect(Object.keys(report).slice(-6)).toEqual([
+      "timestampedAt", "timestampAuthority", "rekorLogIndex", "rekorOrigin", "disclosedPrompts", "problems",
     ]);
     expect((await verifyPackage(pkg, PINNED, { requiredWitnesses: 0 })).rekorOrigin).toBe("rekor.local");
     const other = await NoteKey.of("rekor.local", ED25519, LEDGER_KEY.publicKey);

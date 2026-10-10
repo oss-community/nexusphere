@@ -265,6 +265,8 @@ def _print_package(r, timestamp_pinned, rekor_pinned, out):
     out.write("  Disclosed   : %d entries%s%s\n" % (r.disclosed_entries,
                                                     "" if r.agent_id is None else ", agent " + r.agent_id,
                                                     "" if r.principal_id is None else ", principal " + r.principal_id))
+    if r.disclosed_prompts > 0:
+        out.write("  Prompts     : %d prompt texts match the hashes their entries name\n" % r.disclosed_prompts)
     if r.log_tree_size is not None:
         out.write("  Log         : %s, %d entries, %d disclosed entries proven\n"
                   % (r.log_origin, r.log_tree_size, r.proven_entries))

@@ -3,6 +3,13 @@ export interface Page<T> {
   nextAfter: number | string | null
 }
 
+export interface EvidenceModel {
+  name: string | null
+  version: string | null
+  promptHash: string | null
+  configHash: string | null
+}
+
 export interface Evidence {
   format: string
   id: string
@@ -20,6 +27,7 @@ export interface Evidence {
   outputHash: string | null
   outcome: string
   correlationId: string | null
+  model?: EvidenceModel | null
   attributes: Record<string, string>
   erased: boolean
   salts: Record<string, string> | null

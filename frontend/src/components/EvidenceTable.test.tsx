@@ -36,4 +36,25 @@ describe('EvidenceTable', () => {
     await userEvent.setup().click(screen.getByText('invoice-agent'))
     expect(screen.getByText('ab'.repeat(32))).toBeInTheDocument()
   })
+
+  it('shows the model of an entry', async () => {
+    const entry: Evidence = {
+      ...ERASED,
+      erased: false,
+      principalId: 'alice',
+      target: 'invoice-42',
+      model: { name: 'gpt-5', version: '2026-09-01', promptHash: '12'.repeat(32), configHash: null },
+    }
+    render(<EvidenceTable items={[entry]} />)
+    await userEvent.setup().click(screen.getByText('invoice-agent'))
+    expect(screen.getByText('gpt-5 (2026-09-01)')).toBeInTheDocument()
+    expect(screen.getByText('12'.repeat(32))).toBeInTheDocument()
+    expect(screen.queryByText('Config hash')).not.toBeInTheDocument()
+  })
+
+  it('omits the model when the entry has none', async () => {
+    render(<EvidenceTable items={[{ ...ERASED, model: null }]} />)
+    await userEvent.setup().click(screen.getByText('invoice-agent'))
+    expect(screen.queryByText('Model')).not.toBeInTheDocument()
+  })
 })

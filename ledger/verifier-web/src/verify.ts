@@ -10,6 +10,7 @@ export interface Entry {
   target: string | null
   decision: string | null
   outcome: string
+  model: string | null
   erased: boolean
 }
 
@@ -115,6 +116,16 @@ function entriesOf(pkg: Record<string, unknown>): Entry[] {
       target: entry.target == null ? null : String(entry.target),
       decision: entry.decision == null ? null : String(entry.decision),
       outcome: String(entry.outcome ?? ''),
+      model: modelOf(entry.model),
       erased: !entry.salts || typeof entry.salts !== 'object',
     }))
+}
+
+function modelOf(model: unknown): string | null {
+  if (!model || typeof model !== 'object') {
+    return null
+  }
+  const { name, version } = model as Record<string, unknown>
+  const parts = [name, version].filter((part): part is string => typeof part === 'string' && part !== '')
+  return parts.length ? parts.join(' ') : null
 }

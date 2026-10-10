@@ -159,6 +159,47 @@ describe("evidence-chain.json", () => {
   });
 });
 
+describe("evidence-model.json", () => {
+  function modelEntry(v: any): Json {
+    const { commitments: _, ...content } = v.content;
+    return { ...content, ...v.values, salts: v.salts, sequence: 1, previousHash: v.previousHash, hash: v.hash };
+  }
+
+  it("binds the model into the content hash", async () => {
+    const v = vector("evidence-model.json");
+    const entry = modelEntry(v);
+    expect(canonicalJson(await canonicalContent(entry))).toBe(v.canonicalContent);
+    expect(await commitments(entry)).toEqual(v.content.commitments);
+    expect(await contentHash(entry)).toBe(v.contentHash);
+    expect(await linkHash(1, v.previousHash, v.contentHash)).toBe(v.hash);
+    expect(await new ChainVerifier().accept(entry)).toBe(true);
+    for (const prompt of v.prompts) {
+      expect(await sha256Hex(prompt.text)).toBe(prompt.hash);
+    }
+    expect([v.model.promptHash, v.model.configHash]).toEqual(v.prompts.map((p: any) => p.hash));
+  });
+
+  it("hashes an entry without a model as before", async () => {
+    const v = vector("evidence-model.json");
+    const { model: _, ...unnamed } = modelEntry(v);
+    expect(await canonicalContent(unnamed)).not.toHaveProperty("model");
+    expect(await canonicalContent({ ...unnamed, model: { name: null } })).not.toHaveProperty("model");
+    expect(await contentHash(unnamed)).not.toBe(v.contentHash);
+    expect(await contentHash({ ...unnamed, model: null })).toBe(await contentHash(unnamed));
+  });
+
+  it("keeps only the given model fields and requires lowercase hashes", async () => {
+    const v = vector("evidence-model.json");
+    const entry = modelEntry(v);
+    const named = { ...entry, model: { name: v.model.name, version: null } };
+    expect((await canonicalContent(named)).model).toEqual({ name: v.model.name });
+    const changed = { ...entry, model: { ...v.model, version: "2026-09-02" } };
+    expect(await contentHash(changed)).not.toBe(v.contentHash);
+    const upper = { ...entry, model: { ...v.model, promptHash: v.model.promptHash.toUpperCase() } };
+    await expect(contentHash(upper)).rejects.toThrow("promptHash must be a lowercase hex SHA-256 digest");
+  });
+});
+
 describe("merkle-tree.json", async () => {
   const v = vector("merkle-tree.json");
   const leaves = await Promise.all([0, 1, 2, 3, 4, 5, 6, 7].map((i) => merkle.leafHash(Uint8Array.of(i))));

@@ -39,11 +39,12 @@ import java.util.zip.ZipOutputStream;
 @RestController
 class ReportController {
 
-    record ReportRequest(String agentId, String principalId, Long fromSequence, Long toSequence) {
+    record ReportRequest(String agentId, String principalId, Long fromSequence, Long toSequence,
+                         Boolean includePrompts) {
     }
 
     record DisputeRequest(String agentId, String principalId, Long fromSequence, Long toSequence, String title,
-                          String description) {
+                          String description, Boolean includePrompts) {
     }
 
     private static final JsonMapper PRETTY = JsonMapper.builder().enable(SerializationFeature.INDENT_OUTPUT).build();
@@ -79,9 +80,9 @@ class ReportController {
                              @RequestBody(required = false) ReportRequest request) {
         caller.requireOperator();
         reports.template(id);
-        ReportRequest r = request == null ? new ReportRequest(null, null, null, null) : request;
+        ReportRequest r = request == null ? new ReportRequest(null, null, null, null, null) : request;
         JsonNode pkg = documents.tree(documents.export(new PackageRequest(r.agentId(), r.principalId(),
-                r.fromSequence(), r.toSequence())));
+                r.fromSequence(), r.toSequence()), Boolean.TRUE.equals(r.includePrompts())));
         Map<String, Object> report = reports.create(id, pkg, documents.verifyWithAnchors(pkg), null);
         if ("html".equals(format)) {
             return ResponseEntity.ok().contentType(new MediaType(MediaType.TEXT_HTML, StandardCharsets.UTF_8))
@@ -108,7 +109,7 @@ class ReportController {
         }
         reports.template(ReportTemplates.DISPUTE);
         JsonNode pkg = documents.tree(documents.export(new PackageRequest(request.agentId(), request.principalId(),
-                request.fromSequence(), request.toSequence())));
+                request.fromSequence(), request.toSequence()), Boolean.TRUE.equals(request.includePrompts())));
         PackageReport verification = documents.verifyWithAnchors(pkg);
         Map<String, Object> report = reports.create(ReportTemplates.DISPUTE, pkg, verification,
                 new ReportService.Subject(request.title().trim(), request.description()));
@@ -157,7 +158,8 @@ class ReportController {
                 Created %s from checkpoint %d of the ledger.
 
                 Files
-                  package.json             The evidence package: entries, hash chain, checkpoints, log proofs, receipts
+                  package.json             The evidence package: entries, hash chain, checkpoints, log proofs, receipts,
+                                           and the prompt texts of its entries when they were asked for
                   report.json              The dispute report, signed by the ledger
                   report.html              The same report for reading and printing
                   keys.json                The ledger's signing keys with their rotations and revocations

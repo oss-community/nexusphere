@@ -26,6 +26,7 @@ public record EvidenceEntry(
         String inputHash,
         String outputHash,
         String outcome,
+        AgentModel model,
         String correlationId,
         SortedMap<String, String> attributes,
         SortedMap<String, String> salts,
@@ -65,7 +66,16 @@ public record EvidenceEntry(
                          String correlationId, SortedMap<String, String> attributes, String previousHash,
                          String hash) {
         this(id, sequence, occurredAt, recordedAt, agentId, principalId, action, target, decision, reason,
-                delegationId, inputHash, outputHash, outcome, correlationId, attributes,
+                delegationId, inputHash, outputHash, outcome, null, correlationId, attributes, previousHash, hash);
+    }
+
+    public EvidenceEntry(UUID id, long sequence, Instant occurredAt, Instant recordedAt, String agentId,
+                         String principalId, String action, String target, String decision, String reason,
+                         String delegationId, String inputHash, String outputHash, String outcome, AgentModel model,
+                         String correlationId, SortedMap<String, String> attributes, String previousHash,
+                         String hash) {
+        this(id, sequence, occurredAt, recordedAt, agentId, principalId, action, target, decision, reason,
+                delegationId, inputHash, outputHash, outcome, model, correlationId, attributes,
                 newSalts(attributes == null ? Map.of() : attributes), null, previousHash, hash);
     }
 
@@ -93,13 +103,14 @@ public record EvidenceEntry(
 
     public EvidenceEntry erase() {
         return new EvidenceEntry(id, sequence, occurredAt, recordedAt, agentId, null, action, null, decision, null,
-                delegationId, inputHash, outputHash, outcome, null, null, null, commitments, previousHash, hash);
+                delegationId, inputHash, outputHash, outcome, model, null, null, null, commitments, previousHash,
+                hash);
     }
 
     public EvidenceEntry sealed() {
         return new EvidenceEntry(id, sequence, occurredAt, recordedAt, agentId, principalId, action, target, decision,
-                reason, delegationId, inputHash, outputHash, outcome, correlationId, attributes, salts, commitments,
-                previousHash, computeHash());
+                reason, delegationId, inputHash, outputHash, outcome, model, correlationId, attributes, salts,
+                commitments, previousHash, computeHash());
     }
 
     public String computeHash() {
@@ -127,6 +138,9 @@ public record EvidenceEntry(
         content.put("inputHash", inputHash);
         content.put("outputHash", outputHash);
         content.put("outcome", outcome);
+        if (model != null && !model.toMap().isEmpty()) {
+            content.put("model", model.toMap());
+        }
         content.put("commitments", commitments);
         return content;
     }

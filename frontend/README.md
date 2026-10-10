@@ -23,7 +23,7 @@ same origin, so it needs no CORS on the ledger.
 ## Responsibilities
 
 * Operator pages: the ledger head, checkpoints and signing keys, full verification, evidence with filters and entry
-  details, erased entries marked with their commitments, agents, grants with their mandates, evidence package export
+  details (including the model name, version, prompt hash and config hash when recorded), erased entries marked with their commitments, agents, grants with their mandates, evidence package export
   and verification, a Reports page that creates the signed reports of the active compliance profiles and dispute
   packages, A2A exchanges, and a Privacy page to erase principals, place and release legal holds and run the
   retention pass

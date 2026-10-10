@@ -4,8 +4,8 @@ import uuid
 from datetime import datetime, timedelta, timezone
 
 from nexusphere_ledger import (Denied, EvidenceLink, EvidenceStatement, LedgerClient, LedgerError, LogReceipt,
-                               MandateVerifier, Note, NoteKey, PrivateKey, PublicKey, SdJwt, present_bound,
-                               verify_package)
+                               MandateVerifier, Note, NoteKey, PrivateKey, PublicKey, SdJwt, hash_of,
+                               present_bound, verify_package)
 
 URL = os.environ.get("NEXUSPHERE_LEDGER_URL")
 OPERATOR_KEY = os.environ.get("NEXUSPHERE_LEDGER_API_KEY", "nexusphere-ledger-development-key-change-me")
@@ -64,6 +64,27 @@ class LiveLedger(unittest.TestCase):
         self.assertEqual(single, self.agent.evidence(single["id"]))
         ids = [entry["id"] for entry in self.agent.iter_evidence(limit=2)]
         self.assertIn(single["id"], ids)
+
+    def test_model_and_prompts(self):
+        prompt = "You read invoices of alice. " + uuid.uuid4().hex
+        prompt_hash = self.agent.store_prompt(prompt)
+        self.assertEqual(hash_of(prompt), prompt_hash)
+        self.assertEqual(prompt_hash, self.agent.store_prompt(prompt))
+        self.assertEqual(prompt, self.operator.prompt(prompt_hash)["text"])
+        model = {"name": "model-a", "version": "1", "promptHash": prompt_hash}
+        recorded = self.agent.record(self.agent_id, "alice", "tools/call", "SUCCEEDED", target="read_invoice",
+                                     model=model)
+        self.assertEqual("model-a", recorded["model"]["name"])
+        with self.agent.act("alice", "tools/call", "read_invoice", model=model) as action:
+            action.output("contents")
+        self.operator.create_checkpoint()
+        pinned = self.operator.active_public_key()
+        self.assertNotIn("prompts", self.operator.export_package(agent_id=self.agent_id))
+        pkg = self.operator.export_package(agent_id=self.agent_id, include_prompts=True)
+        self.assertIn(prompt, [p["text"] for p in pkg["prompts"]])
+        report = verify_package(pkg, pinned)
+        self.assertTrue(report.valid, report.problems)
+        self.assertEqual(len(pkg["prompts"]), report.disclosed_prompts)
 
     def test_mandate_from_live_ledger(self):
         issued = self.operator.issue_mandate(self.grant["id"], "https://supplier.example")

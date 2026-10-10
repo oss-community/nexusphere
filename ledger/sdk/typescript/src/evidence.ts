@@ -22,6 +22,15 @@ export const CONTENT_FIELDS = [
   "outcome",
 ] as const;
 
+export const MODEL_FIELDS = ["name", "version", "promptHash", "configHash"] as const;
+
+export interface AgentModel {
+  name?: string | null;
+  version?: string | null;
+  promptHash?: string | null;
+  configHash?: string | null;
+}
+
 export const PERSONAL_FIELDS = ["principalId", "target", "reason", "correlationId"] as const;
 export const ATTRIBUTE = "attributes.";
 
@@ -48,8 +57,31 @@ export async function canonicalContent(entry: Json): Promise<Json> {
     const value = entry[field];
     content[field] = typeof value === "string" ? value : null;
   }
+  const model = agentModel(entry.model);
+  if (model) {
+    content.model = model;
+  }
   content.commitments = await commitments(entry);
   return content;
+}
+
+export function agentModel(value: unknown): Record<string, string> | null {
+  if (!isObject(value)) {
+    return null;
+  }
+  const model: Record<string, string> = {};
+  for (const field of MODEL_FIELDS) {
+    const given = value[field];
+    if (typeof given === "string") {
+      model[field] = given;
+    }
+  }
+  for (const field of ["promptHash", "configHash"]) {
+    if (field in model && !isSha256(model[field])) {
+      throw new Error(field + " must be a lowercase hex SHA-256 digest");
+    }
+  }
+  return Object.keys(model).length > 0 ? model : null;
 }
 
 export async function contentHash(entry: Json): Promise<string> {
