@@ -85,8 +85,8 @@ public final class PackageVerifier {
                                        List<NoteKey> witnessKeys, int requiredWitnesses, TimestampPolicy timestamps,
                                        RekorPolicy rekor) {
         List<String> problems = new ArrayList<>();
-        if (!FORMAT.equals(text(pkg, "format"))) {
-            problems.add("unknown package format " + text(pkg, "format"));
+        if (!FORMAT.equals(pkg.path("format").asString(null))) {
+            problems.add("unknown package format " + pkg.path("format").asString(null));
             return report(false, null, null, null, 0, null, null, 0, 0, 0, pkg, LogResult.NONE, List.of(), problems);
         }
         SignedCheckpoint checkpoint;

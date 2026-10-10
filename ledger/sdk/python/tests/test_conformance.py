@@ -16,6 +16,7 @@ from nexusphere_ledger.note import COSIGNATURE, ED25519, LogCheckpoint, Note, No
 
 from nexusphere_ledger.package import verify_package
 from nexusphere_ledger.rekor import rekor_request, verify_rekor_entry
+from nexusphere_ledger.report import entries_digest, report_signed_bytes
 from nexusphere_ledger.timestamp import TimestampToken, read_certificates
 
 from .support import ISSUER, LEDGER_KEY, ORIGIN, WITNESS, WITNESS_KEY, package, vector
@@ -211,6 +212,22 @@ class RekorVector(unittest.TestCase):
         self.assertTrue(report.valid, report.problems)
         self.assertEqual(self.v["origin"], report.rekor_origin)
         self.assertEqual(["rekorLogIndex", "rekorOrigin", "problems"], list(report.to_dict())[-3:])
+
+
+class ReportVector(unittest.TestCase):
+
+    def test_signed_report(self):
+        v = vector("report.json")
+        signed = report_signed_bytes(v["report"])
+        self.assertEqual(v["signedBytes"], signed.decode("utf-8"))
+        self.assertEqual(LEDGER_KEY.key_id, v["report"]["keyId"])
+        self.assertTrue(LEDGER_KEY.public_key.verify_base64(signed, v["report"]["signature"]))
+        self.assertEqual([entry["hash"] for entry in chain_entries()], v["entryHashes"])
+        self.assertEqual(v["entriesDigest"], entries_digest(v["entryHashes"]))
+        self.assertEqual(v["entriesDigest"], v["report"]["evidence"]["entriesDigest"])
+        changed = json.loads(json.dumps(v["report"]))
+        changed["sections"][0]["status"] = "NOT_SHOWN"
+        self.assertFalse(LEDGER_KEY.public_key.verify_base64(report_signed_bytes(changed), changed["signature"]))
 
 
 class MerkleTreeVector(unittest.TestCase):

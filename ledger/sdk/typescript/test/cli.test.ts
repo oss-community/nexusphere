@@ -8,11 +8,14 @@ import {
   ISSUER,
   LEDGER_KEY,
   buildPackage,
+  buildReport,
   entries,
+  keyRecord,
   rekorPackage,
   timestampedPackage,
   vector,
   witnessNoteKey,
+  zip,
 } from "./support.js";
 
 async function cli(...args: string[]) {
@@ -132,5 +135,111 @@ describe("nexusphere-ledger-verify", () => {
     const unbound = await cli(...common, "--require-key-binding", vector("mandate.json").token);
     expect(unbound.code).toBe(INVALID);
     expect(unbound.out).toContain("KEY_NOT_BOUND");
+  });
+
+  it("verifies a report against its package", async () => {
+    const pkg = await buildPackage(await entries(4), [2], { witness: true });
+    const packagePath = join(directory, "report-package.json");
+    const reportPath = join(directory, "report.json");
+    writeFileSync(packagePath, JSON.stringify(pkg));
+    writeFileSync(reportPath, JSON.stringify(await buildReport(pkg)));
+    const witness = (await witnessNoteKey()).vkey;
+    const key = LEDGER_KEY.publicKey.encoded;
+    const valid = await cli("report", "--public-key", key, "--witness", witness, "--package", packagePath, reportPath);
+    expect(valid.code).toBe(VALID);
+    expect(valid.out).toContain(
+      "Result: VALID\n" +
+        "Nexusphere Ledger report\n" +
+        "  Report      : dispute (Dispute package)\n" +
+        `  Signed by   : ${LEDGER_KEY.keyId}\n` +
+        "  Evidence    : checkpoint 4, 1 entries\n" +
+        "  Sections    : 1 shown\n" +
+        "Result: VALID\n",
+    );
+    expect(valid.out).not.toContain("Archive");
+    const json = await cli("report", "--json", "--public-key", key, "--witnesses-required", "0", "--package",
+      packagePath, reportPath);
+    const result = JSON.parse(json.out);
+    expect(json.code).toBe(VALID);
+    expect(Object.keys(result)).toEqual(["valid", "package", "report", "takenFromArchive"]);
+    expect(result).toMatchObject({ valid: true, package: { valid: true }, report: { valid: true, entries: 1 } });
+    expect(result.takenFromArchive).toEqual([]);
+    const other = join(directory, "other-package.json");
+    writeFileSync(other, JSON.stringify(await buildPackage(await entries(4), [3], { witness: true })));
+    const invalid = await cli("report", "--public-key", key, "--witness", witness, "--package", other, reportPath);
+    expect(invalid.code).toBe(INVALID);
+    expect(invalid.out).toContain("Result: INVALID\n  - the report covers other entries than the package discloses\n");
+    expect((await cli("report", reportPath)).code).toBe(USAGE);
+    expect((await cli("dispute", "--package", packagePath, reportPath)).code).toBe(USAGE);
+    const missing = await cli("report", "--package", join(directory, "missing.json"), reportPath);
+    expect(missing.code).toBe(USAGE);
+    expect(missing.err).toContain("Cannot read " + join(directory, "missing.json"));
+  });
+
+  it("verifies a dispute package", async () => {
+    const pkg = await buildPackage(await entries(4), [2], { witness: true });
+    const files = {
+      "README.txt": "Nexusphere Ledger dispute package\n",
+      "package.json": JSON.stringify(pkg, null, 2),
+      "report.json": JSON.stringify(await buildReport(pkg), null, 2),
+      "keys.json": JSON.stringify([keyRecord(LEDGER_KEY)]),
+      "witnesses.txt": (await witnessNoteKey()).vkey + "\n",
+    };
+    const key = LEDGER_KEY.publicKey.encoded;
+    for (const [name, options] of [
+      ["stored.zip", {}],
+      ["deflated.zip", { deflate: true, descriptor: true }],
+    ] as const) {
+      const path = join(directory, name);
+      writeFileSync(path, zip(files, options));
+      const valid = await cli("dispute", "--public-key", key, path);
+      expect(valid.code).toBe(VALID);
+      expect(valid.out).toContain("  Witnesses   : witness.example\n");
+      expect(valid.out).toContain(
+        "  Sections    : 1 shown\n  Archive     : taken from the archive itself: the witness keys\nResult: VALID\n",
+      );
+    }
+    const path = join(directory, "stored.zip");
+    const unpinned = await cli("dispute", "--json", path);
+    expect(unpinned.code).toBe(VALID);
+    expect(JSON.parse(unpinned.out).takenFromArchive).toEqual(["the witness keys", "no ledger key; pass --public-key"]);
+    const pinnedWitness = await cli("dispute", "--json", "--public-key", key, "--witness", (await witnessNoteKey()).vkey,
+      path);
+    expect(JSON.parse(pinnedWitness.out).takenFromArchive).toEqual([]);
+    const changed = join(directory, "changed.zip");
+    const report = await buildReport(pkg);
+    writeFileSync(changed, zip({ ...files, "report.json": JSON.stringify({ ...report, title: "Another title" }) }));
+    const invalid = await cli("dispute", "--public-key", key, changed);
+    expect(invalid.code).toBe(INVALID);
+    expect(invalid.out).toContain("  Report      : dispute (Another title)\n");
+    expect(invalid.out).toContain("Result: INVALID\n  - the signature of the report is not valid\n");
+    const empty = join(directory, "empty.zip");
+    writeFileSync(empty, zip({ "package.json": "{}" }));
+    const unreadable = await cli("dispute", empty);
+    expect(unreadable.code).toBe(USAGE);
+    expect(unreadable.err).toBe(`Cannot read ${empty}: it has no package.json and report.json\n`);
+    const damaged = join(directory, "damaged.zip");
+    const bytes = zip(files);
+    bytes[40] ^= 1;
+    writeFileSync(damaged, bytes);
+    expect((await cli("dispute", damaged)).err).toContain("invalid entry CRC");
+  });
+
+  it("takes the timestamp authority and the Rekor key from a dispute package", async () => {
+    const pkg = await rekorPackage();
+    const path = join(directory, "anchored.zip");
+    writeFileSync(path, zip({
+      "package.json": JSON.stringify(pkg),
+      "report.json": JSON.stringify(await buildReport(pkg)),
+      "timestamp-authority.pem": vector("timestamp.json").certificates.slice(1).join(""),
+      "rekor.json": JSON.stringify({ origin: "rekor.local", key: vector("rekor.json").rekorVerifierKey }),
+    }, { deflate: true }));
+    const result = await cli("dispute", "--public-key", LEDGER_KEY.publicKey.encoded, path);
+    expect(result.code).toBe(VALID);
+    expect(result.out).toContain("  Rekor       : entry 1 in rekor.local (pinned)\n");
+    expect(result.out).toMatch(/  Timestamp   : .* \(pinned\)\n/);
+    expect(result.out).toContain(
+      "  Archive     : taken from the archive itself: the timestamp authority chain, the Rekor log key\n",
+    );
   });
 });

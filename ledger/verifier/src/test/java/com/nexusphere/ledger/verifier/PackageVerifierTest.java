@@ -87,6 +87,12 @@ class PackageVerifierTest {
     }
 
     @Test
+    void aPackageWithoutAFormatIsInvalid() {
+        assertThat(PackageVerifier.verify(JSON.createObjectNode(), null).problems())
+                .containsExactly("unknown package format null");
+    }
+
+    @Test
     void aGenuinePackageIsValid() {
         PackageReport report = PackageVerifier.verify(pkg(4, 2), SigningKeys.encode(KEYS.getPublic()));
 

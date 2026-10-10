@@ -3,18 +3,22 @@ import base64
 import json
 import os
 import sys
+import zipfile
 from dataclasses import asdict
 
 from .cose import EvidenceStatement, LogReceipt
 from .keys import PublicKey
 from .mandate import MandateVerifier, StaticKeys
+from .note import NoteKey
 from .package import verify_package
+from .report import verify_report
 from .timestamp import read_certificates
 from .timestamps import epoch_text
 
 VALID = 0
 INVALID = 1
 USAGE = 2
+MAX_FILE = 256 * 1024 * 1024
 
 
 def main(argv=None) -> int:
@@ -26,6 +30,10 @@ def run(args, out, err, stdin=None) -> int:
         return _mandate(args[1:], out, err, stdin or sys.stdin)
     if args and args[0] == "statement":
         return _statement(args[1:], out, err)
+    if args and args[0] == "report":
+        return _report(args[1:], out, err)
+    if args and args[0] == "dispute":
+        return _dispute(args[1:], out, err)
     return _package(args[1:] if args and args[0] == "package" else args, out, err)
 
 
@@ -54,8 +62,8 @@ def _public_key(options):
     return options.public_key.strip() if options.public_key else None
 
 
-def _package(args, out, err) -> int:
-    parser = _Parser(prog="nexusphere-ledger-verify", add_help=False)
+def _package_parser(prog, usage=None):
+    parser = _Parser(prog=prog, usage=usage, add_help=False)
     parser.add_argument("--public-key")
     parser.add_argument("--public-key-file")
     parser.add_argument("--keys")
@@ -66,6 +74,11 @@ def _package(args, out, err) -> int:
     parser.add_argument("--rekor-key", action="append", default=[])
     parser.add_argument("--require-rekor", action="store_true")
     parser.add_argument("--json", action="store_true")
+    return parser
+
+
+def _package(args, out, err) -> int:
+    parser = _package_parser("nexusphere-ledger-verify")
     parser.add_argument("package")
     options = _parse(parser, args, err)
     if options is None:
@@ -100,6 +113,131 @@ def _package(args, out, err) -> int:
     else:
         _print_package(report, bool(certificates), bool(options.rekor_key), out)
     return VALID if report.valid else INVALID
+
+
+def _report(args, out, err) -> int:
+    parser = _package_parser("nexusphere-ledger-verify report",
+                             "%(prog)s [package options] --package <package.json> <report.json>")
+    parser.add_argument("--package", required=True)
+    parser.add_argument("report")
+    options = _parse(parser, args, err)
+    if options is None:
+        return USAGE
+    reading = options.report
+    try:
+        public_key = _public_key(options)
+        with open(options.report, encoding="utf-8") as file:
+            report = json.load(file)
+        reading = options.package
+        with open(options.package, encoding="utf-8") as file:
+            pkg = json.load(file)
+        key_list = None
+        if options.keys:
+            reading = options.keys
+            with open(options.keys, encoding="utf-8") as file:
+                key_list = json.load(file)
+        certificates = []
+        if options.timestamp_certificates:
+            reading = options.timestamp_certificates
+            with open(options.timestamp_certificates, "rb") as file:
+                certificates = read_certificates(file.read())
+    except (OSError, ValueError) as e:
+        err.write("Cannot read %s: %s\n" % (reading, e))
+        return USAGE
+    return _finish(pkg, report, public_key, key_list, certificates, options.witness, options.witnesses_required,
+                   options.rekor_key, options, [], out, err)
+
+
+def _dispute(args, out, err) -> int:
+    parser = _package_parser("nexusphere-ledger-verify dispute", "%(prog)s [package options] <dispute.zip>")
+    parser.add_argument("dispute")
+    options = _parse(parser, args, err)
+    if options is None:
+        return USAGE
+    witnesses = list(options.witness)
+    rekor_keys = list(options.rekor_key)
+    notes = []
+    try:
+        public_key = _public_key(options)
+        files = {}
+        with zipfile.ZipFile(options.dispute) as archive:
+            for info in archive.infolist():
+                with archive.open(info) as file:
+                    files[info.filename] = file.read(MAX_FILE + 1)
+                if len(files[info.filename]) > MAX_FILE:
+                    raise ValueError("%s is larger than %d bytes" % (info.filename, MAX_FILE))
+        if "package.json" not in files or "report.json" not in files:
+            raise ValueError("it has no package.json and report.json")
+        pkg = json.loads(files["package.json"])
+        report = json.loads(files["report.json"])
+        if options.keys:
+            with open(options.keys, encoding="utf-8") as file:
+                key_list = json.load(file)
+        else:
+            key_list = json.loads(files["keys.json"]) if "keys.json" in files else None
+        if options.timestamp_certificates:
+            with open(options.timestamp_certificates, "rb") as file:
+                certificates = read_certificates(file.read())
+        elif "timestamp-authority.pem" in files:
+            certificates = read_certificates(files["timestamp-authority.pem"])
+            notes.append("the timestamp authority chain")
+        else:
+            certificates = []
+        if not rekor_keys and "rekor.json" in files:
+            log = json.loads(files["rekor.json"])
+            key = log.get("key") if isinstance(log, dict) else None
+            if isinstance(key, str):
+                rekor_keys.append(NoteKey.parse(key))
+                notes.append("the Rekor log key")
+        if not witnesses and "witnesses.txt" in files:
+            for line in files["witnesses.txt"].decode("utf-8").split("\n"):
+                if line.strip():
+                    witnesses.append(NoteKey.parse(line.strip()))
+            notes.append("the witness keys")
+    except (OSError, ValueError, zipfile.BadZipFile) as e:
+        err.write("Cannot read %s: %s\n" % (options.dispute, e))
+        return USAGE
+    required = 0 if options.witnesses_required is None and not options.witness else options.witnesses_required
+    if public_key is None:
+        notes.append("no ledger key; pass --public-key")
+    return _finish(pkg, report, public_key, key_list, certificates, witnesses, required, rekor_keys, options, notes,
+                   out, err)
+
+
+def _finish(pkg, report, public_key, key_list, certificates, witnesses, required, rekor_keys, options, notes, out,
+            err) -> int:
+    try:
+        package_report = verify_package(pkg, public_key, witnesses, required, key_list, certificates,
+                                        options.require_timestamp, rekor_keys, options.require_rekor)
+    except ValueError as e:
+        err.write("Invalid argument: %s\n" % e)
+        return USAGE
+    check = verify_report(report, pkg, public_key, key_list)
+    valid = package_report.valid and check.valid
+    if options.json:
+        out.write(json.dumps({"valid": valid, "package": package_report.to_dict(), "report": check.to_dict(),
+                              "takenFromArchive": notes}, indent=2) + "\n")
+        return VALID if valid else INVALID
+    _print_package(package_report, bool(certificates), bool(rekor_keys), out)
+    out.write("Nexusphere Ledger report\n")
+    out.write("  Report      : %s (%s)\n" % (_show(check.report), _show(check.title)))
+    out.write("  Signed by   : %s\n" % _show(check.key_id))
+    out.write("  Evidence    : checkpoint %s, %s entries\n" % (_show(check.checkpoint_sequence), _show(check.entries)))
+    sections = ["%d %s" % (count, status.replace("_", " ").lower()) for status, count in check.statuses.items()]
+    out.write("  Sections    : %s\n" % ", ".join(sections))
+    if notes:
+        out.write("  Archive     : taken from the archive itself: %s\n" % ", ".join(notes))
+    if check.valid:
+        out.write("Result: VALID\n")
+    else:
+        out.write("Result: INVALID\n")
+        for problem in check.problems:
+            out.write("  - %s\n" % problem)
+    return VALID if valid else INVALID
+
+
+def _show(value) -> str:
+    return "null" if value is None else str(value)
 
 
 def _print_package(r, timestamp_pinned, rekor_pinned, out):

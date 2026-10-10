@@ -161,6 +161,17 @@ where it was anchored.
 
 </p>
 
+<p style="text-align: justify;">
+
+`client.reports()` lists the [reports](../../README.md#reports-and-dispute-packages) the ledger offers,
+`client.create_report(report_id, agent_id=...)` returns one signed by the ledger, or its HTML with `html=True`, and
+`client.create_dispute(title, description, agent_id=...)` returns the bytes of a dispute package zip.
+`verify_report(report, package, public_key)` checks the signature of a report with the keys the package is verified
+with, and that it was made for the checkpoint, scope and disclosed entries of that package; `check.valid`,
+`check.statuses` and `check.problems` give the result.
+
+</p>
+
 ## Verify a Statement and Receipt
 
 ```python
@@ -281,6 +292,13 @@ verifier key; the output must show `Rekor       : entry ... (pinned)` and `Resul
 nexusphere-ledger-verify --rekor-key "$REKOR_KEY" --require-rekor package.json
 ```
 
+Step 7. Verify a [dispute package](../../README.md#reports-and-dispute-packages) with its signed report; the output
+must show `Nexusphere Ledger report` and `Result: VALID`:
+
+```shell
+nexusphere-ledger-verify dispute --public-key "$LEDGER_PUBLIC_KEY" dispute.zip
+```
+
 ## Reference
 
 | Module      | Contents                                                                                         |
@@ -289,6 +307,7 @@ nexusphere-ledger-verify --rekor-key "$REKOR_KEY" --require-rekor package.json
 | `package`   | `verify_package` and `PackageReport`                                                             |
 | `timestamp` | RFC 3161 `TimestampToken`, its verification against a pinned chain, and `read_certificates`      |
 | `rekor`     | Rekor v2 `hashedrekord` requests and `verify_rekor_entry` against a pinned log                   |
+| `report`    | Signed reports: `verify_report`, `ReportCheck`, `report_signed_bytes` and `entries_digest`       |
 | `evidence`  | Content and link hashes, commitments, `ChainVerifier`, `Checkpoint` with its compliance profiles |
 | `merkle`    | RFC 9162 roots, inclusion and consistency proofs                                                 |
 | `note`      | C2SP signed notes, note keys and `tlog-cosignature/v1` cosignatures                              |

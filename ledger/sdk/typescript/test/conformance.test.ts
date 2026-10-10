@@ -43,8 +43,12 @@ import {
   rekorRequest,
   fromBase64,
   sha256,
+  entriesDigest,
+  fromUtf8,
+  reportSignedBytes,
+  verifyReport,
 } from "../src/index.js";
-import { ISSUER, LEDGER_KEY, ORIGIN, WITNESS, WITNESS_KEY, vector } from "./support.js";
+import { ISSUER, LEDGER_KEY, ORIGIN, WITNESS, WITNESS_KEY, buildPackage, vector } from "./support.js";
 
 function chainEntries(): Json[] {
   return vector("evidence-chain.json").entries.map((item: any) => {
@@ -407,5 +411,32 @@ describe("rekor.json", () => {
     const body = JSON.parse(new TextDecoder().decode(fromBase64(kind.canonicalizedBody)));
     kind.canonicalizedBody = toBase64(utf8(JSON.stringify({ ...body, apiVersion: "0.0.1" })));
     expect(await problem(kind)).toBe("the entry is not a hashedrekord 0.0.2");
+  });
+});
+
+describe("report.json", () => {
+  it("rebuilds the signed bytes, the signature and the entries digest", async () => {
+    const v = vector("report.json");
+    const bytes = reportSignedBytes(v.report);
+    expect(fromUtf8(bytes)).toBe(v.signedBytes);
+    expect(v.report.keyId).toBe(LEDGER_KEY.keyId);
+    expect(await LEDGER_KEY.publicKey.verifyBase64(bytes, v.report.signature)).toBe(true);
+    expect(await LEDGER_KEY.signBase64(bytes)).toBe(v.report.signature);
+    expect(await entriesDigest(v.entryHashes)).toBe(v.entriesDigest);
+    expect(v.report.evidence.entriesDigest).toBe(v.entriesDigest);
+    const chain = chainEntries();
+    expect(chain.map((entry) => entry.hash)).toEqual(v.entryHashes);
+    const pkg = await buildPackage(chain, [1, 2, 3]);
+    const check = await verifyReport(v.report, pkg, { publicKey: LEDGER_KEY.publicKey.encoded });
+    expect(check).toEqual({
+      valid: true,
+      report: "dispute",
+      title: "Dispute package",
+      keyId: LEDGER_KEY.keyId,
+      checkpointSequence: 3,
+      entries: 3,
+      statuses: { PARTLY_SHOWN: 1, SHOWN: 1 },
+      problems: [],
+    });
   });
 });

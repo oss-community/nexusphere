@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { crc32, deflateRawSync } from "node:zlib";
 import {
   Checkpoint,
   COSIGNATURE,
@@ -17,10 +18,14 @@ import {
   contentHash,
   cosign,
   fromHex,
+  concat,
+  entriesDigest,
   linkHash,
   merkle,
+  reportSignedBytes,
   sha256,
   toBase64,
+  utf8,
 } from "../src/index.js";
 
 const here = dirname(fileURLToPath(import.meta.url));
@@ -203,4 +208,100 @@ export async function buildPackage(
     pkg.log = { checkpoint: note.text(), proofs };
   }
   return pkg;
+}
+
+export async function signReport(report: Json, key = LEDGER_KEY): Promise<Json> {
+  const { signature: _, ...unsigned } = report;
+  return { ...unsigned, signature: await key.signBase64(reportSignedBytes(unsigned)) };
+}
+
+export async function buildReport(pkg: Json, key = LEDGER_KEY): Promise<Json> {
+  const hashes = (pkg.links as Json[]).filter((link) => link.entry).map((link) => link.hash as string);
+  const scope = pkg.scope as Json;
+  return signReport({
+    format: "nexusphere-ledger/report/v1",
+    report: "dispute",
+    title: "Dispute package",
+    createdAt: "2026-10-07T09:00:00Z",
+    profiles: [],
+    subject: null,
+    scope: { agentId: scope.agentId, principalId: null, fromSequence: 1, toSequence: scope.toSequence },
+    evidence: {
+      checkpoint: (pkg.checkpoint as Json).sequence,
+      headHash: (pkg.checkpoint as Json).headHash,
+      entries: hashes.length,
+      entriesDigest: await entriesDigest(hashes),
+      valid: true,
+    },
+    notice: "A mapping, not a certification",
+    sections: [
+      {
+        id: "timeline",
+        reference: "Incident timeline",
+        requirement: "What the agents did",
+        status: "SHOWN",
+        findings: ["#2 sales-agent tools/call on read_invoice"],
+      },
+    ],
+    keyId: key.keyId,
+  }, key);
+}
+
+export function zip(files: Record<string, string | Uint8Array>, options: { deflate?: boolean; descriptor?: boolean } = {}) {
+  const locals: Uint8Array[] = [];
+  const central: Uint8Array[] = [];
+  let offset = 0;
+  for (const [name, content] of Object.entries(files)) {
+    const data = typeof content === "string" ? utf8(content) : content;
+    const stored = options.deflate ? new Uint8Array(deflateRawSync(data)) : data;
+    const nameBytes = utf8(name);
+    const crc = crc32(data);
+    const header = (signature: number, size: number) => {
+      const bytes = new Uint8Array(size);
+      const view = new DataView(bytes.buffer);
+      view.setUint32(0, signature, true);
+      return { bytes, view };
+    };
+    const local = header(0x04034b50, 30);
+    local.view.setUint16(4, 20, true);
+    local.view.setUint16(6, options.descriptor ? 8 : 0, true);
+    local.view.setUint16(8, options.deflate ? 8 : 0, true);
+    if (!options.descriptor) {
+      local.view.setUint32(14, crc, true);
+      local.view.setUint32(18, stored.length, true);
+      local.view.setUint32(22, data.length, true);
+    }
+    local.view.setUint16(26, nameBytes.length, true);
+    const parts = [local.bytes, nameBytes, stored];
+    if (options.descriptor) {
+      const descriptor = header(0x08074b50, 16);
+      descriptor.view.setUint32(4, crc, true);
+      descriptor.view.setUint32(8, stored.length, true);
+      descriptor.view.setUint32(12, data.length, true);
+      parts.push(descriptor.bytes);
+    }
+    const entry = header(0x02014b50, 46);
+    entry.view.setUint16(4, 20, true);
+    entry.view.setUint16(6, 20, true);
+    entry.view.setUint16(8, options.descriptor ? 8 : 0, true);
+    entry.view.setUint16(10, options.deflate ? 8 : 0, true);
+    entry.view.setUint32(16, crc, true);
+    entry.view.setUint32(20, stored.length, true);
+    entry.view.setUint32(24, data.length, true);
+    entry.view.setUint16(28, nameBytes.length, true);
+    entry.view.setUint32(42, offset, true);
+    central.push(entry.bytes, nameBytes);
+    const written = concat(...parts);
+    locals.push(written);
+    offset += written.length;
+  }
+  const directory = concat(...central);
+  const end = new Uint8Array(22);
+  const view = new DataView(end.buffer);
+  view.setUint32(0, 0x06054b50, true);
+  view.setUint16(8, Object.keys(files).length, true);
+  view.setUint16(10, Object.keys(files).length, true);
+  view.setUint32(12, directory.length, true);
+  view.setUint32(16, offset, true);
+  return concat(...locals, directory, end);
 }
