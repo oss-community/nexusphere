@@ -22,8 +22,11 @@ import {
   contentHash,
   cosign,
   fromHex,
+  jwkPublicKey,
   linkHash,
   mandatePayload,
+  presentBound,
+  sdHash,
   revocationBytes,
   rotationBytes,
   trustedAndRevoked,
@@ -218,6 +221,35 @@ describe("mandate.json", () => {
     expect(payload.mandate.grant).toBe(v.claims.mandate.grant);
     expect(payload.mandate.principal).toBeUndefined();
     expect(payload.mandate.termsHash).toBeUndefined();
+  });
+});
+
+describe("mandate-key-binding.json", () => {
+  const verifier = (at: number) =>
+    new MandateVerifier(ISSUER, {
+      keys: StaticKeys.fixed(ISSUER, LEDGER_KEY.publicKey),
+      skipStatus: true,
+      audience: "https://supplier.example",
+      clock: () => at,
+    });
+
+  it("checks the key-bound presentation", async () => {
+    const v = vector("mandate-key-binding.json");
+    const check = await verifier(v.presentedAt + 10).verifyBound(v.presentation, v.nonce, "a2a/send", "supplier/orders");
+    expect(check.problems).toEqual([]);
+    expect(mandatePayload(check.claims!)).toEqual(v.claims);
+    expect((await PublicKey.fromBase64(v.agentPublicKey)).raw).toEqual(
+      (await jwkPublicKey(check.claims!.holderKey!)).raw);
+    expect(await sdHash(v.token)).toBe(v.sdHash);
+    expect((await verifier(v.presentedAt + 10).verifyBound(v.token, v.nonce)).has("KEY_BINDING_MISSING")).toBe(true);
+    expect((await verifier(v.presentedAt + 10).verifyBound(v.presentation, "00".repeat(32))).has("KEY_BINDING_INVALID"))
+      .toBe(true);
+  });
+
+  it("makes the same presentation", async () => {
+    const v = vector("mandate-key-binding.json");
+    const agent = await PrivateKey.fromSeed(fromHex(v.agentSeed));
+    expect(await presentBound(v.token, agent, v.audience, v.nonce, v.presentedAt)).toBe(v.presentation);
   });
 });
 

@@ -8,7 +8,8 @@ from nexusphere_ledger.evidence import (ChainVerifier, Checkpoint, EvidenceLink,
                                         link_hash)
 from nexusphere_ledger.keys import (KeyRevocation, KeyRotation, PrivateKey, PublicKey, signed_revocation_bytes,
                                     signed_rotation_bytes, trusted_and_revoked)
-from nexusphere_ledger.mandate import MandateVerifier, StaticKeys
+from nexusphere_ledger.mandate import (KEY_BINDING_INVALID, KEY_BINDING_MISSING, MandateVerifier, StaticKeys,
+                                       present_bound, sd_hash)
 from nexusphere_ledger.note import COSIGNATURE, ED25519, LogCheckpoint, Note, NoteKey, cosign
 
 from .support import ISSUER, LEDGER_KEY, ORIGIN, WITNESS, WITNESS_KEY, vector
@@ -176,6 +177,30 @@ class MandateVector(unittest.TestCase):
         self.assertEqual(v["claims"]["mandate"]["grant"], payload["mandate"]["grant"])
         self.assertNotIn("principal", payload["mandate"])
         self.assertNotIn("termsHash", payload["mandate"])
+
+
+class KeyBoundMandateVector(unittest.TestCase):
+
+    def verifier(self, at):
+        return MandateVerifier(ISSUER, keys=StaticKeys.fixed(ISSUER, LEDGER_KEY.public_key), skip_status=True,
+                               audience="https://supplier.example", clock=lambda: at)
+
+    def test_presentation(self):
+        v = vector("mandate-key-binding.json")
+        verifier = self.verifier(v["presentedAt"] + 10)
+        check = verifier.verify_bound(v["presentation"], v["nonce"], "a2a/send", "supplier/orders")
+        self.assertTrue(check.valid, check.problems)
+        self.assertEqual(v["claims"], check.claims.to_payload())
+        self.assertEqual(PublicKey.from_base64(v["agentPublicKey"]), check.claims.holder_key)
+        self.assertEqual(v["sdHash"], sd_hash(v["token"]))
+        self.assertTrue(verifier.verify_bound(v["token"], v["nonce"]).has(KEY_BINDING_MISSING))
+        self.assertTrue(verifier.verify_bound(v["presentation"], "00" * 32).has(KEY_BINDING_INVALID))
+
+    def test_presentation_made_here(self):
+        v = vector("mandate-key-binding.json")
+        agent = PrivateKey.from_seed(bytes.fromhex(v["agentSeed"]))
+        presented = present_bound(v["token"], agent, v["audience"], v["nonce"], v["presentedAt"])
+        self.assertEqual(v["presentation"], presented)
 
 
 class KeyHistoryVector(unittest.TestCase):

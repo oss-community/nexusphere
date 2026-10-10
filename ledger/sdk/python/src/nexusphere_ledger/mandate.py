@@ -31,6 +31,10 @@ WRONG_AUDIENCE = "WRONG_AUDIENCE"
 NOT_COVERED = "NOT_COVERED"
 REVOKED = "REVOKED"
 STATUS_UNAVAILABLE = "STATUS_UNAVAILABLE"
+KEY_BINDING_MISSING = "KEY_BINDING_MISSING"
+KEY_BINDING_INVALID = "KEY_BINDING_INVALID"
+KEY_NOT_BOUND = "KEY_NOT_BOUND"
+KEY_BINDING_TYPE = "kb+jwt"
 
 
 def b64url_encode(data: bytes) -> str:
@@ -125,15 +129,20 @@ class SdJwt:
     jwt: Jws
     issuer_jwt: str
     disclosures: List[Disclosure]
+    presentation: str = ""
+    key_binding: Optional[str] = None
 
     @classmethod
     def parse(cls, token: str) -> "SdJwt":
         if token is None:
             raise ValueError("The token is missing")
         trimmed = token.strip()
-        if not trimmed.endswith("~"):
-            raise ValueError("The token is not an SD-JWT without key binding")
-        parts = trimmed.split("~")
+        last = trimmed.rfind("~")
+        if last < 0:
+            raise ValueError("The token is not an SD-JWT")
+        presentation = trimmed[:last + 1]
+        key_binding = trimmed[last + 1:] or None
+        parts = presentation.split("~")
         disclosures = []
         seen = set()
         for part in parts[1:-1]:
@@ -141,7 +150,7 @@ class SdJwt:
                 raise ValueError("A disclosure is repeated")
             seen.add(part)
             disclosures.append(Disclosure.parse(part))
-        return cls(Jws.parse(parts[0]), parts[0], disclosures)
+        return cls(Jws.parse(parts[0]), parts[0], disclosures, presentation, key_binding)
 
     @staticmethod
     def issue(header: dict, payload: dict, disclosures: List[Disclosure], key: PrivateKey) -> str:
@@ -208,6 +217,11 @@ class MandateClaims:
     expires_at: int
     status_list_url: str
     status_index: int
+    holder_key: Optional[PublicKey] = None
+
+    @property
+    def bound(self) -> bool:
+        return self.holder_key is not None
 
     @classmethod
     def from_payload(cls, p: dict) -> "MandateClaims":
@@ -232,7 +246,8 @@ class MandateClaims:
             _number(p, "nbf"),
             _number(p, "exp"),
             _required(s, "uri"),
-            _number(s, "idx"))
+            _number(s, "idx"),
+            _confirmation(p.get("cnf")))
 
     def covers(self, action: str, target: Optional[str]) -> bool:
         return (any(_matches(p, action) for p in self.actions)
@@ -260,7 +275,63 @@ class MandateClaims:
             mandate["termsHash"] = self.terms_hash
         payload["mandate"] = mandate
         payload["status"] = {"status_list": {"idx": self.status_index, "uri": self.status_list_url}}
+        if self.holder_key is not None:
+            payload["cnf"] = {"jwk": confirmation_jwk(self.holder_key)}
         return payload
+
+
+def _confirmation(cnf) -> Optional[PublicKey]:
+    if not isinstance(cnf, dict):
+        return None
+    if not isinstance(cnf.get("jwk"), dict):
+        raise ValueError("The mandate has a cnf claim without a jwk")
+    return jwk_public_key(cnf["jwk"])
+
+
+def confirmation_jwk(key: PublicKey) -> dict:
+    return {"kty": "OKP", "crv": "Ed25519", "x": b64url_encode(key.raw)}
+
+
+def sd_hash(presentation: str) -> str:
+    return b64url_encode(hashlib.sha256(presentation.encode("ascii")).digest())
+
+
+def present_bound(token: str, holder: PrivateKey, audience: str, nonce: str, issued_at: Optional[int] = None) -> str:
+    parsed = SdJwt.parse(token)
+    if parsed.key_binding is not None:
+        raise ValueError("The presentation already has a key binding")
+    if not audience or not nonce:
+        raise ValueError("A key binding needs an audience and a nonce")
+    payload = {"iat": int(_time.time()) if issued_at is None else int(issued_at), "aud": audience, "nonce": nonce,
+               "sd_hash": sd_hash(parsed.presentation)}
+    return parsed.presentation + Jws.sign({"alg": ALGORITHM, "typ": KEY_BINDING_TYPE}, payload, holder)
+
+
+def key_binding_problem(token: SdJwt, holder_key: PublicKey, audience: Optional[str], nonce: Optional[str],
+                        now: float, clock_skew: float, max_age: float) -> Optional[str]:
+    try:
+        kb = Jws.parse(token.key_binding)
+    except ValueError as e:
+        return "The key binding cannot be read: %s" % e
+    if kb.header.get("typ") != KEY_BINDING_TYPE or kb.header.get("alg") != ALGORITHM:
+        return "The key binding is not an EdDSA " + KEY_BINDING_TYPE
+    if not kb.verify(holder_key):
+        return "The key binding is not signed by the agent's key"
+    payload = kb.payload
+    if payload.get("sd_hash") != sd_hash(token.presentation):
+        return "The key binding is for another presentation"
+    if audience is not None and payload.get("aud") != audience:
+        return "The key binding is for %s, not %s" % (payload.get("aud", "no audience"), audience)
+    if not isinstance(payload.get("nonce"), str) or not payload["nonce"].strip():
+        return "The key binding has no nonce"
+    if nonce is not None and payload["nonce"] != nonce:
+        return "The key binding is for another nonce"
+    if not _is_number(payload.get("iat")):
+        return "The key binding has no iat"
+    issued_at = int(payload["iat"])
+    if issued_at > now + clock_skew or issued_at < now - max_age - clock_skew:
+        return "The key binding was made at %s, outside the accepted window" % epoch_text(issued_at)
+    return None
 
 
 def _matches(pattern: str, value: Optional[str]) -> bool:
@@ -474,7 +545,8 @@ class MandateVerifier:
 
     def __init__(self, issuers, keys=None, status_lists=None, skip_status: bool = False,
                  audience: Optional[str] = None, clock: Callable[[], float] = _time.time, clock_skew: float = 60,
-                 cache_ttl: float = 300, timeout: float = 10, fetch: Optional[Fetcher] = None):
+                 cache_ttl: float = 300, timeout: float = 10, fetch: Optional[Fetcher] = None,
+                 require_key_binding: bool = False, key_binding_max_age: float = 300):
         if isinstance(issuers, str):
             issuers = [issuers]
         self._issuers = {issuer[:-1] if issuer.endswith("/") else issuer for issuer in issuers}
@@ -484,17 +556,23 @@ class MandateVerifier:
         self._clock = clock
         self._skew = clock_skew
         self._audience = audience
+        self._require_key_binding = require_key_binding
+        self._key_binding_max_age = key_binding_max_age
         self._keys = keys or JwksKeys(fetch, cache_ttl, clock)
         self._status_lists = None if skip_status else status_lists or HttpStatusLists(fetch, self._keys, cache_ttl,
                                                                                          clock)
 
     def verify(self, token: str) -> MandateCheck:
-        return self._check(token, None, None, False)
+        return self._check(token, None, None, False, None)
 
     def verify_action(self, token: str, action: str, target: Optional[str]) -> MandateCheck:
-        return self._check(token, action, target, True)
+        return self._check(token, action, target, True, None)
 
-    def _check(self, token, action, target, coverage) -> MandateCheck:
+    def verify_bound(self, token: str, nonce: Optional[str], action: Optional[str] = None,
+                     target: Optional[str] = None) -> MandateCheck:
+        return self._check(token, action, target, action is not None, nonce)
+
+    def _check(self, token, action, target, coverage, nonce) -> MandateCheck:
         try:
             sd_jwt = SdJwt.parse(token)
             parsed = sd_jwt.jwt
@@ -524,11 +602,28 @@ class MandateVerifier:
         if self._audience is not None and self._audience != claims.audience:
             problems.append(Problem(WRONG_AUDIENCE, "The mandate is for %s, not %s"
                                     % (claims.audience, self._audience)))
+        binding = self._key_binding(sd_jwt, claims, nonce, now)
+        if binding is not None:
+            problems.append(binding)
         if coverage and not claims.covers(action, target):
             problems.append(Problem(NOT_COVERED, "The mandate does not cover %s on %s" % (action, target)))
         if self._status_lists is not None:
             problems.extend(self._status(claims))
         return MandateCheck(claims, problems)
+
+    def _key_binding(self, sd_jwt: SdJwt, claims: MandateClaims, nonce, now) -> Optional[Problem]:
+        if not claims.bound:
+            if sd_jwt.key_binding is not None:
+                return Problem(KEY_BINDING_INVALID, "The mandate names no agent key, so it cannot carry a key binding")
+            if self._require_key_binding:
+                return Problem(KEY_NOT_BOUND, "The mandate is not bound to a key of the agent")
+            return None
+        if sd_jwt.key_binding is None:
+            return Problem(KEY_BINDING_MISSING, "The mandate is bound to a key of the agent and needs a key binding")
+        problem = key_binding_problem(sd_jwt, claims.holder_key,
+                                      self._audience if self._audience is not None else claims.audience, nonce, now,
+                                      self._skew, self._key_binding_max_age)
+        return None if problem is None else Problem(KEY_BINDING_INVALID, problem)
 
     def _status(self, claims: MandateClaims) -> List[Problem]:
         if not claims.status_list_url.startswith(claims.issuer + "/"):

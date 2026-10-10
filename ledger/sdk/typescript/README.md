@@ -11,6 +11,7 @@
 * [Verify a Package](#verify-a-package)
 * [Verify a Statement and Receipt](#verify-a-statement-and-receipt)
 * [Verify a Mandate](#verify-a-mandate)
+* [Present a Key-Bound Mandate](#present-a-key-bound-mandate)
 * [Command Line](#command-line)
 * [Reference](#reference)
 * [Test](#test)
@@ -179,6 +180,28 @@ const check = await verifier.verifyAction(token, "a2a/send", "supplier/sales");
 console.log(check.valid, check.claims?.agentId, check.problems.map((p) => p.code));
 ```
 
+## Present a Key-Bound Mandate
+
+<p style="text-align: justify;">
+
+An agent with its own key registers the public half with `setSigningKey`; mandates issued afterwards name it in
+`cnf`. `presentBound` adds a KB-JWT signed by the agent for an audience and a nonce, and `verifyBound` checks it. For
+the A2A gateway the nonce is the hex SHA-256 of the request body.
+
+</p>
+
+```typescript
+import { MandateVerifier, PrivateKey, hashOf, presentBound } from "@nexusphere/ledger";
+
+const key = await PrivateKey.generate();
+await agent.setSigningKey("invoice-agent", key.publicKey);
+const token = (await agent.issueMandate(grantId, "https://supplier.example")).token as string;
+const presented = await presentBound(token, key, "https://supplier.example", await hashOf(body));
+const check = await new MandateVerifier("http://localhost:8090", { audience: "https://supplier.example" })
+  .verifyBound(presented, await hashOf(body));
+console.log(check.valid, check.claims?.holderKey);
+```
+
 ## Command Line
 
 <p style="text-align: justify;">
@@ -203,18 +226,18 @@ npx nexusphere-ledger-verify mandate --issuer http://localhost:8090 --action a2a
 
 ## Reference
 
-| Module       | Contents                                                                                         |
-|--------------|--------------------------------------------------------------------------------------------------|
-| `client`     | `LedgerClient` for evidence, batches, decisions, `act`, grants, mandates, packages, keys, proofs |
-| `package`    | `verifyPackage` and `PackageReport`                                                              |
-| `evidence`   | Content and link hashes, `ChainVerifier`, `Checkpoint`                                           |
-| `merkle`     | RFC 9162 roots, inclusion and consistency proofs, exported as `merkle`                           |
-| `note`       | C2SP signed notes, note keys and `tlog-cosignature/v1` cosignatures                              |
-| `cose`       | `CoseSign1`, SCITT `EvidenceStatement` and RFC 9942 `LogReceipt`                                 |
-| `mandate`    | SD-JWT VC mandates, `MandateVerifier`, status lists and JWKs                                     |
-| `keys`       | Ed25519 keys, key IDs, key rotations and trusted keys from a pinned key                          |
-| `canonical`  | Canonical JSON and SHA-256                                                                       |
-| `cbor`       | Deterministic CBOR, exported as `cbor`                                                           |
+| Module      | Contents                                                                                         |
+|-------------|--------------------------------------------------------------------------------------------------|
+| `client`    | `LedgerClient` for evidence, batches, decisions, `act`, grants, mandates, packages, keys, proofs |
+| `package`   | `verifyPackage` and `PackageReport`                                                              |
+| `evidence`  | Content and link hashes, `ChainVerifier`, `Checkpoint`                                           |
+| `merkle`    | RFC 9162 roots, inclusion and consistency proofs, exported as `merkle`                           |
+| `note`      | C2SP signed notes, note keys and `tlog-cosignature/v1` cosignatures                              |
+| `cose`      | `CoseSign1`, SCITT `EvidenceStatement` and RFC 9942 `LogReceipt`                                 |
+| `mandate`   | SD-JWT VC mandates, `MandateVerifier`, status lists and JWKs                                     |
+| `keys`      | Ed25519 keys, key IDs, key rotations and trusted keys from a pinned key                          |
+| `canonical` | Canonical JSON and SHA-256                                                                       |
+| `cbor`      | Deterministic CBOR, exported as `cbor`                                                           |
 
 ## Test
 

@@ -176,6 +176,8 @@ def _mandate(args, out, err, stdin) -> int:
     parser.add_argument("--public-key")
     parser.add_argument("--public-key-file")
     parser.add_argument("--skip-status", action="store_true")
+    parser.add_argument("--nonce")
+    parser.add_argument("--require-key-binding", action="store_true")
     parser.add_argument("--json", action="store_true")
     parser.add_argument("token")
     options = _parse(parser, args, err)
@@ -199,9 +201,8 @@ def _mandate(args, out, err, stdin) -> int:
             return USAGE
         keys = StaticKeys({issuer.rstrip("/"): {key.key_id: key} for issuer in options.issuer})
     verifier = MandateVerifier(options.issuer, keys=keys, skip_status=options.skip_status,
-                               audience=options.audience)
-    check = verifier.verify(token) if options.action is None else verifier.verify_action(token, options.action,
-                                                                                        options.target)
+                               audience=options.audience, require_key_binding=options.require_key_binding)
+    check = verifier.verify_bound(token, options.nonce, options.action, options.target)
     if options.json:
         out.write(json.dumps({"valid": check.valid, "problems": [asdict(p) for p in check.problems],
                               "claims": None if check.claims is None else check.claims.to_payload()},
@@ -231,6 +232,7 @@ def _print_mandate(check, options, out):
         out.write("  Allows      : %s on %s%s\n" % (", ".join(c.actions), ", ".join(c.targets),
                                                      "" if c.max_uses is None else ", at most %d uses" % c.max_uses))
         out.write("  Valid       : %s to %s\n" % (epoch_text(c.not_before), epoch_text(c.expires_at)))
+        out.write("  Agent key   : %s\n" % ("none" if c.holder_key is None else c.holder_key.key_id))
         out.write("  Status      : %s\n" % ("not checked" if options.skip_status
                                            else "index %d in %s" % (c.status_index, c.status_list_url)))
     if options.action is not None:

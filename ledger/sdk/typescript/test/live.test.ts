@@ -10,8 +10,10 @@ import {
   MandateVerifier,
   Note,
   NoteKey,
+  PrivateKey,
   PublicKey,
   SdJwt,
+  presentBound,
   verifyPackage,
 } from "../src/index.js";
 
@@ -112,6 +114,31 @@ describe.skipIf(!URL)("a running ledger", async () => {
     expect(check.claims!.principalId).toBe("alice");
     await operator.revokeMandate(issued.id as string, "test");
     expect((await new MandateVerifier(issuer).verify(token)).has("REVOKED")).toBe(true);
+  });
+
+  it("binds a mandate to the agent key", async () => {
+    const keyedId = "ts-keyed-" + crypto.randomUUID().substring(0, 8);
+    const keyed = await operator.registerAgent(keyedId, "TypeScript SDK keyed agent", "acme");
+    const client = new LedgerClient(URL ?? "", { apiKey: keyed.apiKey as string });
+    const key = await PrivateKey.generate();
+    expect((await client.setSigningKey(keyedId, key.publicKey)).signingKeyId).toBe(key.keyId);
+    const keyedGrant = await operator.createGrant({
+      principalId: "alice",
+      agentId: keyedId,
+      actions: ["a2a/send"],
+      targets: ["supplier/*"],
+      expiresAt: new Date(Date.now() + 86_400_000),
+    });
+    const token = (await client.issueMandate(keyedGrant.id as string, "https://supplier.example")).token as string;
+    const issuer = SdJwt.parse(token).jwt.payload.iss as string;
+    const presented = await presentBound(token, key, "https://supplier.example", "ab".repeat(32));
+    const check = await new MandateVerifier(issuer, { audience: "https://supplier.example" }).verifyBound(
+      presented,
+      "ab".repeat(32),
+    );
+    expect(check.problems).toEqual([]);
+    const replaced = await client.setSigningKey(keyedId, (await PrivateKey.generate()).publicKey).catch((e) => e);
+    expect(replaced).toMatchObject({ status: 403 });
   });
 
   it("raises ledger errors", async () => {

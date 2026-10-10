@@ -47,7 +47,7 @@ class A2aInbound {
     private static final Logger log = LoggerFactory.getLogger(A2aInbound.class);
     private static final Set<MandateProblem> UNAUTHENTICATED = EnumSet.of(MandateProblem.MALFORMED,
             MandateProblem.WRONG_TYPE, MandateProblem.UNTRUSTED_ISSUER, MandateProblem.UNKNOWN_KEY,
-            MandateProblem.BAD_SIGNATURE);
+            MandateProblem.BAD_SIGNATURE, MandateProblem.KEY_BINDING_MISSING, MandateProblem.KEY_BINDING_INVALID);
 
     private final LedgerProperties properties;
     private final MandateService mandates;
@@ -89,7 +89,8 @@ class A2aInbound {
             return unauthenticated(id, "A2A requests need the " + A2aOutbound.MANDATE_HEADER + " and "
                     + A2aOutbound.REQUEST_HEADER + " headers.", List.of());
         }
-        MandateCheck check = verifier.verify(mandateToken);
+        String requestHash = Hashes.sha256(body);
+        MandateCheck check = verifier.verifyBound(mandateToken, requestHash);
         List<String> fatal = check.problems().stream().filter(p -> UNAUTHENTICATED.contains(p.code()))
                 .map(p -> p.code().name()).toList();
         if (check.claims() == null || !fatal.isEmpty()) {
@@ -99,7 +100,6 @@ class A2aInbound {
         if (claims.principalId() == null) {
             return unauthenticated(id, "The mandate must disclose its principal.", List.of());
         }
-        String requestHash = Hashes.sha256(body);
         Instant now = clock.instant().truncatedTo(ChronoUnit.SECONDS);
         ExchangeRequest request;
         try {

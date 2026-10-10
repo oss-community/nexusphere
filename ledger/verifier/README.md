@@ -24,7 +24,8 @@ database, so an auditor, a court or a counterparty can verify what a ledger hand
   cosignatures with `--witness` and `--witnesses-required`
 * Check the SCITT statement and receipt of every disclosed entry, and a single statement and receipt with the
   `statement` command
-* Verify a mandate with the `mandate` command: issuer, key, signature, time, audience, coverage and revocation
+* Verify a mandate with the `mandate` command: issuer, key, signature, time, audience, coverage and revocation, and
+  the agent's key binding against `--nonce`, refusing unbound mandates with `--require-key-binding`
 * Pin the ledger's public key with `--public-key`, print JSON with `--json`, and exit with 0 (valid), 1 (invalid) or 2
   (usage error)
 * Accept checkpoints signed by other keys of the ledger only when signed key rotations lead to them from the pinned key

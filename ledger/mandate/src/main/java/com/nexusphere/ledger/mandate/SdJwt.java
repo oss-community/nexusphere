@@ -19,7 +19,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-public record SdJwt(Jws.Parsed jwt, String issuerJwt, List<Disclosure> disclosures) {
+public record SdJwt(Jws.Parsed jwt, String issuerJwt, List<Disclosure> disclosures, String presentation,
+                    String keyBinding) {
 
     public static final String HASH_ALGORITHM = "sha-256";
 
@@ -75,10 +76,13 @@ public record SdJwt(Jws.Parsed jwt, String issuerJwt, List<Disclosure> disclosur
             throw new IllegalArgumentException("The token is missing");
         }
         String trimmed = token.trim();
-        if (!trimmed.endsWith("~")) {
-            throw new IllegalArgumentException("The token is not an SD-JWT without key binding");
+        int last = trimmed.lastIndexOf('~');
+        if (last < 0) {
+            throw new IllegalArgumentException("The token is not an SD-JWT");
         }
-        String[] parts = trimmed.split("~", -1);
+        String presentation = trimmed.substring(0, last + 1);
+        String keyBinding = last + 1 == trimmed.length() ? null : trimmed.substring(last + 1);
+        String[] parts = presentation.split("~", -1);
         List<Disclosure> disclosures = new ArrayList<>();
         Set<String> seen = new HashSet<>();
         for (int i = 1; i < parts.length - 1; i++) {
@@ -87,7 +91,7 @@ public record SdJwt(Jws.Parsed jwt, String issuerJwt, List<Disclosure> disclosur
             }
             disclosures.add(Disclosure.parse(parts[i]));
         }
-        return new SdJwt(Jws.parse(parts[0]), parts[0], List.copyOf(disclosures));
+        return new SdJwt(Jws.parse(parts[0]), parts[0], List.copyOf(disclosures), presentation, keyBinding);
     }
 
     public JsonNode claims() {

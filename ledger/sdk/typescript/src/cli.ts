@@ -3,7 +3,7 @@ import { existsSync, readFileSync, statSync } from "node:fs";
 import { toBase64 } from "./bytes.js";
 import { EvidenceStatement, LogReceipt } from "./cose.js";
 import { PublicKey } from "./keys.js";
-import { MandateCheck, MandateVerifier, StaticKeys, mandatePayload } from "./mandate.js";
+import { MandateCheck, MandateVerifier, StaticKeys, jwkPublicKey, mandatePayload } from "./mandate.js";
 import { PackageReport, verifyPackage } from "./package.js";
 import { epochText } from "./timestamps.js";
 
@@ -12,7 +12,7 @@ export const INVALID = 1;
 export const USAGE = 2;
 
 export const USAGE_TEXT = `Usage: nexusphere-ledger-verify [--public-key <base64 X.509 Ed25519 key> | --public-key-file <file>] [--keys <keys.json>] [--witness <verifier key>]... [--witnesses-required <n>] [--json] <package.json>
-       nexusphere-ledger-verify mandate --issuer <url> [--issuer <url>] [--audience <aud>] [--action <action> --target <target>] [--public-key <key> | --public-key-file <file>] [--skip-status] [--json] <token | token file | ->
+       nexusphere-ledger-verify mandate --issuer <url> [--issuer <url>] [--audience <aud>] [--action <action> --target <target>] [--public-key <key> | --public-key-file <file>] [--skip-status] [--nonce <nonce>] [--require-key-binding] [--json] <token | token file | ->
        nexusphere-ledger-verify statement [--public-key <key> | --public-key-file <file>] [--receipt <receipt.cose>] <statement.cose>`;
 
 export interface Io {
@@ -23,7 +23,7 @@ export interface Io {
 
 class UsageError extends Error {}
 
-const FLAGS = new Set(["--json", "--skip-status"]);
+const FLAGS = new Set(["--json", "--skip-status", "--require-key-binding"]);
 
 function parse(args: string[], allowed: string[]): { options: Record<string, string[]>; positional: string | null } {
   const options: Record<string, string[]> = {};
@@ -200,6 +200,7 @@ async function statement(args: string[], io: Io): Promise<number> {
 async function mandate(args: string[], io: Io): Promise<number> {
   const { options, positional } = parse(args, [
     "--issuer", "--audience", "--action", "--target", "--public-key", "--public-key-file", "--skip-status", "--json",
+    "--nonce", "--require-key-binding",
   ]);
   const issuers = options["--issuer"] ?? [];
   const action = options["--action"]?.[0] ?? null;
@@ -228,8 +229,16 @@ async function mandate(args: string[], io: Io): Promise<number> {
     keys = new StaticKeys(Object.fromEntries(issuers.map((issuer) => [issuer.replace(/\/$/, ""), { [key.keyId]: key }])));
   }
   const skipStatus = !!options["--skip-status"];
-  const verifier = new MandateVerifier(issuers, { keys, skipStatus, audience: options["--audience"]?.[0] ?? null });
-  const check = action === null ? await verifier.verify(token) : await verifier.verifyAction(token, action, target);
+  const verifier = new MandateVerifier(issuers, {
+    keys,
+    skipStatus,
+    audience: options["--audience"]?.[0] ?? null,
+    requireKeyBinding: !!options["--require-key-binding"],
+  });
+  const nonce = options["--nonce"]?.[0] ?? null;
+  const check = action === null
+    ? await verifier.verifyBound(token, nonce)
+    : await verifier.verifyBound(token, nonce, action, target);
   if (options["--json"]) {
     io.out(JSON.stringify({
       valid: check.valid,
@@ -237,7 +246,7 @@ async function mandate(args: string[], io: Io): Promise<number> {
       claims: check.claims === null ? null : mandatePayload(check.claims),
     }, null, 2) + "\n");
   } else {
-    printMandate(check, action, target, skipStatus, io);
+    await printMandate(check, action, target, skipStatus, io);
   }
   return check.valid ? VALID : INVALID;
 }
@@ -249,7 +258,11 @@ function readToken(source: string, io: Io): string {
   return existsSync(source) && statSync(source).isFile() ? readFileSync(source, "ascii").trim() : source.trim();
 }
 
-function printMandate(check: MandateCheck, action: string | null, target: string | null, skipStatus: boolean, io: Io) {
+async function keyIdOf(jwk: Record<string, unknown>): Promise<string> {
+  return (await jwkPublicKey(jwk)).keyId;
+}
+
+async function printMandate(check: MandateCheck, action: string | null, target: string | null, skipStatus: boolean, io: Io) {
   const lines = ["Nexusphere Ledger mandate"];
   const c = check.claims;
   if (c) {
@@ -260,6 +273,7 @@ function printMandate(check: MandateCheck, action: string | null, target: string
     lines.push(`  Allows      : ${c.actions.join(", ")} on ${c.targets.join(", ")}${
       c.maxUses === null ? "" : `, at most ${c.maxUses} uses`}`);
     lines.push(`  Valid       : ${epochText(c.notBefore)} to ${epochText(c.expiresAt)}`);
+    lines.push(`  Agent key   : ${c.holderKey ? await keyIdOf(c.holderKey) : "none"}`);
     lines.push(`  Status      : ${skipStatus ? "not checked" : `index ${c.statusIndex} in ${c.statusListUrl}`}`);
   }
   if (action !== null) {

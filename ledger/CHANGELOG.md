@@ -43,6 +43,10 @@ agent platforms and gateways.
 * Key revocation with a compromise time, signed by the active key and recorded as evidence; the verifiers in Java,
   Python, TypeScript and the browser accept a revoked key only where witness cosignatures prove the log checkpoint
   came before the compromise, and a new `key-history.json` conformance vector covers rotation and revocation
+* Agent signing keys: an agent registers its own Ed25519 key, mandates name it in `cnf`, and the agent presents
+  them with an SD-JWT key binding (KB-JWT) for the audience and the request body hash; the A2A gateway and the
+  receiving ledger refuse a bound mandate without a valid key binding, and the verifiers in Java, Python and
+  TypeScript check it, with a `mandate-key-binding.json` conformance vector
 * Browser verifier: one self-contained HTML page in React and TypeScript that verifies a package with the
   TypeScript SDK, pinned to the ledger key and optional witnesses, with a Content Security Policy that blocks every
   connection

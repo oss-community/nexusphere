@@ -10,6 +10,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -27,12 +28,15 @@ class AgentController {
     }
 
     record AgentResponse(String agentId, String name, String ownerId, String status, String keyPrefix,
-                         Instant createdAt) {
+                         Instant createdAt, String signingKey, String signingKeyId, Instant signingKeySetAt) {
 
         static AgentResponse of(Agent a) {
             return new AgentResponse(a.agentId(), a.name(), a.ownerId(), a.status().name(), a.keyPrefix(),
-                    a.createdAt());
+                    a.createdAt(), a.signingKey(), a.signingKeyId(), a.signingKeySetAt());
         }
+    }
+
+    record SigningKeyRequest(String publicKey) {
     }
 
     record IssuedAgentResponse(String agentId, String name, String ownerId, String status, String keyPrefix,
@@ -84,6 +88,14 @@ class AgentController {
     AgentResponse disable(Caller caller, @PathVariable String agentId) {
         caller.requireOperator();
         return AgentResponse.of(agents.disable(agentId));
+    }
+
+    @PutMapping("/{agentId}/signing-key")
+    AgentResponse setSigningKey(Caller caller, @PathVariable String agentId, @RequestBody SigningKeyRequest request) {
+        if (!caller.canActAs(agentId)) {
+            throw LedgerException.notFound("Agent " + agentId);
+        }
+        return AgentResponse.of(agents.setSigningKey(agentId, request.publicKey(), caller.isOperator()));
     }
 
     @PostMapping("/{agentId}/key")

@@ -19,6 +19,7 @@
 * [Principal Login and Consent](#principal-login-and-consent)
 * [MCP Gateway](#mcp-gateway)
 * [Mandates](#mandates)
+* [Agent Keys and Key Binding](#agent-keys-and-key-binding)
 * [A2A Gateway](#a2a-gateway)
 * [Conformance Vectors](#conformance-vectors)
 * [API](#api)
@@ -691,8 +692,8 @@ or the peer ledger refused the A2A request without a receipt. The outcome entry 
 | `USES_EXHAUSTED`   | DENY     | The covering grant has used all its uses                   |
 
 Agent, grant and decision changes are evidence too: `agent/register`, `agent/disable`, `agent/rotate-key`,
-`grant/create`, `grant/approve`, `grant/deny` and `grant/revoke`, with the owner or the granting principal as
-`principalId`.
+`agent/signing-key`, `grant/create`, `grant/approve`, `grant/deny` and `grant/revoke`, with the owner or the granting
+principal as `principalId`.
 
 ```shell
 curl -X POST http://localhost:8090/api/v1/agents -H "Authorization: Bearer nexusphere-ledger-development-key-change-me" -H "Content-Type: application/json" -d '{"agentId":"invoice-agent","name":"Invoice agent","ownerId":"acme"}'
@@ -804,6 +805,7 @@ grant's own expiry. Only an active or not-yet-valid grant can be turned into a m
 | `mandate.grant`      | The grant ID (selectively disclosable)                                         |
 | `mandate.termsHash`  | The grant terms' SHA-256, as in the grant's evidence (selectively disclosable) |
 | `status.status_list` | `idx` and `uri` of the mandate's bit in the status list                        |
+| `cnf.jwk`            | The agent's Ed25519 public key, when the agent has registered one              |
 | `_sd_alg`            | `sha-256`, the hash of the disclosures listed in `mandate._sd`                 |
 
 <p style="text-align: justify;">
@@ -812,8 +814,8 @@ The principal, grant and terms hash are disclosures, so an agent can hand a mand
 `SdJwt.parse(token).present(Set.of("grant"))` keeps only the grant, and the receiver still checks the signature,
 time, audience, coverage and revocation. Actions, targets, the use limit, time and status are always in the signed
 JWT and cannot be withheld. The A2A gateway always sends the full mandate, because the receiving ledger records the
-principal. Agents hold API keys rather than key pairs, so mandates have no key binding; the audience and the A2A
-request proof take its place.
+principal. A mandate for an agent with a signing key names that key in `cnf` and is presented with a key binding, as
+described in [Agent Keys and Key Binding](#agent-keys-and-key-binding).
 
 </p>
 
@@ -847,7 +849,9 @@ in the mandate, which must be served by the issuer, checks its signature, issuer
 mandate's bit. Keys and status lists are cached (5 minutes by default, and never past the status list's `exp`). When
 the keys or the status list cannot be read the mandate is not valid, so a verifier fails closed. Each problem has a
 code: `MALFORMED`, `WRONG_TYPE`, `UNTRUSTED_ISSUER`, `UNKNOWN_KEY`, `BAD_SIGNATURE`, `NOT_YET_VALID`, `EXPIRED`,
-`WRONG_AUDIENCE`, `NOT_COVERED`, `REVOKED` and `STATUS_UNAVAILABLE`.
+`WRONG_AUDIENCE`, `NOT_COVERED`, `REVOKED`, `STATUS_UNAVAILABLE`, `KEY_BINDING_MISSING`, `KEY_BINDING_INVALID` and
+`KEY_NOT_BOUND`. `verifyBound(token, nonce)` also checks the key binding against the nonce the verifier expects, and
+`requireKeyBinding()` refuses mandates without `cnf`.
 
 </p>
 
@@ -866,7 +870,8 @@ String principal = check.claims().principalId();
 <p style="text-align: justify;">
 
 The verifier jar checks a mandate from the command line. `--public-key` pins the issuer's key instead of reading it
-from the issuer, and `--skip-status` leaves out the revocation check for offline use. The exit codes are the same as
+from the issuer, and `--skip-status` leaves out the revocation check for offline use. `--nonce` checks the key binding
+against an expected nonce and `--require-key-binding` refuses mandates without `cnf`. The exit codes are the same as
 for packages.
 
 </p>
@@ -881,8 +886,8 @@ java -jar ledger/verifier/target/verifier-1.0.0-SNAPSHOT-exec.jar mandate --issu
 
 AP2 and Mastercard's Verifiable Intent, now developed at the FIDO Alliance, carry payment mandates as SD-JWT
 credentials too. A Nexusphere mandate is not an AP2 mandate, but its parts line up, so a bridge can translate one
-into the other. AP2 signs with ES256 and binds mandates to the holder's key; Nexusphere signs with EdDSA and has no
-key binding.
+into the other. AP2 signs with ES256 and Nexusphere with EdDSA; both bind mandates to the holder's key with `cnf` and
+a KB-JWT.
 
 </p>
 
@@ -898,6 +903,66 @@ key binding.
 | Cart and payment mandates                  | No equivalent: Nexusphere does not handle payments                            |
 | `merchant_authorization` from the merchant | The receipt the receiving ledger signs for an A2A exchange                    |
 | Audit trail of the transaction             | Evidence on both ledgers, with SCITT statements and receipts                  |
+
+## Agent Keys and Key Binding
+
+<p style="text-align: justify;">
+
+An API key proves who calls the ledger, but whoever copies it can act as the agent. An agent can therefore register
+an Ed25519 public key of its own with `PUT /api/v1/agents/{agentId}/signing-key`; the private key never leaves the
+agent. The agent may set its key once, and only the operator can replace it afterwards, so a stolen API key cannot
+swap in another key. The ledger records `agent/signing-key` with the key ID and the previous key ID.
+
+</p>
+
+<p style="text-align: justify;">
+
+Every mandate issued for such an agent names its key in `cnf.jwk` (RFC 7800). The agent presents the mandate with a
+key binding JWT as in the SD-JWT specification: `typ` `kb+jwt`, signed with its own key, with `iat`, `aud` (the
+receiving organization), `nonce` and `sd_hash`, the base64url SHA-256 of the presentation up to its last `~`. A
+verifier checks the signature with the key in `cnf`, the `sd_hash`, the audience, the nonce and that `iat` is at most
+five minutes old. A mandate with `cnf` but no key binding is `KEY_BINDING_MISSING`; a wrong key, nonce, audience,
+`sd_hash` or age, or a key binding on a mandate without `cnf`, is `KEY_BINDING_INVALID`.
+
+</p>
+
+<p style="text-align: justify;">
+
+Once an agent has a signing key, the A2A gateway no longer makes mandates for it. The agent sends its own
+presentation in `X-Nexusphere-Mandate` with the peer's issuer as `aud` and the hex SHA-256 of the request body as
+`nonce`. The ledger answers HTTP 400 without the header and HTTP 403 with the problems when the presentation does not
+hold: a key binding problem, `WRONG_AGENT`, `WRONG_AUDIENCE`, `NOT_COVERED`, `WRONG_PRINCIPAL`, `UNDISCLOSED` when the
+principal or grant is withheld, `STALE_KEY` when the mandate names a replaced key, and `GRANT_MISMATCH` when the
+decision picked another grant. The receiving ledger checks the key binding with the same body hash, so a presentation
+cannot be used for another request, and records the sender's key ID as `a2a.keyBinding`.
+
+</p>
+
+Step 1. Make a key pair for the agent; only the public key goes to the ledger:
+
+```shell
+openssl genpkey -algorithm ed25519 -out agent.pem && openssl pkey -in agent.pem -pubout -outform DER | base64 -w0 > agent.pub
+```
+
+Step 2. Register the public key with the agent's own API key; the answer shows its `signingKeyId`:
+
+```shell
+curl -s -X PUT http://localhost:8090/api/v1/agents/invoice-agent/signing-key -H "Authorization: Bearer {agentApiKey}" -H "Content-Type: application/json" -d "{\"publicKey\":\"$(cat agent.pub)\"}" | jq -r .signingKeyId
+```
+
+Step 3. Get a mandate for the grant; it now carries the agent's key in `cnf`:
+
+```shell
+curl -s -X POST http://localhost:8090/api/v1/mandates -H "Authorization: Bearer {agentApiKey}" -H "Content-Type: application/json" -d '{"grantId":"{grantId}","audience":"https://supplier.example"}' | jq -r .token > mandate.jwt
+```
+
+Step 4. Present it with a key binding from the agent, here with the Python SDK, and check it; it must end with
+`Result: VALID` and show the `signingKeyId` from Step 2 as `Agent key`:
+
+```shell
+python3 -c "from nexusphere_ledger import PrivateKey, present_bound; from cryptography.hazmat.primitives.serialization import load_pem_private_key as load; print(present_bound(open('mandate.jwt').read().strip(), PrivateKey(load(open('agent.pem', 'rb').read(), None)), 'https://supplier.example', 'ab' * 32))" > presented.jwt
+java -jar ledger/verifier/target/verifier-1.0.0-SNAPSHOT-exec.jar mandate --issuer http://localhost:8090 --audience https://supplier.example --nonce "$(python3 -c "print('ab' * 32)")" presented.jwt
+```
 
 ## A2A Gateway
 
@@ -919,7 +984,7 @@ The agent sends its JSON-RPC request to `/a2a/out/{peer}` with its own API key a
 The ledger decides action `a2a/send` on target `{peer}/{method}`, so a grant on `supplier/*` covers it. A denied
 request never leaves and is answered with JSON-RPC error `-32003`. An allowed request carries two headers:
 `X-Nexusphere-Mandate`, a mandate for the grant with the peer's issuer as audience (reused while it is valid for at
-least another minute), and `X-Nexusphere-Request`, a request proof signed by the sending ledger
+least another minute), or the agent's own key-bound presentation when the agent has a signing key, and `X-Nexusphere-Request`, a request proof signed by the sending ledger
 (`typ` `nexusphere-a2a-request+jwt`) that binds the mandate, the method, the SHA-256 of the body and the decision ID
 as the request ID.
 
@@ -928,8 +993,8 @@ as the request ID.
 <p style="text-align: justify;">
 
 The receiving ledger answers on `/a2a/in/{agent}` without an API key. It verifies the mandate with `MandateVerifier`
-(trusted issuer, key from the issuer's JWKS, signature, time, its own issuer as audience, the `a2a/send` action and the
-revocation status) and the request proof (same issuer, key, mandate and agent, its own issuer as audience, the method,
+(trusted issuer, key from the issuer's JWKS, signature, time, its own issuer as audience, the `a2a/send` action, the
+revocation status and, for a mandate with `cnf`, the key binding with the body hash as nonce) and the request proof (same issuer, key, mandate and agent, its own issuer as audience, the method,
 the body hash and an `iat` within `LEDGER_A2A_REQUEST_MAX_AGE`). A request ID is accepted once. A mandate or proof
 that cannot be trusted is answered with HTTP 401 and is not recorded. A trusted mandate that is revoked, expired or for
 another audience is answered with HTTP 403 and recorded as an `a2a/receive` DENY entry. Otherwise the request goes to
@@ -974,7 +1039,8 @@ curl -X POST http://localhost:8090/a2a/out/supplier -H "Authorization: Bearer {a
 
 [Conformance Vectors](conformance/README.md) hold fixed inputs and outputs for every format the ledger produces, made
 with the published RFC 8032 test keys: canonical JSON, the evidence chain and checkpoints, Merkle roots and proofs,
-signed notes and cosignatures, SCITT statements and receipts, and an SD-JWT VC mandate. Another implementation checks
+signed notes and cosignatures, SCITT statements and receipts, an SD-JWT VC mandate and a key-bound mandate with its
+KB-JWT. Another implementation checks
 itself against them, and `ConformanceVectorsTest` in `ledger/verifier` fails when the ledger's own output changes.
 
 </p>
@@ -1009,6 +1075,7 @@ API key, except `/api/v1/principal/**`, which requires a principal token from th
 | GET    | `/api/v1/agents/{agentId}`              | Get an agent                                                                                           |
 | POST   | `/api/v1/agents/{agentId}/disable`      | Disable an agent and its key (operator)                                                                |
 | POST   | `/api/v1/agents/{agentId}/key`          | Issue a new API key; the old one stops working (operator)                                              |
+| PUT    | `/api/v1/agents/{agentId}/signing-key`  | Register the agent's Ed25519 `publicKey`; the agent sets it once, the operator can replace it          |
 | POST   | `/api/v1/grants`                        | Create a grant (operator), or ask for one for itself (agent, only with OIDC)                           |
 | GET    | `/api/v1/grants`                        | List grants by `agentId`, `principalId`, `after` and `limit`                                           |
 | GET    | `/api/v1/grants/{id}`                   | Get a grant with its status and uses                                                                   |

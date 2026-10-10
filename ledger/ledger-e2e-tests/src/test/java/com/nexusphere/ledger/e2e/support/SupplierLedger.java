@@ -11,6 +11,8 @@ import java.security.KeyPair;
 
 public final class SupplierLedger implements AutoCloseable {
 
+    private static final KeyPair KEYS = SigningKeys.generate();
+
     private final PostgreSQLContainer postgres;
     private final ConfigurableApplicationContext context;
     private final String baseUrl;
@@ -24,7 +26,6 @@ public final class SupplierLedger implements AutoCloseable {
     public static SupplierLedger start(int port, String trustedIssuer, String agentUrl) {
         PostgreSQLContainer postgres = new PostgreSQLContainer(DockerImageName.parse("postgres:18-alpine"));
         postgres.start();
-        KeyPair keys = SigningKeys.generate();
         String baseUrl = "http://localhost:" + port;
         ConfigurableApplicationContext context = new SpringApplicationBuilder(LedgerApplication.class)
                 .profiles("postgresql", "dev")
@@ -32,8 +33,8 @@ public final class SupplierLedger implements AutoCloseable {
                         "--spring.datasource.url=" + postgres.getJdbcUrl(),
                         "--spring.datasource.username=" + postgres.getUsername(),
                         "--spring.datasource.password=" + postgres.getPassword(),
-                        "--ledger.signing.private-key=" + SigningKeys.encode(keys.getPrivate()),
-                        "--ledger.signing.public-key=" + SigningKeys.encode(keys.getPublic()),
+                        "--ledger.signing.private-key=" + SigningKeys.encode(KEYS.getPrivate()),
+                        "--ledger.signing.public-key=" + SigningKeys.encode(KEYS.getPublic()),
                         "--ledger.mandate.issuer=" + baseUrl,
                         "--ledger.a2a.trusted-issuers=" + trustedIssuer,
                         "--ledger.a2a.agents.sales.url=" + agentUrl,

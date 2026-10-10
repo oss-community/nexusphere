@@ -156,6 +156,11 @@ class LedgerClient:
     def register_agent(self, agent_id: str, name: Optional[str] = None, owner_id: Optional[str] = None) -> dict:
         return self._post("/api/v1/agents", _compact({"agentId": agent_id, "name": name, "ownerId": owner_id}))
 
+    def set_signing_key(self, agent_id: str, public_key) -> dict:
+        encoded = public_key if isinstance(public_key, str) else public_key.encoded
+        return self._request("PUT", "/api/v1/agents/%s/signing-key" % _segment(agent_id),
+                             body={"publicKey": encoded})
+
     def create_grant(self, principal_id: str, agent_id: str, actions: List[str], targets: List[str], expires_at,
                      not_before=None, max_uses: Optional[int] = None) -> dict:
         return self._post("/api/v1/grants", _compact({

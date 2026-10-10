@@ -15,9 +15,11 @@ import com.nexusphere.ledger.chain.SignedCheckpoint;
 import com.nexusphere.ledger.chain.Signer;
 import com.nexusphere.ledger.chain.SigningKeys;
 import com.nexusphere.ledger.chain.TrustedKeys;
+import com.nexusphere.ledger.mandate.KeyBinding;
 import com.nexusphere.ledger.mandate.KeyResolver;
 import com.nexusphere.ledger.mandate.MandateCheck;
 import com.nexusphere.ledger.mandate.MandateClaims;
+import com.nexusphere.ledger.mandate.MandateProblem;
 import com.nexusphere.ledger.mandate.MandateVerifier;
 import com.nexusphere.ledger.mandate.Mandates;
 import com.nexusphere.ledger.mandate.SdJwt;
@@ -60,6 +62,8 @@ class ConformanceVectorsTest {
     private static final String LEDGER_SEED = "9d61b19deffd5a60ba844af492ec2cc44449c5697b326919703bac031cae7f60";
     private static final String LEDGER_PUBLIC = "d75a980182b10ab7d54bfed3c964073a0ee172f3daa62325af021a68f707511a";
     private static final String WITNESS_SEED = "4ccd089b28ff96da9db6c346ec114e0f5b8a319f35aba624da8cf6ed4fb8a6fb";
+    private static final String AGENT_SEED = "c5aa8df43f9f837bedb7442f31dcb7b166d38535076f094b85ce3a2e0b4458f7";
+    private static final String AGENT_PUBLIC = "fc51cd8e6218a1a38da47ed00230f0580816ed13ba3303ac5deb911548908025";
     private static final String WITNESS_PUBLIC = "3d4017c3e843895a92b70aa74d1b7ebc9c982ccf2ec4968cc0cd55f12af4660c";
     private static final String ISSUER = "https://ledger.example";
     private static final String ORIGIN = "ledger.example";
@@ -348,6 +352,52 @@ class ConformanceVectorsTest {
         assertThat(JSON.readTree(JSON.writeValueAsString(full.claims().toPayload()))).isEqualTo(stored.path("claims"));
         assertThat(presented.problems()).isEmpty();
         assertThat(presented.claims().principalId()).isNull();
+    }
+
+    @Test
+    void keyBoundMandate() throws IOException {
+        Path file = DIR.resolve("mandate-key-binding.json");
+        PrivateKey agent = privateKey(AGENT_SEED);
+        PublicKey agentPublic = NoteKey.publicKey(HEX.parseHex(AGENT_PUBLIC));
+        Instant presentedAt = T0.truncatedTo(ChronoUnit.SECONDS).plusSeconds(3600);
+        String nonce = Hashes.sha256("{\"jsonrpc\":\"2.0\"}".getBytes());
+        MandateClaims claims = new MandateClaims(ISSUER, UUID.fromString("00000000-0000-4000-8000-0000000000cc"),
+                "sales-agent", "globex", "https://supplier.example", List.of("a2a/send"), List.of("supplier/*"), null,
+                UUID.fromString("00000000-0000-4000-8000-0000000000bb"), Hashes.sha256("terms".getBytes()),
+                T0.truncatedTo(ChronoUnit.SECONDS), T0.truncatedTo(ChronoUnit.SECONDS),
+                Instant.parse("2027-10-01T08:00:00Z"), ISSUER + "/public/v1/mandates/status", 4, agentPublic);
+        if (WRITE) {
+            String token = Mandates.issue(claims, KEY_ID, LEDGER_KEY);
+            Map<String, Object> vector = new LinkedHashMap<>();
+            vector.put("description", "SD-JWT VC mandate bound to the agent key with cnf, presented with a KB-JWT");
+            vector.put("agentSeed", AGENT_SEED);
+            vector.put("agentPublicKey", SigningKeys.encode(agentPublic));
+            vector.put("audience", "https://supplier.example");
+            vector.put("nonce", nonce);
+            vector.put("presentedAt", presentedAt.getEpochSecond());
+            vector.put("token", token);
+            vector.put("presentation", KeyBinding.present(token, agent, "https://supplier.example", nonce,
+                    presentedAt));
+            vector.put("sdHash", KeyBinding.sdHash(token));
+            vector.put("claims", claims.toPayload());
+            Files.writeString(file, JSON.writeValueAsString(vector) + "\n");
+        }
+        JsonNode stored = JSON.readTree(file.toFile());
+        MandateVerifier verifier = MandateVerifier.builder().trustIssuer(ISSUER).keys(KeyResolver.fixed(ISSUER, LEDGER))
+                .audience("https://supplier.example").skipStatus()
+                .clock(Clock.fixed(presentedAt.plusSeconds(10), ZoneOffset.UTC)).build();
+
+        MandateCheck bound = verifier.verifyBound(stored.path("presentation").asString(), nonce, "a2a/send",
+                "supplier/orders");
+        MandateCheck bare = verifier.verifyBound(stored.path("token").asString(), nonce);
+        MandateCheck replayed = verifier.verifyBound(stored.path("presentation").asString(), "00".repeat(32));
+
+        assertThat(bound.problems()).isEmpty();
+        assertThat(bound.claims()).isEqualTo(claims);
+        assertThat(JSON.readTree(JSON.writeValueAsString(bound.claims().toPayload()))).isEqualTo(stored.path("claims"));
+        assertThat(KeyBinding.sdHash(stored.path("token").asString())).isEqualTo(stored.path("sdHash").asString());
+        assertThat(bare.has(MandateProblem.KEY_BINDING_MISSING)).isTrue();
+        assertThat(replayed.has(MandateProblem.KEY_BINDING_INVALID)).isTrue();
     }
 
     private static List<String> hex(List<byte[]> hashes) {

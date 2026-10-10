@@ -10,14 +10,16 @@ import {
   StatusList,
   TYPE,
   VCT,
+  confirmationJwk,
   jwkOf,
+  presentBound,
 } from "../src/index.js";
 import { ISSUER, LEDGER_KEY, vector } from "./support.js";
 
 const NOW = 1790841600 + 3600;
 const STATUS = ISSUER + "/public/v1/mandates/status";
 
-async function issue(options: { key?: PrivateKey; issuer?: string; index?: number; exp?: number; nbf?: number; status?: string } = {}) {
+async function issue(options: { key?: PrivateKey; issuer?: string; index?: number; exp?: number; nbf?: number; status?: string; holder?: PrivateKey } = {}) {
   const key = options.key ?? LEDGER_KEY;
   const nbf = options.nbf ?? 1790841600;
   const disclosures = [Disclosure.of("principal", "globex"), Disclosure.of("grant", "00000000-0000-4000-8000-0000000000bb")];
@@ -34,6 +36,7 @@ async function issue(options: { key?: PrivateKey; issuer?: string; index?: numbe
     mandate: { actions: ["a2a/send"], targets: ["supplier/*"], maxUses: 5, _sd: digests },
     status: { status_list: { idx: options.index ?? 3, uri: options.status ?? STATUS } },
     _sd_alg: "sha-256",
+    ...(options.holder ? { cnf: { jwk: confirmationJwk(options.holder.publicKey) } } : {}),
   };
   return SdJwt.issue({ alg: "EdDSA", typ: TYPE, kid: key.keyId }, payload, disclosures, key);
 }
@@ -124,5 +127,55 @@ describe("MandateVerifier", () => {
       vector("mandate.json").token,
     );
     expect(check.valid).toBe(true);
+  });
+});
+
+describe("key binding", () => {
+  const AUDIENCE = "https://supplier.example";
+  const NONCE = "ab".repeat(32);
+  const bound = (options: MandateVerifierOptions = {}) => verifier({ audience: AUDIENCE, ...options });
+
+  it("accepts a presentation signed by the agent key", async () => {
+    const agent = await PrivateKey.generate();
+    const token = await presentBound(await issue({ holder: agent }), agent, AUDIENCE, NONCE, NOW - 5);
+    const check = await bound().verifyBound(token, NONCE, "a2a/send", "supplier/orders");
+    expect(check.problems).toEqual([]);
+    expect(check.claims!.holderKey!.x).toBe(confirmationJwk(agent.publicKey).x);
+    expect(SdJwt.parse(token).keyBinding).not.toBeNull();
+  });
+
+  it("needs a key binding for a bound mandate", async () => {
+    const agent = await PrivateKey.generate();
+    expect((await bound().verifyBound(await issue({ holder: agent }), NONCE)).has("KEY_BINDING_MISSING")).toBe(true);
+  });
+
+  it("rejects another key, nonce, audience, age or presentation", async () => {
+    const agent = await PrivateKey.generate();
+    const thief = await PrivateKey.generate();
+    const moved = await presentBound(await issue({ holder: agent }), agent, AUDIENCE, NONCE, NOW);
+    const cases = [
+      await presentBound(await issue({ holder: agent }), thief, AUDIENCE, NONCE, NOW),
+      await presentBound(await issue({ holder: agent }), agent, AUDIENCE, "cd".repeat(32), NOW),
+      await presentBound(await issue({ holder: agent }), agent, "https://evil.example", NONCE, NOW),
+      await presentBound(await issue({ holder: agent }), agent, AUDIENCE, NONCE, NOW - 600),
+      (await issue({ holder: agent })) + moved.substring(moved.lastIndexOf("~") + 1),
+    ];
+    for (const token of cases) {
+      expect((await bound().verifyBound(token, NONCE)).has("KEY_BINDING_INVALID")).toBe(true);
+    }
+  });
+
+  it("handles unbound mandates", async () => {
+    const agent = await PrivateKey.generate();
+    const withBinding = await presentBound(await issue(), agent, AUDIENCE, NONCE, NOW);
+    expect((await bound().verifyBound(withBinding, NONCE)).has("KEY_BINDING_INVALID")).toBe(true);
+    expect((await bound().verifyBound(await issue(), NONCE)).valid).toBe(true);
+    expect((await bound({ requireKeyBinding: true }).verifyBound(await issue(), NONCE)).has("KEY_NOT_BOUND")).toBe(true);
+  });
+
+  it("binds a presentation only once", async () => {
+    const agent = await PrivateKey.generate();
+    const token = await presentBound(await issue({ holder: agent }), agent, AUDIENCE, NONCE, NOW);
+    await expect(presentBound(token, agent, AUDIENCE, NONCE, NOW)).rejects.toThrow();
   });
 });

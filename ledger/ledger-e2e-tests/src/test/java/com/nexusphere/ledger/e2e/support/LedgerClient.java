@@ -71,6 +71,11 @@ public final class LedgerClient {
         return send(builder);
     }
 
+    public Response put(String path, String jsonBody) {
+        return send(request(path).header("Content-Type", "application/json")
+                .PUT(HttpRequest.BodyPublishers.ofString(jsonBody)));
+    }
+
     public Response postText(String path, String body) {
         return send(request(path).header("Content-Type", "text/plain; charset=utf-8")
                 .POST(HttpRequest.BodyPublishers.ofString(body)));

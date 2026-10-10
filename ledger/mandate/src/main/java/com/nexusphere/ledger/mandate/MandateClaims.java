@@ -2,6 +2,7 @@ package com.nexusphere.ledger.mandate;
 
 import tools.jackson.databind.JsonNode;
 
+import java.security.PublicKey;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
@@ -24,7 +25,8 @@ public record MandateClaims(
         Instant notBefore,
         Instant expiresAt,
         String statusListUrl,
-        long statusIndex) {
+        long statusIndex,
+        PublicKey holderKey) {
 
     public static final String TYPE = "dc+sd-jwt";
     public static final String VCT = "urn:nexusphere:vct:agent-mandate:1";
@@ -33,6 +35,18 @@ public record MandateClaims(
     public MandateClaims {
         actions = List.copyOf(actions);
         targets = List.copyOf(targets);
+    }
+
+    public MandateClaims(String issuer, UUID mandateId, String agentId, String principalId, String audience,
+                         List<String> actions, List<String> targets, Long maxUses, UUID grantId, String termsHash,
+                         Instant issuedAt, Instant notBefore, Instant expiresAt, String statusListUrl,
+                         long statusIndex) {
+        this(issuer, mandateId, agentId, principalId, audience, actions, targets, maxUses, grantId, termsHash,
+                issuedAt, notBefore, expiresAt, statusListUrl, statusIndex, null);
+    }
+
+    public boolean bound() {
+        return holderKey != null;
     }
 
     public boolean covers(String action, String target) {
@@ -85,6 +99,9 @@ public record MandateClaims(
         statusList.put("uri", statusListUrl);
         status.put("status_list", statusList);
         payload.put("status", status);
+        if (holderKey != null) {
+            payload.put("cnf", Map.of("jwk", Jwk.confirmation(holderKey)));
+        }
         return payload;
     }
 
@@ -109,7 +126,8 @@ public record MandateClaims(
                 Instant.ofEpochSecond(number(p, "nbf")),
                 Instant.ofEpochSecond(number(p, "exp")),
                 required(s, "uri"),
-                number(s, "idx"));
+                number(s, "idx"),
+                p.path("cnf").isObject() ? Jwk.publicKey(p.path("cnf").path("jwk")) : null);
     }
 
     private static String required(JsonNode node, String field) {

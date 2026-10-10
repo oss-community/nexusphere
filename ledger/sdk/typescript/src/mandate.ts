@@ -10,6 +10,7 @@ export const SELECTIVE = ["principal", "grant", "termsHash"];
 export const HASH_ALGORITHM = "sha-256";
 export const STATUS_LIST_TYPE = "statuslist+jwt";
 export const KEYS_PATH = "/public/v1/keys";
+export const KEY_BINDING_TYPE = "kb+jwt";
 
 export type MandateProblem =
   | "MALFORMED"
@@ -22,7 +23,10 @@ export type MandateProblem =
   | "WRONG_AUDIENCE"
   | "NOT_COVERED"
   | "REVOKED"
-  | "STATUS_UNAVAILABLE";
+  | "STATUS_UNAVAILABLE"
+  | "KEY_BINDING_MISSING"
+  | "KEY_BINDING_INVALID"
+  | "KEY_NOT_BOUND";
 
 type Json = Record<string, unknown>;
 
@@ -132,6 +136,8 @@ export class SdJwt {
     readonly jwt: Jws,
     readonly issuerJwt: string,
     readonly disclosures: Disclosure[],
+    readonly presentation: string = "",
+    readonly keyBinding: string | null = null,
   ) {}
 
   static parse(token: string): SdJwt {
@@ -139,10 +145,13 @@ export class SdJwt {
       throw new Error("The token is missing");
     }
     const trimmed = token.trim();
-    if (!trimmed.endsWith("~")) {
-      throw new Error("The token is not an SD-JWT without key binding");
+    const last = trimmed.lastIndexOf("~");
+    if (last < 0) {
+      throw new Error("The token is not an SD-JWT");
     }
-    const parts = trimmed.split("~");
+    const presentation = trimmed.substring(0, last + 1);
+    const keyBinding = trimmed.substring(last + 1) || null;
+    const parts = presentation.split("~");
     const seen = new Set<string>();
     const disclosures: Disclosure[] = [];
     for (const part of parts.slice(1, -1)) {
@@ -152,7 +161,7 @@ export class SdJwt {
       seen.add(part);
       disclosures.push(Disclosure.parse(part));
     }
-    return new SdJwt(Jws.parse(parts[0]), parts[0], disclosures);
+    return new SdJwt(Jws.parse(parts[0]), parts[0], disclosures, presentation, keyBinding);
   }
 
   static async issue(header: Json, payload: Json, disclosures: Disclosure[], key: PrivateKey): Promise<string> {
@@ -231,6 +240,7 @@ export interface MandateClaims {
   expiresAt: number;
   statusListUrl: string;
   statusIndex: number;
+  holderKey?: Json | null;
 }
 
 export function mandateClaims(p: Json): MandateClaims {
@@ -256,7 +266,92 @@ export function mandateClaims(p: Json): MandateClaims {
     expiresAt: number(p, "exp"),
     statusListUrl: text(s, "uri"),
     statusIndex: number(s, "idx"),
+    holderKey: confirmation(p.cnf),
   };
+}
+
+function confirmation(cnf: unknown): Json | null {
+  if (!isObject(cnf)) {
+    return null;
+  }
+  const jwk = cnf.jwk;
+  if (!isObject(jwk) || jwk.kty !== "OKP" || jwk.crv !== "Ed25519" || typeof jwk.x !== "string") {
+    throw new Error("The mandate has a cnf claim without an Ed25519 jwk");
+  }
+  if (fromBase64Url(jwk.x).length !== 32) {
+    throw new Error("An Ed25519 key has 32 bytes");
+  }
+  return { kty: "OKP", crv: "Ed25519", x: jwk.x };
+}
+
+export function confirmationJwk(key: PublicKey): Json {
+  return { kty: "OKP", crv: "Ed25519", x: toBase64Url(key.raw) };
+}
+
+export async function sdHash(presentation: string): Promise<string> {
+  return toBase64Url(await sha256(ascii(presentation)));
+}
+
+export async function presentBound(
+  token: string,
+  holder: PrivateKey,
+  audience: string,
+  nonce: string,
+  issuedAt: number = Math.floor(Date.now() / 1000),
+): Promise<string> {
+  const parsed = SdJwt.parse(token);
+  if (parsed.keyBinding !== null) {
+    throw new Error("The presentation already has a key binding");
+  }
+  if (!audience || !nonce) {
+    throw new Error("A key binding needs an audience and a nonce");
+  }
+  const payload = { iat: Math.trunc(issuedAt), aud: audience, nonce, sd_hash: await sdHash(parsed.presentation) };
+  return parsed.presentation + (await Jws.sign({ alg: JWS_ALGORITHM, typ: KEY_BINDING_TYPE }, payload, holder));
+}
+
+export async function keyBindingProblem(
+  token: SdJwt,
+  holderKey: PublicKey,
+  audience: string | null,
+  nonce: string | null,
+  now: number,
+  clockSkew: number,
+  maxAge: number,
+): Promise<string | null> {
+  let kb: Jws;
+  try {
+    kb = Jws.parse(token.keyBinding as string);
+  } catch (e) {
+    return "The key binding cannot be read: " + (e as Error).message;
+  }
+  if (kb.header.typ !== KEY_BINDING_TYPE || kb.header.alg !== JWS_ALGORITHM) {
+    return "The key binding is not an EdDSA " + KEY_BINDING_TYPE;
+  }
+  if (!(await kb.verify(holderKey))) {
+    return "The key binding is not signed by the agent's key";
+  }
+  const payload = kb.payload;
+  if (payload.sd_hash !== (await sdHash(token.presentation))) {
+    return "The key binding is for another presentation";
+  }
+  if (audience !== null && payload.aud !== audience) {
+    return `The key binding is for ${payload.aud ?? "no audience"}, not ${audience}`;
+  }
+  if (typeof payload.nonce !== "string" || payload.nonce.trim() === "") {
+    return "The key binding has no nonce";
+  }
+  if (nonce !== null && payload.nonce !== nonce) {
+    return "The key binding is for another nonce";
+  }
+  if (typeof payload.iat !== "number") {
+    return "The key binding has no iat";
+  }
+  const issuedAt = Math.trunc(payload.iat);
+  if (issuedAt > now + clockSkew || issuedAt < now - maxAge - clockSkew) {
+    return `The key binding was made at ${epochText(issuedAt)}, outside the accepted window`;
+  }
+  return null;
 }
 
 export function covers(claims: MandateClaims, action: string, target: string | null): boolean {
@@ -286,6 +381,9 @@ export function mandatePayload(c: MandateClaims): Json {
   }
   payload.mandate = mandate;
   payload.status = { status_list: { idx: c.statusIndex, uri: c.statusListUrl } };
+  if (c.holderKey) {
+    payload.cnf = { jwk: { ...c.holderKey } };
+  }
   return payload;
 }
 
@@ -553,6 +651,8 @@ export interface MandateVerifierOptions {
   cacheTtl?: number;
   timeoutMillis?: number;
   fetcher?: Fetcher;
+  requireKeyBinding?: boolean;
+  keyBindingMaxAge?: number;
 }
 
 export class MandateVerifier {
@@ -562,6 +662,8 @@ export class MandateVerifier {
   private readonly audience: string | null;
   private readonly clock: Clock;
   private readonly skew: number;
+  private readonly requireKeyBinding: boolean;
+  private readonly keyBindingMaxAge: number;
 
   constructor(issuers: string | string[], options: MandateVerifierOptions = {}) {
     const list = typeof issuers === "string" ? [issuers] : issuers;
@@ -573,6 +675,8 @@ export class MandateVerifier {
     this.clock = options.clock ?? systemClock;
     this.skew = options.clockSkew ?? 60;
     this.audience = options.audience ?? null;
+    this.requireKeyBinding = options.requireKeyBinding ?? false;
+    this.keyBindingMaxAge = options.keyBindingMaxAge ?? 300;
     const ttl = options.cacheTtl ?? 300;
     this.keys = options.keys ?? new JwksKeys(fetcher, ttl, this.clock);
     this.statusLists = options.skipStatus
@@ -581,18 +685,29 @@ export class MandateVerifier {
   }
 
   verify(token: string): Promise<MandateCheck> {
-    return this.check(token, null, null, false);
+    return this.check(token, null, null, false, null);
   }
 
   verifyAction(token: string, action: string, target: string | null): Promise<MandateCheck> {
-    return this.check(token, action, target, true);
+    return this.check(token, action, target, true, null);
   }
 
-  private async check(token: string, action: string | null, target: string | null, coverage: boolean) {
+  verifyBound(token: string, nonce: string | null, action?: string, target?: string | null): Promise<MandateCheck> {
+    return this.check(token, action ?? null, target ?? null, action !== undefined, nonce);
+  }
+
+  private async check(
+    token: string,
+    action: string | null,
+    target: string | null,
+    coverage: boolean,
+    nonce: string | null,
+  ) {
     let parsed: Jws;
     let claims: MandateClaims;
+    let sdJwt: SdJwt;
     try {
-      const sdJwt = SdJwt.parse(token);
+      sdJwt = SdJwt.parse(token);
       parsed = sdJwt.jwt;
       claims = mandateClaims(await sdJwt.claims());
     } catch (e) {
@@ -629,6 +744,10 @@ export class MandateVerifier {
     if (this.audience !== null && this.audience !== claims.audience) {
       problems.push({ code: "WRONG_AUDIENCE", message: `The mandate is for ${claims.audience}, not ${this.audience}` });
     }
+    const binding = await this.keyBinding(sdJwt, claims, nonce, now);
+    if (binding) {
+      problems.push(binding);
+    }
     if (coverage && !covers(claims, action as string, target)) {
       problems.push({ code: "NOT_COVERED", message: `The mandate does not cover ${action} on ${target}` });
     }
@@ -636,6 +755,23 @@ export class MandateVerifier {
       problems.push(...(await this.status(claims)));
     }
     return new MandateCheck(claims, problems);
+  }
+
+  private async keyBinding(sdJwt: SdJwt, claims: MandateClaims, nonce: string | null, now: number) {
+    if (!claims.holderKey) {
+      if (sdJwt.keyBinding !== null) {
+        return { code: "KEY_BINDING_INVALID", message: "The mandate names no agent key, so it cannot carry a key binding" } as Problem;
+      }
+      return this.requireKeyBinding
+        ? ({ code: "KEY_NOT_BOUND", message: "The mandate is not bound to a key of the agent" } as Problem)
+        : null;
+    }
+    if (sdJwt.keyBinding === null) {
+      return { code: "KEY_BINDING_MISSING", message: "The mandate is bound to a key of the agent and needs a key binding" } as Problem;
+    }
+    const problem = await keyBindingProblem(sdJwt, await jwkPublicKey(claims.holderKey),
+      this.audience ?? claims.audience, nonce, now, this.skew, this.keyBindingMaxAge);
+    return problem === null ? null : ({ code: "KEY_BINDING_INVALID", message: problem } as Problem);
   }
 
   private async status(claims: MandateClaims): Promise<Problem[]> {
