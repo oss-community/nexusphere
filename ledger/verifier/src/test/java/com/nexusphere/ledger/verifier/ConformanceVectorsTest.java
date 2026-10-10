@@ -499,6 +499,26 @@ class ConformanceVectorsTest {
     }
 
     @Test
+    void rekor() throws IOException {
+        JsonNode stored = JSON.readTree(DIR.resolve("rekor.json").toFile());
+        JsonNode chain = JSON.readTree(DIR.resolve("evidence-chain.json").toFile());
+        String signedText = stored.path("signedBytes").asString();
+        byte[] signedBytes = signedText.getBytes(StandardCharsets.UTF_8);
+        assertThat(signedText).isEqualTo(chain.path("checkpoint").path("signedBytes").asString());
+        byte[] signature = SigningKeys.prehashed(LEDGER_KEY).sign(signedBytes);
+        assertThat(Base64.getEncoder().encodeToString(signature)).isEqualTo(stored.path("signature").asString());
+        assertThat(Base64.getEncoder().encodeToString(Hashes.sha512Bytes(signedBytes)))
+                .isEqualTo(stored.path("digest").asString());
+        assertThat(RekorEntry.request(signedBytes, signature, LEDGER)).isEqualTo(stored.path("request").asString());
+
+        RekorEntry.Verification verification = RekorEntry.verify(stored.path("entry"), signedBytes, LEDGER,
+                List.of(NoteKey.parse(stored.path("rekorVerifierKey").asString())));
+
+        assertThat(verification.valid()).as(verification.problem()).isTrue();
+        assertThat(verification.origin()).isEqualTo(stored.path("origin").asString());
+    }
+
+    @Test
     void timestamp() throws IOException {
         JsonNode stored = JSON.readTree(DIR.resolve("timestamp.json").toFile());
         byte[] signedBytes = stored.path("signedBytes").asString().getBytes(StandardCharsets.UTF_8);

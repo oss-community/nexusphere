@@ -67,8 +67,23 @@ public final class PackageVerifier {
         }
     }
 
+    public record RekorPolicy(List<NoteKey> keys, boolean required) {
+
+        public static final RekorPolicy NONE = new RekorPolicy(List.of(), false);
+
+        public RekorPolicy {
+            keys = List.copyOf(keys == null ? List.of() : keys);
+        }
+    }
+
     public static PackageReport verify(JsonNode pkg, String pinnedPublicKey, JsonNode keyList,
                                        List<NoteKey> witnessKeys, int requiredWitnesses, TimestampPolicy timestamps) {
+        return verify(pkg, pinnedPublicKey, keyList, witnessKeys, requiredWitnesses, timestamps, RekorPolicy.NONE);
+    }
+
+    public static PackageReport verify(JsonNode pkg, String pinnedPublicKey, JsonNode keyList,
+                                       List<NoteKey> witnessKeys, int requiredWitnesses, TimestampPolicy timestamps,
+                                       RekorPolicy rekor) {
         List<String> problems = new ArrayList<>();
         if (!FORMAT.equals(text(pkg, "format"))) {
             problems.add("unknown package format " + text(pkg, "format"));
@@ -96,6 +111,7 @@ public final class PackageVerifier {
             problems.add("the signature of anchor checkpoint " + anchor.checkpoint().sequence() + " is not valid");
         }
         TimestampToken.Verification stamp = timestamp(checkpoint, timestamps, problems);
+        RekorEntry.Verification anchored = rekor(pkg.path("checkpoint"), checkpoint, key, rekor, problems);
         long first = anchor == null ? 1 : anchor.checkpoint().sequence() + 1;
         ChainVerifier chain = new ChainVerifier(first, anchor == null ? Hashes.GENESIS : anchor.checkpoint().headHash());
         long disclosed = 0;
@@ -142,7 +158,29 @@ public final class PackageVerifier {
         return report(problems.isEmpty(), checkpoint.checkpoint().keyId(), pinnedKeyId(pinnedPublicKey),
                 anchor == null ? null : anchor.checkpoint().sequence(), checkpoint.checkpoint().sequence(),
                 checkpoint.checkpoint().createdAt().toString(), checkpoint.checkpoint().profiles(), first,
-                result.checkedEntries(), disclosed, pkg, log, revoked, stamp, problems);
+                result.checkedEntries(), disclosed, pkg, log, revoked, stamp, anchored, problems);
+    }
+
+    private static RekorEntry.Verification rekor(JsonNode node, SignedCheckpoint checkpoint,
+                                                 SigningKeys.PublicKeyInfo key, RekorPolicy policy,
+                                                 List<String> problems) {
+        long sequence = checkpoint.checkpoint().sequence();
+        if (!node.path("rekor").isObject()) {
+            if (policy.required()) {
+                problems.add("checkpoint " + sequence + " is not anchored in Rekor");
+            }
+            return null;
+        }
+        if (key == null) {
+            return null;
+        }
+        RekorEntry.Verification result = RekorEntry.verify(node.path("rekor"), checkpoint.checkpoint().signedBytes(),
+                key.publicKey(), policy.keys());
+        if (!result.valid()) {
+            problems.add("the Rekor entry of checkpoint " + sequence + ": " + result.problem());
+            return null;
+        }
+        return result;
     }
 
     private static TimestampToken.Verification timestamp(SignedCheckpoint checkpoint, TimestampPolicy policy,
@@ -438,18 +476,20 @@ public final class PackageVerifier {
                                         long disclosed, JsonNode pkg,
                                         LogResult log, List<String> revoked, List<String> problems) {
         return report(valid, keyId, pinnedKeyId, anchor, checkpoint, createdAt, profiles, first, checked, disclosed,
-                pkg, log, revoked, null, problems);
+                pkg, log, revoked, null, null, problems);
     }
 
     private static PackageReport report(boolean valid, String keyId, String pinnedKeyId, Long anchor, long checkpoint,
                                         String createdAt, List<Checkpoint.Profile> profiles, long first, long checked,
                                         long disclosed, JsonNode pkg, LogResult log, List<String> revoked,
-                                        TimestampToken.Verification stamp, List<String> problems) {
+                                        TimestampToken.Verification stamp, RekorEntry.Verification anchored,
+                                        List<String> problems) {
         return new PackageReport(valid, keyId, pinnedKeyId, anchor, checkpoint, createdAt,
                 profiles == null ? List.of() : profiles, first, checked, disclosed,
                 nullable(pkg.path("scope"), "agentId"), nullable(pkg.path("scope"), "principalId"), log.origin(),
                 log.size(), log.proven(), log.receipted(), log.witnesses(), List.copyOf(revoked),
                 stamp == null ? null : stamp.genTime().toString(), stamp == null ? null : stamp.authority(),
+                anchored == null ? null : anchored.logIndex(), anchored == null ? null : anchored.origin(),
                 List.copyOf(problems));
     }
 

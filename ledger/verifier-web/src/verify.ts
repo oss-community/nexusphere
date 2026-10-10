@@ -17,6 +17,7 @@ export interface Verification {
   report: PackageReport
   pinned: boolean
   timestampPinned: boolean
+  rekorPinned: boolean
   entries: Entry[]
 }
 
@@ -28,6 +29,8 @@ export interface Input {
   requiredWitnesses: string
   timestampCertificatesText?: string
   requireTimestamp?: boolean
+  rekorKeys?: string
+  requireRekor?: boolean
 }
 
 export async function verify(input: Input): Promise<Verification> {
@@ -71,6 +74,10 @@ export async function verify(input: Input): Promise<Verification> {
       throw new Error('The timestamp authority chain is not a PEM file of certificates.')
     }
   }
+  const rekorKeys = (input.rekorKeys ?? '')
+    .split('\n')
+    .map((line) => line.trim())
+    .filter((line) => line !== '')
   let report: PackageReport
   try {
     report = await verifyPackage(pkg as Record<string, unknown>, publicKey, {
@@ -79,6 +86,8 @@ export async function verify(input: Input): Promise<Verification> {
       keys,
       timestampCertificates,
       requireTimestamp: input.requireTimestamp ?? false,
+      rekorKeys,
+      requireRekor: input.requireRekor ?? false,
     })
   } catch (e) {
     throw new Error(`The keys cannot be read: ${(e as Error).message}`)
@@ -87,6 +96,7 @@ export async function verify(input: Input): Promise<Verification> {
     report,
     pinned: publicKey !== null,
     timestampPinned: timestampCertificates.length > 0,
+    rekorPinned: rekorKeys.length > 0,
     entries: entriesOf(pkg as Record<string, unknown>),
   }
 }

@@ -5,11 +5,13 @@ import com.nexusphere.ledger.chain.SigningKeys;
 import com.nexusphere.ledger.server.config.LedgerProperties;
 
 import java.security.PrivateKey;
+import java.util.Optional;
 
 final class LocalSigningProvider implements SigningProvider {
 
     private final SigningKeys.PublicKeyInfo publicKey;
     private final Signer signer;
+    private final Signer prehashSigner;
 
     LocalSigningProvider(LedgerProperties.Signing signing) {
         if (signing == null || isBlank(signing.privateKey()) || isBlank(signing.publicKey())) {
@@ -21,6 +23,7 @@ final class LocalSigningProvider implements SigningProvider {
             throw new IllegalStateException("ledger.signing.public-key does not belong to ledger.signing.private-key");
         }
         this.signer = Signer.of(privateKey);
+        this.prehashSigner = SigningKeys.prehashed(privateKey);
     }
 
     @Override
@@ -36,6 +39,11 @@ final class LocalSigningProvider implements SigningProvider {
     @Override
     public Signer signer() {
         return signer;
+    }
+
+    @Override
+    public Optional<Signer> prehashSigner() {
+        return Optional.of(prehashSigner);
     }
 
     private static boolean isBlank(String value) {

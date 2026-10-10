@@ -17,6 +17,7 @@ import {
 import { KeyRevocation, KeyRotation, PublicKey, revokedKeys, trustedAndRevoked } from "./keys.js";
 import { leafHash, verifyInclusion } from "./merkle.js";
 import { ED25519, LogCheckpoint, Note, NoteKey } from "./note.js";
+import { RekorVerification, verifyRekorEntry } from "./rekor.js";
 import { TimestampToken, TimestampVerification, X509Certificate } from "./timestamp.js";
 import { parseMicros } from "./timestamps.js";
 
@@ -44,6 +45,8 @@ export interface PackageReport {
   revokedKeys: string[];
   timestampedAt: string | null;
   timestampAuthority: string | null;
+  rekorLogIndex: number | null;
+  rekorOrigin: string | null;
   problems: string[];
 }
 
@@ -53,6 +56,8 @@ export interface PackageOptions {
   keys?: Json[];
   timestampCertificates?: X509Certificate[];
   requireTimestamp?: boolean;
+  rekorKeys?: (string | NoteKey)[];
+  requireRekor?: boolean;
 }
 
 interface LogResult {
@@ -84,6 +89,9 @@ export async function verifyPackage(
     (options.witnesses ?? []).map((key) => (typeof key === "string" ? NoteKey.parse(key) : key)),
   );
   const requiredWitnesses = options.requiredWitnesses ?? witnessKeys.length;
+  const rekorKeys = await Promise.all(
+    (options.rekorKeys ?? []).map((key) => (typeof key === "string" ? NoteKey.parse(key) : key)),
+  );
   const problems: string[] = [];
   const scope = isObject(pkg.scope) ? (pkg.scope as Json) : {};
   const empty = (): PackageReport => report(false, null, null, null, 0, null, null, 0, 0, 0, scope, NO_LOG, [], problems);
@@ -115,6 +123,7 @@ export async function verifyPackage(
     problems.push(`the signature of anchor checkpoint ${anchor.sequence} is not valid`);
   }
   const stamp = await verifyTimestampOf(checkpoint, (pkg.checkpoint as Json).timestamp, options, problems);
+  const anchored = await verifyRekorOf(checkpoint, (pkg.checkpoint as Json).rekor, key, rekorKeys, options, problems);
   const first = anchor ? anchor.sequence + 1 : 1;
   const chain = new ChainVerifier(first, anchor ? anchor.headHash : GENESIS);
   let disclosed = 0;
@@ -184,7 +193,34 @@ export async function verifyPackage(
     revoked,
     problems,
     stamp,
+    anchored,
   );
+}
+
+async function verifyRekorOf(
+  checkpoint: Checkpoint,
+  entry: unknown,
+  key: PublicKey | null,
+  rekorKeys: NoteKey[],
+  options: PackageOptions,
+  problems: string[],
+): Promise<RekorVerification | null> {
+  const sequence = checkpoint.sequence;
+  if (!isObject(entry)) {
+    if (options.requireRekor) {
+      problems.push(`checkpoint ${sequence} is not anchored in Rekor`);
+    }
+    return null;
+  }
+  if (!key) {
+    return null;
+  }
+  const result = await verifyRekorEntry(entry, checkpoint.signedBytes(), key, rekorKeys);
+  if (!result.valid) {
+    problems.push(`the Rekor entry of checkpoint ${sequence}: ${result.problem}`);
+    return null;
+  }
+  return result;
 }
 
 async function verifyTimestampOf(
@@ -522,6 +558,7 @@ function report(
   revokedKeys: string[],
   problems: string[],
   stamp: TimestampVerification | null = null,
+  anchored: RekorVerification | null = null,
 ): PackageReport {
   return {
     valid,
@@ -544,6 +581,8 @@ function report(
     revokedKeys: [...revokedKeys],
     timestampedAt: stamp ? stamp.genTime : null,
     timestampAuthority: stamp ? stamp.authority : null,
+    rekorLogIndex: anchored ? anchored.logIndex : null,
+    rekorOrigin: anchored ? anchored.origin : null,
     problems: [...problems],
   };
 }

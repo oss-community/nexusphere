@@ -12,7 +12,7 @@ export const VALID = 0;
 export const INVALID = 1;
 export const USAGE = 2;
 
-export const USAGE_TEXT = `Usage: nexusphere-ledger-verify [--public-key <base64 X.509 Ed25519 key> | --public-key-file <file>] [--keys <keys.json>] [--witness <verifier key>]... [--witnesses-required <n>] [--timestamp-certificates <chain.pem>] [--require-timestamp] [--json] <package.json>
+export const USAGE_TEXT = `Usage: nexusphere-ledger-verify [--public-key <base64 X.509 Ed25519 key> | --public-key-file <file>] [--keys <keys.json>] [--witness <verifier key>]... [--witnesses-required <n>] [--timestamp-certificates <chain.pem>] [--require-timestamp] [--rekor-key <verifier key>]... [--require-rekor] [--json] <package.json>
        nexusphere-ledger-verify mandate --issuer <url> [--issuer <url>] [--audience <aud>] [--action <action> --target <target>] [--public-key <key> | --public-key-file <file>] [--skip-status] [--nonce <nonce>] [--require-key-binding] [--json] <token | token file | ->
        nexusphere-ledger-verify statement [--public-key <key> | --public-key-file <file>] [--receipt <receipt.cose>] <statement.cose>`;
 
@@ -24,7 +24,7 @@ export interface Io {
 
 class UsageError extends Error {}
 
-const FLAGS = new Set(["--json", "--skip-status", "--require-key-binding", "--require-timestamp"]);
+const FLAGS = new Set(["--json", "--skip-status", "--require-key-binding", "--require-timestamp", "--require-rekor"]);
 
 function parse(args: string[], allowed: string[]): { options: Record<string, string[]>; positional: string | null } {
   const options: Record<string, string[]> = {};
@@ -80,7 +80,7 @@ export async function run(args: string[], io: Io): Promise<number> {
 async function pkg(args: string[], io: Io): Promise<number> {
   const { options, positional } = parse(args, [
     "--public-key", "--public-key-file", "--keys", "--witness", "--witnesses-required",
-    "--timestamp-certificates", "--require-timestamp", "--json",
+    "--timestamp-certificates", "--require-timestamp", "--rekor-key", "--require-rekor", "--json",
   ]);
   if (positional === null) {
     throw new UsageError();
@@ -117,6 +117,8 @@ async function pkg(args: string[], io: Io): Promise<number> {
       keys,
       timestampCertificates: certificates,
       requireTimestamp: !!options["--require-timestamp"],
+      rekorKeys: options["--rekor-key"] ?? [],
+      requireRekor: !!options["--require-rekor"],
     });
   } catch {
     throw new UsageError();
@@ -124,12 +126,12 @@ async function pkg(args: string[], io: Io): Promise<number> {
   if (options["--json"]) {
     io.out(JSON.stringify(report, null, 2) + "\n");
   } else {
-    printPackage(report, certificates.length > 0, io);
+    printPackage(report, certificates.length > 0, (options["--rekor-key"] ?? []).length > 0, io);
   }
   return report.valid ? VALID : INVALID;
 }
 
-function printPackage(r: PackageReport, timestampPinned: boolean, io: Io) {
+function printPackage(r: PackageReport, timestampPinned: boolean, rekorPinned: boolean, io: Io) {
   const note =
     r.pinnedKeyId === null
       ? " (taken from the package; pass --public-key to pin the ledger's key)"
@@ -145,6 +147,9 @@ function printPackage(r: PackageReport, timestampPinned: boolean, io: Io) {
       : []),
     ...(r.timestampedAt !== null ? [`  Timestamp   : ${r.timestampedAt} by ${r.timestampAuthority}${
       timestampPinned ? " (pinned)" : " (pass --timestamp-certificates to pin the timestamp authority)"}`]
+      : []),
+    ...(r.rekorLogIndex !== null ? [`  Rekor       : entry ${r.rekorLogIndex} in ${r.rekorOrigin}${
+      rekorPinned ? " (pinned)" : " (pass --rekor-key to pin the Rekor log)"}`]
       : []),
     `  Anchor      : ${r.anchorSequence === null ? "genesis" : "checkpoint " + r.anchorSequence}`,
     `  Chain       : ${r.checkedLinks} links from sequence ${r.firstSequence}`,

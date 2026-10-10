@@ -1,0 +1,31 @@
+{
+  "description" : "A Rekor v2 hashedrekord entry for the evidence-chain checkpoint, signed with Ed25519ph by test key 1, from a local rekor-tiles log, with the log's verifier key",
+  "signedBytes" : "{\"createdAt\":\"2026-10-01T08:01:00.123456Z\",\"format\":\"nexusphere-ledger/checkpoint/v1\",\"headHash\":\"bab1fd8734a3a6bb7bb7431c5b8f35e26640fc32106ab2054f8c27416e4c074b\",\"keyId\":\"06e3fd8fda29bb60\",\"sequence\":3}",
+  "digest" : "FlxHIzGlyrDqH1Kr9aUCR+XW4kEuG2+GglrU3jlPQAfd+uPvfBkPJCkaHQM/Zk+6ZUhoQMf2XCfgKrusyObK3w==",
+  "signature" : "H8nBkJO/mYDVh1mJhE6wgIp1sPMQnB7EYjtcdY09kKIEddYsjFpJL7NSPr7VZW+As+VIXF3N7DnUWt0K1MBPAg==",
+  "request" : "{\"hashedRekordRequestV002\":{\"digest\":\"FlxHIzGlyrDqH1Kr9aUCR+XW4kEuG2+GglrU3jlPQAfd+uPvfBkPJCkaHQM/Zk+6ZUhoQMf2XCfgKrusyObK3w==\",\"signature\":{\"content\":\"H8nBkJO/mYDVh1mJhE6wgIp1sPMQnB7EYjtcdY09kKIEddYsjFpJL7NSPr7VZW+As+VIXF3N7DnUWt0K1MBPAg==\",\"verifier\":{\"keyDetails\":\"PKIX_ED25519_PH\",\"publicKey\":{\"rawBytes\":\"MCowBQYDK2VwAyEA11qYAYKxCrfVS/7TyWQHOg7hcvPapiMlrwIaaPcHURo=\"}}}}}",
+  "entry" : {
+    "logIndex" : "1",
+    "logId" : {
+      "keyId" : "EBptx/1xZG1wlxJQYjo6keLvxDOwq6hfHXOpJ0Rhldw="
+    },
+    "kindVersion" : {
+      "kind" : "hashedrekord",
+      "version" : "0.0.2"
+    },
+    "integratedTime" : "0",
+    "inclusionPromise" : null,
+    "inclusionProof" : {
+      "logIndex" : "1",
+      "rootHash" : "rHlXNJXRIJ6AzYzVEKV6g7/X64ItVeGAqJTEf6iidCU=",
+      "treeSize" : "2",
+      "hashes" : [ "yzG0LiK+iU2+q7yp/CbYSBWQrl8LK0AFsBH1Wtwuc2c=" ],
+      "checkpoint" : {
+        "envelope" : "rekor.local\n2\nrHlXNJXRIJ6AzYzVEKV6g7/X64ItVeGAqJTEf6iidCU=\n\n— rekor.local EBptx1CKBL6/focjIOjUmcSRYLsyEoVpKu0F1BwD4ouJZQANh9Oco1/ZERTQLuq/OhDtov1jKzmV3vMuJF5Xgg+wEw8=\n"
+      }
+    },
+    "canonicalizedBody" : "eyJhcGlWZXJzaW9uIjoiMC4wLjIiLCJraW5kIjoiaGFzaGVkcmVrb3JkIiwic3BlYyI6eyJoYXNoZWRSZWtvcmRWMDAyIjp7ImRhdGEiOnsiYWxnb3JpdGhtIjoiU0hBMl81MTIiLCJkaWdlc3QiOiJGbHhISXpHbHlyRHFIMUtyOWFVQ1IrWFc0a0V1RzIrR2dsclUzamxQUUFmZCt1UHZmQmtQSkNrYUhRTS9aays2WlVob1FNZjJYQ2ZnS3J1c3lPYkszdz09In0sInNpZ25hdHVyZSI6eyJjb250ZW50IjoiSDhuQmtKTy9tWURWaDFtSmhFNndnSXAxc1BNUW5CN0VZanRjZFkwOWtLSUVkZFlzakZwSkw3TlNQcjdWWlcrQXMrVklYRjNON0RuVVd0MEsxTUJQQWc9PSIsInZlcmlmaWVyIjp7ImtleURldGFpbHMiOiJQS0lYX0VEMjU1MTlfUEgiLCJwdWJsaWNLZXkiOnsicmF3Qnl0ZXMiOiJNQ293QlFZREsyVndBeUVBMTFxWUFZS3hDcmZWUy83VHlXUUhPZzdoY3ZQYXBpTWxyd0lhYVBjSFVSbz0ifX19fX19"
+  },
+  "rekorVerifierKey" : "rekor.local+101a6dc7+ASTfCqQdKoZrwPfJNLNiq+8aCzLAQZXYaCxybGIC5SyZ",
+  "origin" : "rekor.local"
+}

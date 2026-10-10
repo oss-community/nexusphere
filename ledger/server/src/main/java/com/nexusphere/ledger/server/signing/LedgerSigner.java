@@ -138,6 +138,14 @@ public class LedgerSigner {
         return publicKey;
     }
 
+    public Optional<Signer> prehashSigner() {
+        return provider.prehashSigner();
+    }
+
+    public String providerName() {
+        return provider.name();
+    }
+
     public KeyRevocation revoke(String keyId, Instant compromisedAt, String reason, Instant now) {
         store.lock();
         SigningKey key = store.all().stream().filter(k -> k.keyId().equals(keyId)).findFirst()

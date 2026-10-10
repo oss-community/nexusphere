@@ -16,6 +16,9 @@ function Report({ report }: { report: PackageReport }) {
         {report.timestampedAt && (
           <><dt>Timestamp</dt><dd>{report.timestampedAt} by {report.timestampAuthority}</dd></>
         )}
+        {report.rekorLogIndex != null && (
+          <><dt>Rekor</dt><dd>entry {report.rekorLogIndex} in {report.rekorOrigin}</dd></>
+        )}
         <dt>Anchor</dt><dd>{report.anchorSequence === null ? 'genesis' : `checkpoint ${report.anchorSequence}`}</dd>
         <dt>Chain</dt><dd>{report.checkedLinks} links from sequence {report.firstSequence}</dd>
         <dt>Disclosed</dt><dd>{report.disclosedEntries} entries</dd>

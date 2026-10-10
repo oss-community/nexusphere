@@ -1,5 +1,6 @@
 package com.nexusphere.ledger.evidence.application;
 
+import com.nexusphere.ledger.transparency.application.RekorService;
 import com.nexusphere.ledger.transparency.application.TimestampService;
 import com.nexusphere.ledger.transparency.application.WitnessCollector;
 import org.slf4j.Logger;
@@ -15,11 +16,14 @@ class CheckpointScheduler {
     private final CheckpointService checkpoints;
     private final WitnessCollector witnesses;
     private final TimestampService timestamps;
+    private final RekorService rekor;
 
-    CheckpointScheduler(CheckpointService checkpoints, WitnessCollector witnesses, TimestampService timestamps) {
+    CheckpointScheduler(CheckpointService checkpoints, WitnessCollector witnesses, TimestampService timestamps,
+                        RekorService rekor) {
         this.checkpoints = checkpoints;
         this.witnesses = witnesses;
         this.timestamps = timestamps;
+        this.rekor = rekor;
     }
 
     @Scheduled(fixedDelayString = "${ledger.checkpoint.interval}", initialDelayString = "${ledger.checkpoint.interval}")
@@ -31,6 +35,7 @@ class CheckpointScheduler {
             log.warn("Scheduled checkpoint failed", e);
         }
         timestamps.stampMissing();
+        rekor.anchorMissing();
         witnesses.collect();
     }
 }

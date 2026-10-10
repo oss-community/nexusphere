@@ -15,6 +15,7 @@ from nexusphere_ledger.mandate import (KEY_BINDING_INVALID, KEY_BINDING_MISSING,
 from nexusphere_ledger.note import COSIGNATURE, ED25519, LogCheckpoint, Note, NoteKey, cosign
 
 from nexusphere_ledger.package import verify_package
+from nexusphere_ledger.rekor import rekor_request, verify_rekor_entry
 from nexusphere_ledger.timestamp import TimestampToken, read_certificates
 
 from .support import ISSUER, LEDGER_KEY, ORIGIN, WITNESS, WITNESS_KEY, package, vector
@@ -159,9 +160,57 @@ class TimestampVector(unittest.TestCase):
         self.assertTrue(report.valid, report.problems)
         self.assertEqual(self.v["genTime"], report.timestamped_at)
         self.assertEqual(self.v["authority"], report.timestamp_authority)
-        self.assertEqual(["timestampedAt", "timestampAuthority", "problems"], list(report.to_dict())[-3:])
+        self.assertEqual(["timestampedAt", "timestampAuthority"], list(report.to_dict())[-5:-3])
         pinned_root = verify_package(pkg, LEDGER_KEY.public_key.encoded, timestamp_certificates=self.chain[2:])
         self.assertIn("the timestamp of checkpoint 3: the timestamp authority is not trusted", pinned_root.problems)
+
+
+class RekorVector(unittest.TestCase):
+
+    def setUp(self):
+        self.v = vector("rekor.json")
+        self.signed = self.v["signedBytes"].encode("utf-8")
+        self.ledger = PublicKey.from_base64(vector("keys.json")["ledgerPublicKey"])
+        self.rekor_key = NoteKey.parse(self.v["rekorVerifierKey"])
+
+    def test_entry_from_a_real_rekor_log(self):
+        self.assertEqual(vector("evidence-chain.json")["checkpoint"]["signedBytes"], self.v["signedBytes"])
+        self.assertEqual(self.v["request"], rekor_request(self.signed, base64.b64decode(self.v["signature"]),
+                                                          self.ledger))
+        result = verify_rekor_entry(self.v["entry"], self.signed, self.ledger, [self.rekor_key])
+        self.assertTrue(result.valid, result.problem)
+        self.assertTrue(result.pinned)
+        self.assertEqual(self.v["origin"], result.origin)
+        self.assertEqual(int(self.v["entry"]["logIndex"]), result.log_index)
+        self.assertFalse(verify_rekor_entry(self.v["entry"], self.signed, self.ledger).pinned)
+
+    def test_rejections(self):
+        other_log = NoteKey(self.v["origin"], ED25519, PrivateKey.generate().public_key)
+        self.assertEqual("the log checkpoint is not signed by a pinned Rekor key",
+                         verify_rekor_entry(self.v["entry"], self.signed, self.ledger, [other_log]).problem)
+        self.assertEqual("the entry is for different data",
+                         verify_rekor_entry(self.v["entry"], b"other", self.ledger).problem)
+        self.assertEqual("the entry is signed by another key",
+                         verify_rekor_entry(self.v["entry"], self.signed, PrivateKey.generate().public_key).problem)
+        changed = json.loads(json.dumps(self.v["entry"]))
+        changed["inclusionProof"]["rootHash"] = base64.b64encode(bytes(32)).decode()
+        self.assertEqual("the entry is not proven in the log",
+                         verify_rekor_entry(changed, self.signed, self.ledger).problem)
+        moved = json.loads(json.dumps(self.v["entry"]))
+        moved["inclusionProof"]["logIndex"] = "7"
+        self.assertEqual("the inclusion proof is for another entry",
+                         verify_rekor_entry(moved, self.signed, self.ledger).problem)
+
+    def test_an_anchored_package(self):
+        pkg = package(chain_entries(), {1}, log=False)
+        pkg["checkpoint"] = dict(json.loads(self.v["signedBytes"]),
+                                 signature=vector("evidence-chain.json")["checkpoint"]["signature"],
+                                 rekor=self.v["entry"])
+        report = verify_package(pkg, LEDGER_KEY.public_key.encoded, rekor_keys=[self.v["rekorVerifierKey"]],
+                                require_rekor=True)
+        self.assertTrue(report.valid, report.problems)
+        self.assertEqual(self.v["origin"], report.rekor_origin)
+        self.assertEqual(["rekorLogIndex", "rekorOrigin", "problems"], list(report.to_dict())[-3:])
 
 
 class MerkleTreeVector(unittest.TestCase):

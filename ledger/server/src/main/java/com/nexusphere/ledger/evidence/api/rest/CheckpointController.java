@@ -5,6 +5,7 @@ import com.nexusphere.ledger.chain.SignedCheckpoint;
 import com.nexusphere.ledger.chain.TimestampToken;
 import com.nexusphere.ledger.evidence.application.CheckpointService;
 import com.nexusphere.ledger.server.security.Caller;
+import com.nexusphere.ledger.transparency.application.RekorService;
 import com.nexusphere.ledger.transparency.application.TimestampService;
 import com.nexusphere.ledger.transparency.application.WitnessCollector;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -12,6 +13,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import tools.jackson.databind.json.JsonMapper;
 
 import java.time.Instant;
 import java.util.List;
@@ -22,13 +24,14 @@ class CheckpointController {
 
     record CheckpointResponse(String format, long sequence, String headHash, Instant createdAt, String keyId,
                               List<Checkpoint.Profile> profiles, String signature, String timestamp,
-                              Instant timestampedAt) {
+                              Instant timestampedAt, Long rekorLogIndex) {
 
         static CheckpointResponse of(SignedCheckpoint signed) {
             Checkpoint c = signed.checkpoint();
             return new CheckpointResponse(c.format(), c.sequence(), c.headHash(), c.createdAt(), c.keyId(),
                     c.profiles(), signed.signature(), signed.timestamp(),
-                    signed.timestamp() == null ? null : TimestampToken.parse(signed.timestamp()).genTime());
+                    signed.timestamp() == null ? null : TimestampToken.parse(signed.timestamp()).genTime(),
+                    signed.rekor() == null ? null : JSON.readTree(signed.rekor()).path("logIndex").asLong());
         }
     }
 
@@ -37,18 +40,23 @@ class CheckpointController {
 
     private final CheckpointService checkpoints;
     private final WitnessCollector witnesses;
-    private final TimestampService timestamps;
+    private static final JsonMapper JSON = JsonMapper.builder().build();
 
-    CheckpointController(CheckpointService checkpoints, WitnessCollector witnesses, TimestampService timestamps) {
+    private final TimestampService timestamps;
+    private final RekorService rekor;
+
+    CheckpointController(CheckpointService checkpoints, WitnessCollector witnesses, TimestampService timestamps,
+                         RekorService rekor) {
         this.checkpoints = checkpoints;
         this.witnesses = witnesses;
         this.timestamps = timestamps;
+        this.rekor = rekor;
     }
 
     @PostMapping
     CheckpointResponse create(Caller caller) {
         caller.requireOperator();
-        CheckpointResponse created = CheckpointResponse.of(timestamps.stamp(checkpoints.create()));
+        CheckpointResponse created = CheckpointResponse.of(rekor.anchor(timestamps.stamp(checkpoints.create())));
         witnesses.collect();
         return created;
     }

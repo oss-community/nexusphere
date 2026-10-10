@@ -53,6 +53,12 @@ export function Overview() {
                   ? <><Time value={data.checkpoint.timestampedAt} />, RFC 3161 token from the timestamp authority</>
                   : 'none'}</dd></>
             )}
+            {data.checkpoint && (
+              <><dt>Rekor</dt>
+                <dd>{data.checkpoint.rekorLogIndex != null
+                  ? `entry ${data.checkpoint.rekorLogIndex} in the public Rekor log`
+                  : 'not anchored'}</dd></>
+            )}
           </dl>
         )}
         {report && (

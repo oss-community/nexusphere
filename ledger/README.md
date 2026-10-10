@@ -26,6 +26,7 @@
 * [Erasure](#erasure)
 * [Retention and Legal Holds](#retention-and-legal-holds)
 * [Checkpoint Timestamps](#checkpoint-timestamps)
+* [Rekor Anchoring](#rekor-anchoring)
 * [Conformance Vectors](#conformance-vectors)
 * [API](#api)
 * [End-to-End Tests](ledger-e2e-tests/README.md)
@@ -300,6 +301,9 @@ LEDGER_COMPLIANCE_RETENTION_INTERVAL: 1h
 LEDGER_TIMESTAMP_URL:
 LEDGER_TIMESTAMP_CERTIFICATES:
 LEDGER_TIMESTAMP_TIMEOUT: 10s
+LEDGER_REKOR_URL:
+LEDGER_REKOR_KEY:
+LEDGER_REKOR_TIMEOUT: 10s
 LEDGER_LOG_ORIGIN:
 LEDGER_LOG_WITNESS_TIMEOUT: 10s
 LEDGER_LOG_WITNESSES_{NAME}_URL:
@@ -1383,6 +1387,78 @@ curl -s -X POST http://localhost:8090/api/v1/packages -H "Authorization: Bearer 
 java -jar verifier/target/verifier-1.0.0-SNAPSHOT-exec.jar --timestamp-certificates tsa-chain.pem --require-timestamp package.json
 ```
 
+## Rekor Anchoring
+
+<p style="text-align: justify;">
+
+A timestamp proves when a checkpoint existed, but only the ledger and its readers hold the checkpoint. With
+`LEDGER_REKOR_URL` set to a Rekor v2 log, such as the public Sigstore log or a private one, the ledger also writes
+every checkpoint to that log as a `hashedrekord` entry: the SHA-512 of the checkpoint's signed bytes, signed with the
+ledger key. Anyone can then find the checkpoint in a log the operator does not run, and a ledger that rewrote its
+history would have to explain two different checkpoints for the same sequence. `LEDGER_REKOR_KEY` is the verifier key
+of the log: the ledger keeps only entries whose log checkpoint that key signs, and publishes both at
+`GET /public/v1/rekor`. When the log cannot be reached, the checkpoint is signed anyway, and the scheduler anchors it
+on a later round.
+
+</p>
+
+<p style="text-align: justify;">
+
+The entry travels as `rekor` in the checkpoint of an evidence package, next to `rekorLogIndex` in the checkpoint API.
+Every verifier checks it offline: the entry must be for this checkpoint's bytes and this checkpoint's key, the
+inclusion proof must lead to the root of the log checkpoint, and `--rekor-key` pins the log that must have signed it.
+`--require-rekor` rejects a checkpoint without an entry. Rekor v2 records no time of its own, so anchoring goes with
+[checkpoint timestamps](#checkpoint-timestamps) rather than replacing them. Rekor needs Ed25519ph signatures, which
+Vault cannot make, so the ledger does not start with `LEDGER_SIGNING_PROVIDER=vault` and `LEDGER_REKOR_URL` together.
+
+</p>
+
+Step 1. Install a Rekor v2 log that keeps its tiles on disk, and make its signing key:
+
+```shell
+go install github.com/sigstore/rekor-tiles/v2/cmd/rekor-server/posix@v2.3.0
+cp "$(go env GOPATH)/bin/posix" rekor-server
+openssl genpkey -algorithm ed25519 -out rekor-key.pem
+```
+
+Step 2. Start the log as `rekor.local`:
+
+```shell
+./rekor-server serve --http-port 3005 --grpc-port 3006 --http-metrics-port 2115 --hostname rekor.local --storage-dir rekor-log --signer-filepath rekor-key.pem --checkpoint-interval 1s &
+```
+
+Step 3. Build the verifier key of the log from its public key; the answer must start with `rekor.local+`:
+
+```shell
+REKOR_PUBLIC=$(openssl pkey -in rekor-key.pem -pubout -outform DER | tail -c 32 | base64 -w0)
+REKOR_ID=$( (printf 'rekor.local\n\001'; echo "$REKOR_PUBLIC" | base64 -d) | openssl dgst -sha256 -binary | head -c 4 | od -An -tx1 | tr -d ' \n')
+REKOR_KEY="rekor.local+$REKOR_ID+$( (printf '\001'; echo "$REKOR_PUBLIC" | base64 -d) | base64 -w0)"
+echo "$REKOR_KEY"
+```
+
+Step 4. Start the ledger with the log, then ask which log it anchors in; the answer must show the same key:
+
+```shell
+export LEDGER_REKOR_URL=http://127.0.0.1:3005
+export LEDGER_REKOR_KEY=$REKOR_KEY
+curl -s http://localhost:8090/public/v1/rekor | jq -c
+```
+
+Step 5. Record evidence and sign a checkpoint; the answer must show a `rekorLogIndex`:
+
+```shell
+curl -s -X POST http://localhost:8090/api/v1/evidence -H "Authorization: Bearer $LEDGER_API_KEY" -H "Content-Type: application/json" -d '{"agentId":"invoice-agent","principalId":"alice","action":"tools/call","target":"read_invoice","outcome":"SUCCEEDED"}' | jq -c '{sequence}'
+curl -s -X POST http://localhost:8090/api/v1/checkpoints -H "Authorization: Bearer $LEDGER_API_KEY" | jq -c '{sequence, rekorLogIndex}'
+```
+
+Step 6. Export a package and verify it with the log pinned; the output must show
+`Rekor       : entry 0 in rekor.local (pinned)` and `Result: VALID`:
+
+```shell
+curl -s -X POST http://localhost:8090/api/v1/packages -H "Authorization: Bearer $LEDGER_API_KEY" -H "Content-Type: application/json" -d '{"agentId":"invoice-agent"}' > package.json
+java -jar verifier/target/verifier-1.0.0-SNAPSHOT-exec.jar --rekor-key "$REKOR_KEY" --require-rekor package.json
+```
+
 ## Conformance Vectors
 
 <p style="text-align: justify;">
@@ -1390,8 +1466,8 @@ java -jar verifier/target/verifier-1.0.0-SNAPSHOT-exec.jar --timestamp-certifica
 [Conformance Vectors](conformance/README.md) hold fixed inputs and outputs for every format the ledger produces, made
 with the published RFC 8032 test keys: canonical JSON, the evidence chain and checkpoints, Merkle roots and proofs,
 signed notes and cosignatures, SCITT statements and receipts, an SD-JWT VC mandate, a key-bound mandate with its
-KB-JWT, an HTTP message signature, a checkpoint that signs compliance profiles and an RFC 3161 token from a real
-timestamp authority. Another implementation checks itself against them, and `ConformanceVectorsTest` in `ledger/verifier` fails when the ledger's own output changes.
+KB-JWT, an HTTP message signature, a checkpoint that signs compliance profiles, an RFC 3161 token from a real
+timestamp authority and a Rekor entry from a real Rekor v2 log. Another implementation checks itself against them, and `ConformanceVectorsTest` in `ledger/verifier` fails when the ledger's own output changes.
 
 </p>
 
@@ -1411,7 +1487,7 @@ API key, except `/api/v1/principal/**`, which requires a principal token from th
 | GET    | `/api/v1/evidence`                         | List entries by `agentId`, `principalId`, `after` and `limit` (max 500)                                |
 | GET    | `/api/v1/ledger/head`                      | Current sequence and hash                                                                              |
 | POST   | `/api/v1/checkpoints`                      | Sign the current head now; `409 LEDGER_EMPTY` when nothing is recorded (operator)                      |
-| GET    | `/api/v1/checkpoints/latest`               | Latest checkpoint, with its RFC 3161 `timestamp` and `timestampedAt` when timestamped                  |
+| GET    | `/api/v1/checkpoints/latest`               | Latest checkpoint, with its RFC 3161 `timestamp`, `timestampedAt` and Rekor `rekorLogIndex` when set   |
 | GET    | `/api/v1/checkpoints`                      | List checkpoints by `after` and `limit`                                                                |
 | GET    | `/api/v1/log/proofs/inclusion`             | Inclusion proof for a `sequence` in the log at `treeSize`, by default the latest log checkpoint        |
 | GET    | `/api/v1/log/proofs/consistency`           | Consistency proof from `firstSize` to `secondSize`, by default the latest log checkpoint               |
@@ -1459,6 +1535,7 @@ API key, except `/api/v1/principal/**`, which requires a principal token from th
 | POST   | `/public/v1/witness/add-checkpoint`        | C2SP witness endpoint: cosign a watched log's checkpoint, `404` when it watches none, no API key       |
 | GET    | `/public/v1/compliance`                    | Active compliance profiles with their digests and the combined rules, no API key                       |
 | GET    | `/public/v1/timestamp-authority`           | The RFC 3161 timestamp authority and its certificate chain in PEM, no API key                          |
+| GET    | `/public/v1/rekor`                         | The Rekor log the ledger anchors checkpoints in and its verifier key, no API key                       |
 | GET    | `/public/v1/oidc`                          | The OIDC issuer and client for principal sign-in, `404` without OIDC                                   |
 | POST   | `/mcp/{server}`                            | MCP gateway: decide, forward and record a `tools/call`; forward other messages                         |
 | GET    | `/mcp/{server}`                            | Relay the MCP server-to-client stream                                                                  |

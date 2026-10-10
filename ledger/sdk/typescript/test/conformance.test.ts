@@ -39,6 +39,8 @@ import {
   toHex,
   utf8,
   verifyTimestamp,
+  verifyRekorEntry,
+  rekorRequest,
   fromBase64,
   sha256,
 } from "../src/index.js";
@@ -357,5 +359,53 @@ describe("timestamp.json", () => {
     const changed = token.encoded.slice();
     changed[changed.length - 5] ^= 1;
     expect((await verifyTimestamp(changed, imprint, chain)).valid).toBe(false);
+  });
+});
+
+describe("rekor.json", () => {
+  it("verifies the hashedrekord entry and its log checkpoint", async () => {
+    const v = vector("rekor.json");
+    const ledger = await PublicKey.fromBase64(vector("keys.json").ledgerPublicKey);
+    const rekorKey = await NoteKey.parse(v.rekorVerifierKey);
+    expect(await rekorRequest(v.signedBytes, fromBase64(v.signature), ledger)).toBe(v.request);
+    const pinned = await verifyRekorEntry(v.entry, v.signedBytes, ledger, [v.rekorVerifierKey]);
+    expect(pinned).toEqual({ valid: true, logIndex: Number(v.entry.logIndex), origin: v.origin, pinned: true, problem: null });
+    expect(v.origin).toBe("rekor.local");
+    expect((await verifyRekorEntry(v.entry, utf8(v.signedBytes), ledger, [rekorKey])).valid).toBe(true);
+    expect(await verifyRekorEntry(v.entry, v.signedBytes, ledger)).toMatchObject({ valid: true, pinned: false, origin: v.origin });
+    const numeric = structuredClone(v.entry);
+    numeric.logIndex = Number(numeric.logIndex);
+    numeric.inclusionProof.logIndex = Number(numeric.inclusionProof.logIndex);
+    numeric.inclusionProof.treeSize = Number(numeric.inclusionProof.treeSize);
+    expect((await verifyRekorEntry(numeric, v.signedBytes, ledger, [rekorKey])).valid).toBe(true);
+    const other = await NoteKey.of(v.origin, ED25519, WITNESS_KEY.publicKey);
+    const problem = async (entry: unknown, signedBytes: string = v.signedBytes, key = ledger) =>
+      (await verifyRekorEntry(entry, signedBytes, key, [other])).problem;
+    expect(await problem(v.entry)).toBe("the log checkpoint is not signed by a pinned Rekor key");
+    expect(await problem(v.entry, v.signedBytes + " ")).toBe("the entry is for different data");
+    expect(await problem(v.entry, v.signedBytes, WITNESS_KEY.publicKey)).toBe("the entry is signed by another key");
+    const hash = structuredClone(v.entry);
+    const changed = fromBase64(hash.inclusionProof.hashes[0]);
+    changed[0] ^= 1;
+    hash.inclusionProof.hashes[0] = toBase64(changed);
+    expect(await problem(hash)).toBe("the entry is not proven in the log");
+    const root = structuredClone(v.entry);
+    const rootHash = fromBase64(root.inclusionProof.rootHash);
+    rootHash[0] ^= 1;
+    root.inclusionProof.rootHash = toBase64(rootHash);
+    expect(await problem(root)).toBe("the entry is not proven in the log");
+    const size = structuredClone(v.entry);
+    size.inclusionProof.checkpoint.envelope = size.inclusionProof.checkpoint.envelope.replace("\n2\n", "\n3\n");
+    expect(await problem(size)).toBe("the log checkpoint does not match the inclusion proof");
+    const index = structuredClone(v.entry);
+    index.inclusionProof.logIndex = "0";
+    expect(await problem(index)).toBe("the inclusion proof is for another entry");
+    const missing = structuredClone(v.entry);
+    delete missing.logIndex;
+    expect(await problem(missing)).toBe("the entry cannot be read: logIndex is missing");
+    const kind = structuredClone(v.entry);
+    const body = JSON.parse(new TextDecoder().decode(fromBase64(kind.canonicalizedBody)));
+    kind.canonicalizedBody = toBase64(utf8(JSON.stringify({ ...body, apiVersion: "0.0.1" })));
+    expect(await problem(kind)).toBe("the entry is not a hashedrekord 0.0.2");
   });
 });

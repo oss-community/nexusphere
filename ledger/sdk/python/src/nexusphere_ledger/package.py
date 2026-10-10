@@ -8,6 +8,7 @@ from .cose import EvidenceStatement, LogReceipt
 from .evidence import GENESIS, ChainVerifier, Checkpoint, EvidenceLink, content_hash, erased
 from .keys import KeyRevocation, KeyRotation, PublicKey, revoked_keys, trusted_and_revoked
 from .note import ED25519, Note, NoteKey
+from .rekor import verify_rekor_entry
 from .timestamp import TimestampToken, read_certificates
 from .timestamps import parse_instant
 
@@ -37,6 +38,8 @@ class PackageReport:
     revoked_keys: List[str] = field(default_factory=list)
     timestamped_at: Optional[str] = None
     timestamp_authority: Optional[str] = None
+    rekor_log_index: Optional[int] = None
+    rekor_origin: Optional[str] = None
     problems: List[str] = field(default_factory=list)
 
     def to_dict(self) -> dict:
@@ -56,10 +59,11 @@ class _Log:
 
 def verify_package(pkg: dict, public_key: Optional[str] = None, witness_keys=(),
                    required_witnesses: Optional[int] = None, key_list=None, timestamp_certificates=(),
-                   require_timestamp: bool = False) -> PackageReport:
+                   require_timestamp: bool = False, rekor_keys=(), require_rekor: bool = False) -> PackageReport:
     if isinstance(timestamp_certificates, (str, bytes)):
         timestamp_certificates = read_certificates(timestamp_certificates)
     witness_keys = [NoteKey.parse(key) if isinstance(key, str) else key for key in witness_keys]
+    rekor_keys = [NoteKey.parse(key) if isinstance(key, str) else key for key in rekor_keys or ()]
     required = len(witness_keys) if required_witnesses is None else required_witnesses
     problems = []
     scope = pkg.get("scope") if isinstance(pkg.get("scope"), dict) else {}
@@ -82,6 +86,7 @@ def verify_package(pkg: dict, public_key: Optional[str] = None, witness_keys=(),
     if anchor_key is not None and not anchor.verify(anchor_key):
         problems.append("the signature of anchor checkpoint %d is not valid" % anchor.sequence)
     stamp = _timestamp(checkpoint, list(timestamp_certificates or ()), require_timestamp, problems)
+    anchored = _rekor(pkg["checkpoint"], checkpoint, key, rekor_keys, require_rekor, problems)
     first = 1 if anchor is None else anchor.sequence + 1
     chain = ChainVerifier(first, GENESIS if anchor is None else anchor.head_hash)
     disclosed = 0
@@ -121,7 +126,7 @@ def verify_package(pkg: dict, public_key: Optional[str] = None, witness_keys=(),
     return _report(not problems, checkpoint.key_id, _pinned_key_id(public_key),
                    None if anchor is None else anchor.sequence, checkpoint.sequence, checkpoint.created_at,
                    checkpoint.profiles, first,
-                   result.checked_entries, disclosed, scope, log, revoked_used, problems, stamp)
+                   result.checked_entries, disclosed, scope, log, revoked_used, problems, stamp, anchored)
 
 
 def _timestamp(checkpoint, certificates, required, problems):
@@ -139,6 +144,21 @@ def _timestamp(checkpoint, certificates, required, problems):
         return None
     if parse_instant(result.gen_time) + MAX_TIMESTAMP_SKEW < parse_instant(checkpoint.created_at):
         problems.append("the timestamp of checkpoint %d predates the checkpoint" % checkpoint.sequence)
+    return result
+
+
+def _rekor(node, checkpoint, key, rekor_keys, required, problems):
+    entry = node.get("rekor")
+    if not isinstance(entry, dict):
+        if required:
+            problems.append("checkpoint %d is not anchored in Rekor" % checkpoint.sequence)
+        return None
+    if key is None:
+        return None
+    result = verify_rekor_entry(entry, checkpoint.signed_bytes(), key, rekor_keys)
+    if not result.valid:
+        problems.append("the Rekor entry of checkpoint %d: %s" % (checkpoint.sequence, result.problem))
+        return None
     return result
 
 
@@ -311,14 +331,15 @@ def _pinned_key_id(pinned) -> Optional[str]:
 
 
 def _report(valid, key_id, pinned_key_id, anchor, checkpoint, created_at, profiles, first, checked, disclosed, scope,
-            log, revoked, problems, stamp=None) -> PackageReport:
+            log, revoked, problems, stamp=None, anchored=None) -> PackageReport:
     compliance = [{"id": i, "digest": d} for i, d in sorted(profiles or ())]
     return PackageReport(valid, key_id, pinned_key_id, anchor, checkpoint, created_at, compliance, first, checked,
                          disclosed,
                          _nullable(scope, "agentId"), _nullable(scope, "principalId"), log.origin, log.size,
                          log.proven, log.receipted, list(log.witnesses), list(revoked),
                          None if stamp is None else stamp.gen_time, None if stamp is None else stamp.authority,
-                         list(problems))
+                         None if anchored is None else anchored.log_index,
+                         None if anchored is None else anchored.origin, list(problems))
 
 
 def _object(node) -> dict:

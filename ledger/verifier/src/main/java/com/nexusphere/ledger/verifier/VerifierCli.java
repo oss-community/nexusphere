@@ -26,7 +26,8 @@ public final class VerifierCli {
     private static final String USAGE_TEXT = """
             Usage: nexusphere-ledger-verify [--public-key <base64 X.509 Ed25519 key> | --public-key-file <file>] \
             [--keys <keys.json>] [--witness <verifier key>]... [--witnesses-required <n>] \
-            [--timestamp-certificates <chain.pem>] [--require-timestamp] [--json] <package.json>
+            [--timestamp-certificates <chain.pem>] [--require-timestamp] [--rekor-key <verifier key>]... \
+            [--require-rekor] [--json] <package.json>
                    nexusphere-ledger-verify mandate --issuer <url> [--issuer <url>] [--audience <aud>] \
             [--action <action> --target <target>] [--public-key <key> | --public-key-file <file>] [--skip-status] \
             [--nonce <nonce>] [--require-key-binding] [--json] <token | token file | ->
@@ -55,6 +56,8 @@ public final class VerifierCli {
         Path keysFile = null;
         Path timestampCertificates = null;
         boolean requireTimestamp = false;
+        List<NoteKey> rekorKeys = new ArrayList<>();
+        boolean requireRekor = false;
         boolean json = false;
         Path file = null;
         try {
@@ -67,6 +70,8 @@ public final class VerifierCli {
                     case "--witnesses-required" -> required = Integer.parseInt(args[++i]);
                     case "--timestamp-certificates" -> timestampCertificates = Path.of(args[++i]);
                     case "--require-timestamp" -> requireTimestamp = true;
+                    case "--rekor-key" -> rekorKeys.add(NoteKey.parse(args[++i]));
+                    case "--require-rekor" -> requireRekor = true;
                     case "--json" -> json = true;
                     default -> {
                         if (file != null || args[i].startsWith("--")) {
@@ -105,16 +110,17 @@ public final class VerifierCli {
         }
         PackageReport report = PackageVerifier.verify(pkg, publicKey, keys, witnesses,
                 required == null ? witnesses.size() : required,
-                new PackageVerifier.TimestampPolicy(certificates, requireTimestamp));
+                new PackageVerifier.TimestampPolicy(certificates, requireTimestamp),
+                new PackageVerifier.RekorPolicy(rekorKeys, requireRekor));
         if (json) {
             out.println(JSON.writeValueAsString(report));
         } else {
-            print(report, !certificates.isEmpty(), out);
+            print(report, !certificates.isEmpty(), !rekorKeys.isEmpty(), out);
         }
         return report.valid() ? VALID : INVALID;
     }
 
-    private static void print(PackageReport r, boolean timestampPinned, PrintStream out) {
+    private static void print(PackageReport r, boolean timestampPinned, boolean rekorPinned, PrintStream out) {
         out.println("Nexusphere Ledger evidence package");
         out.println("  Signing key : " + r.keyId() + (r.pinnedKeyId() == null
                 ? " (taken from the package; pass --public-key to pin the ledger's key)"
@@ -129,6 +135,10 @@ public final class VerifierCli {
         if (r.timestampedAt() != null) {
             out.println("  Timestamp   : " + r.timestampedAt() + " by " + r.timestampAuthority() + (timestampPinned
                     ? " (pinned)" : " (pass --timestamp-certificates to pin the timestamp authority)"));
+        }
+        if (r.rekorLogIndex() != null) {
+            out.println("  Rekor       : entry " + r.rekorLogIndex() + " in " + r.rekorOrigin() + (rekorPinned
+                    ? " (pinned)" : " (pass --rekor-key to pin the Rekor log)"));
         }
         out.println("  Anchor      : " + (r.anchorSequence() == null ? "genesis" : "checkpoint " + r.anchorSequence()));
         out.println("  Chain       : " + r.checkedLinks() + " links from sequence " + r.firstSequence());

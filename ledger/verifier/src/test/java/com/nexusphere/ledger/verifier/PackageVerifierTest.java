@@ -13,6 +13,7 @@ import com.nexusphere.ledger.chain.SigningKeys;
 import com.nexusphere.ledger.chain.TimestampToken;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.json.JsonMapper;
 import tools.jackson.databind.node.ArrayNode;
 import tools.jackson.databind.node.ObjectNode;
@@ -188,6 +189,28 @@ class PackageVerifierTest {
         assertThat(report.valid()).isFalse();
         assertThat(report.problems()).contains("the timestamp of checkpoint 3: the timestamp is for different data");
         assertThat(TimestampToken.parse(token).genTime()).isNotNull();
+    }
+
+    @Test
+    void aRequiredRekorEntryMustBePresent() {
+        PackageReport report = PackageVerifier.verify(pkg(3, 1), null, null, List.of(), 0,
+                PackageVerifier.TimestampPolicy.NONE, new PackageVerifier.RekorPolicy(List.of(), true));
+
+        assertThat(report.valid()).isFalse();
+        assertThat(report.problems()).contains("checkpoint 3 is not anchored in Rekor");
+    }
+
+    @Test
+    void aRekorEntryForAnotherCheckpointIsRejected() throws Exception {
+        JsonNode entry = JSON.readTree(Path.of("../conformance/vectors/rekor.json").toFile()).path("entry");
+        ObjectNode pkg = pkg(3, 1);
+        ((ObjectNode) pkg.path("checkpoint")).set("rekor", entry);
+
+        PackageReport report = PackageVerifier.verify(pkg, null);
+
+        assertThat(report.valid()).isFalse();
+        assertThat(report.problems()).contains("the Rekor entry of checkpoint 3: the entry is for different data");
+        assertThat(report.rekorLogIndex()).isNull();
     }
 
     private static ObjectNode rotated(KeyPair next, boolean endorsed) {

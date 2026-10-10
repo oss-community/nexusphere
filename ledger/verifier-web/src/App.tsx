@@ -14,6 +14,8 @@ export function App() {
   const [chainName, setChainName] = useState<string | null>(null)
   const [chainText, setChainText] = useState('')
   const [requireTimestamp, setRequireTimestamp] = useState(false)
+  const [rekorKeys, setRekorKeys] = useState('')
+  const [requireRekor, setRequireRekor] = useState(false)
   const [result, setResult] = useState<Verification | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
@@ -71,6 +73,8 @@ export function App() {
         requiredWitnesses,
         timestampCertificatesText: chainText,
         requireTimestamp,
+        rekorKeys,
+        requireRekor,
       }))
     } catch (e) {
       setError((e as Error).message)
@@ -149,6 +153,19 @@ export function App() {
           />
           Require a timestamp
         </label>
+        <label>
+          Rekor log keys, one per line
+          <textarea
+            rows={2}
+            value={rekorKeys}
+            onChange={(event) => setRekorKeys(event.target.value)}
+            placeholder="rekor.example+1a2b3c4d+AbCd..., the key that GET /public/v1/rekor lists"
+          />
+        </label>
+        <label className="check">
+          <input type="checkbox" checked={requireRekor} onChange={(event) => setRequireRekor(event.target.checked)} />
+          Require a Rekor entry
+        </label>
         <button type="submit" disabled={busy || packageText === ''}>
           {busy ? 'Verifying…' : 'Verify'}
         </button>
@@ -164,7 +181,7 @@ export function App() {
 }
 
 function Result({ verification }: { verification: Verification }) {
-  const { report, pinned, timestampPinned, entries } = verification
+  const { report, pinned, timestampPinned, rekorPinned, entries } = verification
   const rows: [string, string][] = [
     ['Signing key', report.keyId ?? 'none'],
     ['Pinned key', report.pinnedKeyId ?? 'not pinned'],
@@ -175,6 +192,9 @@ function Result({ verification }: { verification: Verification }) {
     ['Timestamp', report.timestampedAt
       ? `${report.timestampedAt} by ${report.timestampAuthority}` +
         (timestampPinned ? ' (pinned)' : ', authority not pinned')
+      : 'none'],
+    ['Rekor', report.rekorLogIndex != null
+      ? `entry ${report.rekorLogIndex} in ${report.rekorOrigin}` + (rekorPinned ? ' (pinned)' : ', log not pinned')
       : 'none'],
     ['Anchor', report.anchorSequence === null ? 'none, the chain starts at entry 1' : String(report.anchorSequence)],
     ['Checked links', `${report.checkedLinks} from sequence ${report.firstSequence}`],

@@ -22,8 +22,9 @@ import java.util.stream.Collectors;
 class JdbcCheckpointRepository implements CheckpointRepository {
 
     private static final String SELECT = """
-            select c.sequence, c.head_hash, c.created_at, c.key_id, c.signature, c.profiles, t.token
-            from ledger.checkpoint c left join ledger.checkpoint_timestamp t on t.sequence = c.sequence""";
+            select c.sequence, c.head_hash, c.created_at, c.key_id, c.signature, c.profiles, t.token, r.entry
+            from ledger.checkpoint c left join ledger.checkpoint_timestamp t on t.sequence = c.sequence
+            left join ledger.checkpoint_rekor r on r.sequence = c.sequence""";
 
     private final NamedParameterJdbcTemplate jdbc;
 
@@ -59,6 +60,21 @@ class JdbcCheckpointRepository implements CheckpointRepository {
     @Override
     public List<SignedCheckpoint> withoutTimestamp(int limit) {
         return jdbc.query(SELECT + " where t.sequence is null order by c.sequence desc limit :limit",
+                Map.of("limit", limit), JdbcCheckpointRepository::row);
+    }
+
+    @Override
+    public void appendRekor(long sequence, long logIndex, String entry, Instant recordedAt) {
+        jdbc.update("""
+                insert into ledger.checkpoint_rekor (sequence, log_index, entry, recorded_at)
+                values (:sequence, :logIndex, :entry, :recordedAt) on conflict (sequence) do nothing
+                """, new MapSqlParameterSource("sequence", sequence).addValue("logIndex", logIndex)
+                .addValue("entry", entry).addValue("recordedAt", Timestamp.from(recordedAt)));
+    }
+
+    @Override
+    public List<SignedCheckpoint> withoutRekor(int limit) {
+        return jdbc.query(SELECT + " where r.sequence is null order by c.sequence desc limit :limit",
                 Map.of("limit", limit), JdbcCheckpointRepository::row);
     }
 
@@ -103,7 +119,7 @@ class JdbcCheckpointRepository implements CheckpointRepository {
                 rs.getTimestamp("created_at").toInstant(), rs.getString("key_id"), profiles(rs.getString("profiles")));
         byte[] token = rs.getBytes("token");
         return new SignedCheckpoint(checkpoint, rs.getString("signature"),
-                token == null ? null : Base64.getEncoder().encodeToString(token));
+                token == null ? null : Base64.getEncoder().encodeToString(token), rs.getString("entry"));
     }
 
     private static List<Checkpoint.Profile> profiles(String stored) {

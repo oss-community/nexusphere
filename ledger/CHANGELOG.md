@@ -69,6 +69,11 @@ agent platforms and gateways.
   browser check it offline against a pinned chain with `--timestamp-certificates` and `--require-timestamp`, the
   profiles' `timestampAuthorities` decide which authority is accepted, and a `timestamp.json` conformance vector holds
   a token from a Sigstore timestamp authority
+* Rekor anchoring: with `LEDGER_REKOR_URL` and `LEDGER_REKOR_KEY` set, the ledger writes every signed checkpoint to a
+  Rekor v2 log as a `hashedrekord` entry signed with Ed25519ph, later when the log is down, and publishes the log at
+  `GET /public/v1/rekor`; packages carry the entry, the verifiers in Java, Python, TypeScript and the browser check its
+  inclusion proof offline against a pinned log with `--rekor-key` and `--require-rekor`, the web UI shows the entry,
+  and a `rekor.json` conformance vector holds an entry from a real Rekor v2 log
 * Browser verifier: one self-contained HTML page in React and TypeScript that verifies a package with the
   TypeScript SDK, pinned to the ledger key and optional witnesses, with a Content Security Policy that blocks every
   connection
