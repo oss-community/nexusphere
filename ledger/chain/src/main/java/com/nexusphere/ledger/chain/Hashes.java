@@ -21,6 +21,14 @@ public final class Hashes {
         }
     }
 
+    public static byte[] sha256Bytes(byte[] data) {
+        try {
+            return MessageDigest.getInstance("SHA-256").digest(data);
+        } catch (NoSuchAlgorithmException e) {
+            throw new IllegalStateException("SHA-256 is not available", e);
+        }
+    }
+
     public static boolean isSha256(String value) {
         return value != null && SHA_256_HEX.matcher(value).matches();
     }

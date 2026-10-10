@@ -6,7 +6,7 @@ from nexusphere_ledger import verify_package
 from nexusphere_ledger.evidence import Checkpoint
 from nexusphere_ledger.keys import KeyRevocation, KeyRotation, PrivateKey
 
-from .support import LEDGER_KEY, entries, erase, key_record, package, witness_note_key
+from .support import LEDGER_KEY, entries, erase, key_record, package, vector, witness_note_key
 
 PINNED = LEDGER_KEY.public_key.encoded
 
@@ -129,6 +129,20 @@ class PackageVerification(unittest.TestCase):
         pkg = copy.deepcopy(pkg)
         pkg["format"] = "other"
         self.assertEqual(["unknown package format other"], verify_package(pkg, PINNED).problems)
+
+    def test_a_required_timestamp_must_be_present(self):
+        pkg = package(self.chain, {1})
+        self.assertTrue(verify_package(pkg, PINNED).valid)
+        report = verify_package(pkg, PINNED, require_timestamp=True)
+        self.assertEqual(["checkpoint 6 has no timestamp"], report.problems)
+
+    def test_a_timestamp_over_other_data(self):
+        pkg = package(self.chain, {1})
+        pkg["checkpoint"]["timestamp"] = vector("timestamp.json")["token"]
+        self.assertIn("the timestamp of checkpoint 6: the timestamp is for different data",
+                      verify_package(pkg, PINNED).problems)
+        pkg["checkpoint"]["timestamp"] = "AAAA"
+        self.assertIn("the timestamp of checkpoint 6 cannot be read", verify_package(pkg, PINNED).problems)
 
     def test_package_without_log(self):
         report = verify_package(package(self.chain, {1}, log=False), PINNED)

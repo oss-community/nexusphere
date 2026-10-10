@@ -10,7 +10,9 @@ import org.springframework.stereotype.Repository;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Timestamp;
+import java.time.Instant;
 import java.util.Arrays;
+import java.util.Base64;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -19,7 +21,9 @@ import java.util.stream.Collectors;
 @Repository
 class JdbcCheckpointRepository implements CheckpointRepository {
 
-    private static final String SELECT = "select sequence, head_hash, created_at, key_id, signature, profiles from ledger.checkpoint";
+    private static final String SELECT = """
+            select c.sequence, c.head_hash, c.created_at, c.key_id, c.signature, c.profiles, t.token
+            from ledger.checkpoint c left join ledger.checkpoint_timestamp t on t.sequence = c.sequence""";
 
     private final NamedParameterJdbcTemplate jdbc;
 
@@ -44,45 +48,62 @@ class JdbcCheckpointRepository implements CheckpointRepository {
     }
 
     @Override
+    public void appendTimestamp(long sequence, byte[] token, Instant genTime, Instant recordedAt) {
+        jdbc.update("""
+                insert into ledger.checkpoint_timestamp (sequence, token, gen_time, recorded_at)
+                values (:sequence, :token, :genTime, :recordedAt) on conflict (sequence) do nothing
+                """, new MapSqlParameterSource("sequence", sequence).addValue("token", token)
+                .addValue("genTime", Timestamp.from(genTime)).addValue("recordedAt", Timestamp.from(recordedAt)));
+    }
+
+    @Override
+    public List<SignedCheckpoint> withoutTimestamp(int limit) {
+        return jdbc.query(SELECT + " where t.sequence is null order by c.sequence desc limit :limit",
+                Map.of("limit", limit), JdbcCheckpointRepository::row);
+    }
+
+    @Override
     public Optional<SignedCheckpoint> latest() {
-        return jdbc.query(SELECT + " order by sequence desc limit 1", Map.of(), JdbcCheckpointRepository::row)
+        return jdbc.query(SELECT + " order by c.sequence desc limit 1", Map.of(), JdbcCheckpointRepository::row)
                 .stream().findFirst();
     }
 
     @Override
     public Optional<SignedCheckpoint> findBySequence(long sequence) {
-        return jdbc.query(SELECT + " where sequence = :sequence", Map.of("sequence", sequence),
+        return jdbc.query(SELECT + " where c.sequence = :sequence", Map.of("sequence", sequence),
                 JdbcCheckpointRepository::row).stream().findFirst();
     }
 
     @Override
     public List<SignedCheckpoint> list(long afterSequence, int limit) {
-        return jdbc.query(SELECT + " where sequence > :after order by sequence limit :limit",
+        return jdbc.query(SELECT + " where c.sequence > :after order by c.sequence limit :limit",
                 Map.of("after", afterSequence, "limit", limit), JdbcCheckpointRepository::row);
     }
 
     @Override
     public List<SignedCheckpoint> between(long afterSequence, long upToSequence) {
-        return jdbc.query(SELECT + " where sequence > :after and sequence <= :upTo order by sequence",
+        return jdbc.query(SELECT + " where c.sequence > :after and c.sequence <= :upTo order by c.sequence",
                 Map.of("after", afterSequence, "upTo", upToSequence), JdbcCheckpointRepository::row);
     }
 
     @Override
     public Optional<SignedCheckpoint> firstAtOrAfter(long sequence) {
-        return jdbc.query(SELECT + " where sequence >= :sequence order by sequence limit 1",
+        return jdbc.query(SELECT + " where c.sequence >= :sequence order by c.sequence limit 1",
                 Map.of("sequence", sequence), JdbcCheckpointRepository::row).stream().findFirst();
     }
 
     @Override
     public Optional<SignedCheckpoint> lastBefore(long sequence) {
-        return jdbc.query(SELECT + " where sequence < :sequence order by sequence desc limit 1",
+        return jdbc.query(SELECT + " where c.sequence < :sequence order by c.sequence desc limit 1",
                 Map.of("sequence", sequence), JdbcCheckpointRepository::row).stream().findFirst();
     }
 
     private static SignedCheckpoint row(ResultSet rs, int row) throws SQLException {
         Checkpoint checkpoint = new Checkpoint(rs.getLong("sequence"), rs.getString("head_hash"),
                 rs.getTimestamp("created_at").toInstant(), rs.getString("key_id"), profiles(rs.getString("profiles")));
-        return new SignedCheckpoint(checkpoint, rs.getString("signature"));
+        byte[] token = rs.getBytes("token");
+        return new SignedCheckpoint(checkpoint, rs.getString("signature"),
+                token == null ? null : Base64.getEncoder().encodeToString(token));
     }
 
     private static List<Checkpoint.Profile> profiles(String stored) {

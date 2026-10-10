@@ -10,6 +10,7 @@ import com.nexusphere.ledger.chain.MerkleTree;
 import com.nexusphere.ledger.chain.NoteKey;
 import com.nexusphere.ledger.chain.Signer;
 import com.nexusphere.ledger.chain.SigningKeys;
+import com.nexusphere.ledger.chain.TimestampToken;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 import tools.jackson.databind.json.JsonMapper;
@@ -163,6 +164,30 @@ class PackageVerifierTest {
 
         assertThat(report.valid()).isFalse();
         assertThat(report.problems()).anyMatch(p -> p.contains("pinned key"));
+    }
+
+    @Test
+    void aRequiredTimestampMustBePresent() {
+        PackageReport report = PackageVerifier.verify(pkg(3, 1), null, null, List.of(), 0,
+                new PackageVerifier.TimestampPolicy(List.of(), true));
+
+        assertThat(report.valid()).isFalse();
+        assertThat(report.problems()).contains("checkpoint 3 has no timestamp");
+        assertThat(PackageVerifier.verify(pkg(3, 1), null).valid()).isTrue();
+    }
+
+    @Test
+    void aTimestampOverOtherDataIsRejected() throws Exception {
+        String token = JSON.readTree(Path.of("../conformance/vectors/timestamp.json").toFile()).path("token")
+                .asString();
+        ObjectNode pkg = pkg(3, 1);
+        ((ObjectNode) pkg.path("checkpoint")).put("timestamp", token);
+
+        PackageReport report = PackageVerifier.verify(pkg, null);
+
+        assertThat(report.valid()).isFalse();
+        assertThat(report.problems()).contains("the timestamp of checkpoint 3: the timestamp is for different data");
+        assertThat(TimestampToken.parse(token).genTime()).isNotNull();
     }
 
     private static ObjectNode rotated(KeyPair next, boolean endorsed) {

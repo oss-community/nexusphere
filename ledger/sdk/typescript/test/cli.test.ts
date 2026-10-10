@@ -4,7 +4,7 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { INVALID, USAGE, VALID, run } from "../src/cli.js";
 import { PrivateKey, fromHex, presentBound } from "../src/index.js";
-import { ISSUER, LEDGER_KEY, buildPackage, entries, vector, witnessNoteKey } from "./support.js";
+import { ISSUER, LEDGER_KEY, buildPackage, entries, timestampedPackage, vector, witnessNoteKey } from "./support.js";
 
 async function cli(...args: string[]) {
   let out = "";
@@ -29,6 +29,35 @@ describe("nexusphere-ledger-verify", () => {
     expect(JSON.parse(json.out).valid).toBe(false);
     expect((await cli()).code).toBe(USAGE);
     expect((await cli(join(directory, "missing.json"))).code).toBe(USAGE);
+  });
+
+  it("verifies the timestamp of a package", async () => {
+    const v = vector("timestamp.json");
+    const path = join(directory, "timestamped.json");
+    const chain = join(directory, "chain.pem");
+    const root = join(directory, "root.pem");
+    writeFileSync(path, JSON.stringify(await timestampedPackage()));
+    writeFileSync(chain, v.certificates.slice(1).join(""));
+    writeFileSync(root, v.certificates[2]);
+    const key = LEDGER_KEY.publicKey.encoded;
+    const pinned = await cli("--public-key", key, "--timestamp-certificates", chain, "--require-timestamp", path);
+    expect(pinned.code).toBe(VALID);
+    expect(pinned.out).toContain(`  Timestamp   : ${v.genTime} by ${v.authority} (pinned)\n`);
+    const unpinned = await cli("--public-key", key, path);
+    expect(unpinned.out).toContain("(pass --timestamp-certificates to pin the timestamp authority)");
+    const untrusted = await cli("--json", "--public-key", key, "--timestamp-certificates", root, path);
+    expect(untrusted.code).toBe(INVALID);
+    expect(JSON.parse(untrusted.out).problems).toEqual([
+      "the timestamp of checkpoint 3: the timestamp authority is not trusted",
+    ]);
+    const missing = join(directory, "untimed.json");
+    writeFileSync(missing, JSON.stringify(await buildPackage(await entries(2), [1])));
+    const required = await cli("--require-timestamp", missing);
+    expect(required.code).toBe(INVALID);
+    expect(required.out).toContain("checkpoint 2 has no timestamp");
+    const garbage = join(directory, "garbage.pem");
+    writeFileSync(garbage, "not a certificate");
+    expect((await cli("--timestamp-certificates", garbage, path)).code).toBe(USAGE);
   });
 
   it("verifies a statement and its receipt", async () => {

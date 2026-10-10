@@ -155,10 +155,11 @@ describe.skipIf(!URL)("a running ledger", async () => {
     expect(((await operator.evidence(recorded.id as string)).attributes as Json).note).toBe("personal");
     const hold = await operator.placeLegalHold(principal, "dispute");
     expect(((await operator.legalHolds(true)).items as Json[]).map((h) => h.id)).toContain(hold.id);
-    expect((await operator.erasePrincipal(principal)).legalHold).toBe(true);
+    const held = await operator.erasePrincipal(principal);
+    expect(held.legalHold).toBe(true);
     expect((await operator.releaseLegalHold(hold.id as string, "settled")).releasedAt).not.toBeNull();
-    await operator.sweepRetention();
-    const erasure = await operator.erasePrincipal(principal, "request of the principal");
+    const swept = ((await operator.sweepRetention()).erasures as Json[]).find((e) => e.principalRef === held.principalRef);
+    const erasure = swept ?? (await operator.erasePrincipal(principal, "request of the principal"));
     if (!erasure.completed) {
       context.skip();
     }

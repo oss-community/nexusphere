@@ -98,6 +98,16 @@ input {
   max-width: 160px;
 }
 
+.check {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.check input {
+  width: auto;
+}
+
 .drop {
   border: 2px dashed var(--line);
   border-radius: 8px;

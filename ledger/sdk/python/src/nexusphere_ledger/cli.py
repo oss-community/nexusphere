@@ -9,6 +9,7 @@ from .cose import EvidenceStatement, LogReceipt
 from .keys import PublicKey
 from .mandate import MandateVerifier, StaticKeys
 from .package import verify_package
+from .timestamp import read_certificates
 from .timestamps import epoch_text
 
 VALID = 0
@@ -60,6 +61,8 @@ def _package(args, out, err) -> int:
     parser.add_argument("--keys")
     parser.add_argument("--witness", action="append", default=[])
     parser.add_argument("--witnesses-required", type=int)
+    parser.add_argument("--timestamp-certificates")
+    parser.add_argument("--require-timestamp", action="store_true")
     parser.add_argument("--json", action="store_true")
     parser.add_argument("package")
     options = _parse(parser, args, err)
@@ -75,22 +78,28 @@ def _package(args, out, err) -> int:
             reading = options.keys
             with open(options.keys, encoding="utf-8") as file:
                 key_list = json.load(file)
+        certificates = []
+        if options.timestamp_certificates:
+            reading = options.timestamp_certificates
+            with open(options.timestamp_certificates, "rb") as file:
+                certificates = read_certificates(file.read())
     except (OSError, ValueError) as e:
         err.write("Cannot read %s: %s\n" % (reading, e))
         return USAGE
     try:
-        report = verify_package(pkg, public_key, options.witness, options.witnesses_required, key_list)
+        report = verify_package(pkg, public_key, options.witness, options.witnesses_required, key_list,
+                                certificates, options.require_timestamp)
     except ValueError as e:
         err.write("Invalid argument: %s\n" % e)
         return USAGE
     if options.json:
         out.write(json.dumps(report.to_dict(), indent=2) + "\n")
     else:
-        _print_package(report, out)
+        _print_package(report, bool(certificates), out)
     return VALID if report.valid else INVALID
 
 
-def _print_package(r, out):
+def _print_package(r, timestamp_pinned, out):
     out.write("Nexusphere Ledger evidence package\n")
     if r.pinned_key_id is None:
         note = " (taken from the package; pass --public-key to pin the ledger's key)"
@@ -103,6 +112,9 @@ def _print_package(r, out):
     if r.compliance_profiles:
         out.write("  Compliance  : %s, signed in the checkpoint\n"
                   % ", ".join("%s (%s)" % (p["id"], p["digest"][:12]) for p in r.compliance_profiles))
+    if r.timestamped_at is not None:
+        out.write("  Timestamp   : %s by %s%s\n" % (r.timestamped_at, r.timestamp_authority, " (pinned)"
+                  if timestamp_pinned else " (pass --timestamp-certificates to pin the timestamp authority)"))
     out.write("  Anchor      : %s\n" % ("genesis" if r.anchor_sequence is None
                                        else "checkpoint %d" % r.anchor_sequence))
     out.write("  Chain       : %d links from sequence %d\n" % (r.checked_links, r.first_sequence))

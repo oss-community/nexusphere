@@ -14,6 +14,7 @@ import com.nexusphere.ledger.chain.NoteKey;
 import com.nexusphere.ledger.chain.SignedCheckpoint;
 import com.nexusphere.ledger.chain.Signer;
 import com.nexusphere.ledger.chain.SigningKeys;
+import com.nexusphere.ledger.chain.TimestampToken;
 import com.nexusphere.ledger.chain.Timestamps;
 import com.nexusphere.ledger.chain.TrustedKeys;
 import com.nexusphere.ledger.mandate.HttpSignatures;
@@ -38,6 +39,7 @@ import java.nio.file.Path;
 import java.security.KeyFactory;
 import java.security.PrivateKey;
 import java.security.PublicKey;
+import java.security.cert.X509Certificate;
 import java.security.spec.PKCS8EncodedKeySpec;
 import java.time.Clock;
 import java.time.Duration;
@@ -494,6 +496,26 @@ class ConformanceVectorsTest {
 
         assertThat(signed.verify(SigningKeys.PublicKeyInfo.of(LEDGER))).isTrue();
         assertThat(checkpoint.profiles()).extracting(Checkpoint.Profile::id).containsExactly("baseline", "example");
+    }
+
+    @Test
+    void timestamp() throws IOException {
+        JsonNode stored = JSON.readTree(DIR.resolve("timestamp.json").toFile());
+        byte[] signedBytes = stored.path("signedBytes").asString().getBytes(StandardCharsets.UTF_8);
+        assertThat(Hashes.sha256(signedBytes)).isEqualTo(stored.path("messageImprint").asString());
+        List<X509Certificate> chain = new ArrayList<>();
+        stored.path("certificates").forEach(pem -> chain.addAll(
+                TimestampToken.readCertificates(pem.asString().getBytes(StandardCharsets.US_ASCII))));
+        TimestampToken token = TimestampToken.parse(stored.path("token").asString());
+        assertThat(TimestampToken.fromResponse(Base64.getDecoder().decode(stored.path("response").asString()))
+                .base64()).isEqualTo(token.base64());
+
+        TimestampToken.Verification verification = token.verify(Hashes.sha256Bytes(signedBytes), chain);
+
+        assertThat(verification.valid()).as(verification.problem()).isTrue();
+        assertThat(verification.genTime()).isEqualTo(Instant.parse(stored.path("genTime").asString()));
+        assertThat(verification.authority()).isEqualTo(stored.path("authority").asString());
+        assertThat(token.verify(Hashes.sha256Bytes(signedBytes), chain.subList(2, 3)).valid()).isFalse();
     }
 
     private static Map<String, Object> ordered(Object... pairs) {

@@ -152,7 +152,9 @@ digest of each [compliance profile](../../README.md#compliance-profiles) the che
 fields were [erased](../../README.md#erasure) still verifies from its commitments, and
 `client.erase_principal(principal_id, reason)` asks the ledger to erase a principal. `place_legal_hold`,
 `release_legal_hold`, `legal_holds` and `sweep_retention` manage [legal holds](../../README.md#retention-and-legal-holds)
-and the retention pass.
+and the retention pass. `timestamp_certificates`, a list of certificates or PEM text, pins the authority of the
+[checkpoint timestamp](../../README.md#checkpoint-timestamps), `require_timestamp=True` refuses a checkpoint without
+one, and `report.timestamped_at` and `report.timestamp_authority` say when and by whom it was timestamped.
 
 </p>
 
@@ -262,12 +264,20 @@ Step 4. Verify a key-bound presentation against its nonce; the output must show 
 nexusphere-ledger-verify mandate --issuer http://localhost:8090 --audience https://supplier.example --nonce "{nonce}" "{presentation}"
 ```
 
+Step 5. Verify a package from a ledger with [checkpoint timestamps](../../README.md#checkpoint-timestamps), pinned to
+the authority's chain; the output must show `Timestamp   : ... (pinned)` and `Result: VALID`:
+
+```shell
+nexusphere-ledger-verify --timestamp-certificates tsa-chain.pem --require-timestamp package.json
+```
+
 ## Reference
 
 | Module      | Contents                                                                                         |
 |-------------|--------------------------------------------------------------------------------------------------|
 | `client`    | `LedgerClient` for evidence, batches, decisions, `act`, grants, mandates, packages, keys, proofs |
 | `package`   | `verify_package` and `PackageReport`                                                             |
+| `timestamp` | RFC 3161 `TimestampToken`, its verification against a pinned chain, and `read_certificates`      |
 | `evidence`  | Content and link hashes, commitments, `ChainVerifier`, `Checkpoint` with its compliance profiles |
 | `merkle`    | RFC 9162 roots, inclusion and consistency proofs                                                 |
 | `note`      | C2SP signed notes, note keys and `tlog-cosignature/v1` cosignatures                              |

@@ -15,6 +15,7 @@ export * as merkle from "./merkle.js";
 export * from "./mandate.js";
 export * from "./note.js";
 export * from "./package.js";
+export * from "./timestamp.js";
 export * from "./timestamps.js";
 
 export const VERSION = "1.0.0";

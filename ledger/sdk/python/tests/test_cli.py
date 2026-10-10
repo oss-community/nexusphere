@@ -38,6 +38,23 @@ class Cli(unittest.TestCase):
             self.assertEqual(USAGE, self.run_cli()[0])
             self.assertEqual(USAGE, self.run_cli(os.path.join(directory, "missing.json"))[0])
 
+    def test_timestamped_package(self):
+        v = vector("timestamp.json")
+        pkg = package(entries(3), {1})
+        with tempfile.TemporaryDirectory() as directory:
+            path = self.write(directory, "package.json", json.dumps(pkg))
+            code, out, _ = self.run_cli("--require-timestamp", path)
+            self.assertEqual(INVALID, code)
+            self.assertIn("checkpoint 3 has no timestamp", out)
+            pkg["checkpoint"]["timestamp"] = v["token"]
+            path = self.write(directory, "package.json", json.dumps(pkg))
+            chain = self.write(directory, "chain.pem", "".join(v["certificates"][1:]))
+            code, out, _ = self.run_cli("--timestamp-certificates", chain, path)
+            self.assertEqual(INVALID, code)
+            self.assertIn("the timestamp of checkpoint 3: the timestamp is for different data", out)
+            missing = os.path.join(directory, "missing.pem")
+            self.assertEqual(USAGE, self.run_cli("--timestamp-certificates", missing, path)[0])
+
     def test_statement(self):
         item = vector("scitt.json")["items"][0]
         with tempfile.TemporaryDirectory() as directory:

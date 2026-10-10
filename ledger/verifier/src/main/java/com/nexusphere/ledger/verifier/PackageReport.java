@@ -23,5 +23,7 @@ public record PackageReport(
         long receiptedEntries,
         List<String> witnesses,
         List<String> revokedKeys,
+        String timestampedAt,
+        String timestampAuthority,
         List<String> problems) {
 }

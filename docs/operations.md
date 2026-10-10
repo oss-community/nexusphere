@@ -361,6 +361,8 @@ to the internet, since it can also stop floods before they reach Java.
 * WAL archiving with point-in-time recovery, plus a regular logical dump, and a restore tested once, kept no longer
   than the erasure deadline of your profiles
 * Signed checkpoints copied outside the ledger, and at least one independent witness cosigning the log
+* `LEDGER_TIMESTAMP_URL` and `LEDGER_TIMESTAMP_CERTIFICATES` set to an RFC 3161 timestamp authority your auditors
+  accept, as in [Checkpoint Timestamps](../ledger/README.md#checkpoint-timestamps)
 * Prometheus scraping the ledger, and at least one alert channel on
 * Rate limits sized for the expected traffic, plus a limit at the reverse proxy for internet-facing deployments
 * `LEDGER_OIDC_*` set so principals approve grants with their own sign-in

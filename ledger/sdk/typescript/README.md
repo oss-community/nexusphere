@@ -158,6 +158,25 @@ asks the ledger to erase a principal. `placeLegalHold`, `releaseLegalHold`, `leg
 
 </p>
 
+<p style="text-align: justify;">
+
+A checkpoint may carry an RFC 3161 token from a timestamp authority, as the
+[Ledger README](../../README.md#checkpoint-timestamps) describes. Pass `timestampCertificates` with the authority's
+chain from `readCertificates(pem)` to pin the authority, and `requireTimestamp: true` to reject a checkpoint without a
+token; the command takes them as `--timestamp-certificates chain.pem` and `--require-timestamp`. The report gives
+`timestampedAt` and `timestampAuthority`, and `verifyTimestamp(token, sha256, certificates)` checks a token on its own.
+
+</p>
+
+```typescript
+import { readFileSync } from "node:fs";
+import { readCertificates, verifyPackage } from "@nexusphere/ledger";
+
+const timestampCertificates = readCertificates(readFileSync("tsa-chain.pem", "utf8"));
+const report = await verifyPackage(pkg, publicKey, { timestampCertificates, requireTimestamp: true });
+console.log(report.timestampedAt, report.timestampAuthority);
+```
+
 ## Verify a Statement and Receipt
 
 ```typescript
@@ -243,7 +262,14 @@ Step 1. Verify a package pinned to the ledger's key; the last line must be `Resu
 npx nexusphere-ledger-verify --public-key "$(curl -s http://localhost:8090/api/v1/keys -H 'Authorization: Bearer nexusphere-ledger-development-key-change-me' | jq -r '.[] | select(.status == "ACTIVE") | .publicKey')" package.json
 ```
 
-Step 2. Verify a statement with its receipt, and a mandate for an action:
+Step 2. Verify a package whose checkpoint must carry a timestamp from the pinned authority; the output must show
+`Timestamp   : ... (pinned)`:
+
+```shell
+npx nexusphere-ledger-verify --timestamp-certificates tsa-chain.pem --require-timestamp package.json
+```
+
+Step 3. Verify a statement with its receipt, and a mandate for an action:
 
 ```shell
 npx nexusphere-ledger-verify statement --public-key "{publicKey}" --receipt receipt.cose statement.cose
@@ -257,6 +283,7 @@ npx nexusphere-ledger-verify mandate --issuer http://localhost:8090 --action a2a
 | `client`    | `LedgerClient` for evidence, batches, decisions, `act`, grants, mandates, packages, keys, proofs |
 | `package`   | `verifyPackage` and `PackageReport`                                                              |
 | `evidence`  | Content and link hashes, commitments, `ChainVerifier`, `Checkpoint` with its compliance profiles |
+| `timestamp` | RFC 3161 tokens, X.509 certificates, `readCertificates` and `verifyTimestamp`                    |
 | `merkle`    | RFC 9162 roots, inclusion and consistency proofs, exported as `merkle`                           |
 | `note`      | C2SP signed notes, note keys and `tlog-cosignature/v1` cosignatures                              |
 | `cose`      | `CoseSign1`, SCITT `EvidenceStatement` and RFC 9942 `LogReceipt`                                 |

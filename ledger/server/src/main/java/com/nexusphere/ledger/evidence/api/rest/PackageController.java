@@ -35,7 +35,7 @@ class PackageController {
     }
 
     record CheckpointResponse(String format, long sequence, String headHash, Instant createdAt, String keyId,
-                              List<Checkpoint.Profile> profiles, String signature) {
+                              List<Checkpoint.Profile> profiles, String signature, String timestamp) {
 
         static CheckpointResponse of(SignedCheckpoint signed) {
             if (signed == null) {
@@ -43,7 +43,7 @@ class PackageController {
             }
             Checkpoint c = signed.checkpoint();
             return new CheckpointResponse(c.format(), c.sequence(), c.headHash(), c.createdAt(), c.keyId(),
-                    c.profiles(), signed.signature());
+                    c.profiles(), signed.signature(), signed.timestamp());
         }
     }
 
