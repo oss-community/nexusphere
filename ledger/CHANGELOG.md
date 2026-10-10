@@ -74,6 +74,12 @@ agent platforms and gateways.
   `GET /public/v1/rekor`; packages carry the entry, the verifiers in Java, Python, TypeScript and the browser check its
   inclusion proof offline against a pinned log with `--rekor-key` and `--require-rekor`, the web UI shows the entry,
   and a `rekor.json` conformance vector holds an entry from a real Rekor v2 log
+* Reports and dispute packages: each compliance profile's report templates (`dispute`, `eu-ai-act-logging`,
+  `dora-ict-records`, `finra-supervision`, `sec-17a-4-records`) map the evidence of a package to requirements as a
+  signed `nexusphere-ledger/report/v1` report in JSON or HTML, `POST /api/v1/disputes` answers a ZIP with the package,
+  the dispute report, keys and profiles, the verifiers in Java, Python and TypeScript check reports and dispute
+  packages with `report` and `dispute`, the web UI has a Reports page, and a `report.json` conformance vector holds a
+  signed report
 * Browser verifier: one self-contained HTML page in React and TypeScript that verifies a package with the
   TypeScript SDK, pinned to the ledger key and optional witnesses, with a Content Security Policy that blocks every
   connection

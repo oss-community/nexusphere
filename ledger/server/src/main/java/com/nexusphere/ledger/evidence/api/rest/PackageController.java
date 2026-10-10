@@ -1,17 +1,8 @@
 package com.nexusphere.ledger.evidence.api.rest;
 
-import com.nexusphere.ledger.chain.Checkpoint;
-import com.nexusphere.ledger.chain.EvidenceLink;
-import com.nexusphere.ledger.chain.SignedCheckpoint;
-import com.nexusphere.ledger.evidence.application.PackageService;
-import com.nexusphere.ledger.evidence.domain.model.EvidencePackage;
 import com.nexusphere.ledger.evidence.domain.model.PackageRequest;
 import com.nexusphere.ledger.server.security.Caller;
-import com.nexusphere.ledger.server.signing.KeyController;
-import com.nexusphere.ledger.server.signing.LedgerSigner;
-import com.nexusphere.ledger.transparency.application.WitnessCollector;
 import com.nexusphere.ledger.verifier.PackageReport;
-import com.nexusphere.ledger.verifier.PackageVerifier;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -19,94 +10,28 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import tools.jackson.databind.JsonNode;
-import tools.jackson.databind.json.JsonMapper;
-
-import java.time.Instant;
-import java.util.Base64;
-import java.util.List;
 
 @RestController
 class PackageController {
 
-    record ExportRequest(String agentId, String principalId, Long fromSequence, Long toSequence) {
-    }
+    private final PackageDocuments documents;
 
-    record Scope(String agentId, String principalId, long fromSequence, long toSequence) {
-    }
-
-    private static final JsonMapper REKOR_JSON = JsonMapper.builder().build();
-
-    record CheckpointResponse(String format, long sequence, String headHash, Instant createdAt, String keyId,
-                              List<Checkpoint.Profile> profiles, String signature, String timestamp,
-                              JsonNode rekor) {
-
-        static CheckpointResponse of(SignedCheckpoint signed) {
-            if (signed == null) {
-                return null;
-            }
-            Checkpoint c = signed.checkpoint();
-            return new CheckpointResponse(c.format(), c.sequence(), c.headHash(), c.createdAt(), c.keyId(),
-                    c.profiles(), signed.signature(), signed.timestamp(),
-                    signed.rekor() == null ? null : REKOR_JSON.readTree(signed.rekor()));
-        }
-    }
-
-    record LinkResponse(long sequence, String previousHash, String contentHash, String hash,
-                        EvidenceController.EvidenceResponse entry) {
-
-        static LinkResponse of(EvidencePackage.Item item) {
-            EvidenceLink l = item.link();
-            return new LinkResponse(l.sequence(), l.previousHash(), l.contentHash(), l.hash(),
-                    item.entry() == null ? null : EvidenceController.EvidenceResponse.of(item.entry()));
-        }
-    }
-
-    record ProofResponse(long sequence, List<String> hashes, String statement, String receipt) {
-    }
-
-    record LogResponse(String checkpoint, List<ProofResponse> proofs) {
-
-        static LogResponse of(EvidencePackage.Log log) {
-            Base64.Encoder base64 = Base64.getEncoder();
-            return new LogResponse(log.checkpoint(), log.proofs().entrySet().stream()
-                    .map(e -> new ProofResponse(e.getKey(), e.getValue().stream().map(base64::encodeToString).toList(),
-                            base64.encodeToString(log.statements().get(e.getKey())),
-                            base64.encodeToString(log.receipts().get(e.getKey()))))
-                    .toList());
-        }
-    }
-
-    record PackageResponse(String format, Instant createdAt, Scope scope, List<KeyController.KeyResponse> keys,
-                           CheckpointResponse anchor, CheckpointResponse checkpoint, long disclosed,
-                           List<LinkResponse> links, LogResponse log) {
-    }
-
-    private final PackageService packages;
-    private final LedgerSigner signer;
-    private final WitnessCollector witnesses;
-    private final JsonMapper json;
-
-    PackageController(PackageService packages, LedgerSigner signer, WitnessCollector witnesses, JsonMapper json) {
-        this.packages = packages;
-        this.signer = signer;
-        this.witnesses = witnesses;
-        this.json = json;
+    PackageController(PackageDocuments documents) {
+        this.documents = documents;
     }
 
     @PostMapping("/api/v1/packages")
-    ResponseEntity<PackageResponse> export(Caller caller, @RequestBody(required = false) ExportRequest request) {
+    ResponseEntity<PackageDocuments.PackageResponse> export(Caller caller,
+                                                            @RequestBody(required = false)
+                                                            PackageDocuments.ExportRequest request) {
         caller.requireOperator();
-        ExportRequest r = request == null ? new ExportRequest(null, null, null, null) : request;
-        EvidencePackage p = packages.export(new PackageRequest(r.agentId(), r.principalId(), r.fromSequence(),
-                r.toSequence()));
-        PackageResponse body = new PackageResponse(EvidencePackage.FORMAT, p.createdAt(),
-                new Scope(p.agentId(), p.principalId(), p.fromSequence(), p.toSequence()),
-                signer.keys().stream().map(KeyController.KeyResponse::of).toList(),
-                CheckpointResponse.of(p.anchor()), CheckpointResponse.of(p.checkpoint()), p.disclosed(),
-                p.items().stream().map(LinkResponse::of).toList(), LogResponse.of(p.log()));
+        PackageDocuments.ExportRequest r = request == null ? new PackageDocuments.ExportRequest(null, null, null, null)
+                : request;
+        PackageDocuments.PackageResponse body = documents.export(new PackageRequest(r.agentId(), r.principalId(),
+                r.fromSequence(), r.toSequence()));
         return ResponseEntity.ok()
                 .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"evidence-package-"
-                        + p.checkpoint().checkpoint().sequence() + ".json\"")
+                        + body.checkpoint().sequence() + ".json\"")
                 .body(body);
     }
 
@@ -114,8 +39,6 @@ class PackageController {
     PackageReport verify(Caller caller, @RequestParam(required = false) String publicKey,
                          @RequestBody JsonNode body) {
         caller.requireOperator();
-        JsonNode keys = json.valueToTree(signer.keys().stream().map(KeyController.KeyResponse::of).toList());
-        return PackageVerifier.verify(body, publicKey == null || publicKey.isBlank() ? null : publicKey, keys,
-                witnesses.witnessKeys(), 0);
+        return documents.verify(body, publicKey == null || publicKey.isBlank() ? null : publicKey);
     }
 }

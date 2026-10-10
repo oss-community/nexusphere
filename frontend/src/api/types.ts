@@ -213,3 +213,43 @@ export interface RetentionSweep {
   expiredEntries: number
   erasures: Erasure[]
 }
+
+export interface OfferedReport {
+  id: string
+  title: string
+  description: string
+  profiles: string[]
+}
+
+export interface ReportScope {
+  agentId?: string
+  principalId?: string
+  fromSequence?: number
+  toSequence?: number
+}
+
+export type ReportStatus = 'SHOWN' | 'PARTLY_SHOWN' | 'NOT_SHOWN'
+
+export interface ReportSection {
+  id: string
+  reference: string
+  requirement: string
+  status: ReportStatus
+  findings: string[]
+  entries: number[]
+}
+
+export interface SignedReport {
+  format: string
+  report: string
+  title: string
+  createdAt: string
+  profiles: { id: string; digest: string }[]
+  subject: { title: string; description: string | null } | null
+  scope: { agentId: string | null; principalId: string | null; fromSequence: number; toSequence: number }
+  evidence: { checkpoint: number; headHash: string; entries: number; entriesDigest: string; valid: boolean }
+  notice: string
+  sections: ReportSection[]
+  keyId: string
+  signature: string
+}

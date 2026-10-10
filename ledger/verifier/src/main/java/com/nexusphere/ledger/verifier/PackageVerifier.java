@@ -394,6 +394,12 @@ public final class PackageVerifier {
         return null;
     }
 
+    static Map<String, SigningKeys.PublicKeyInfo> trustedKeys(JsonNode pkg, JsonNode keyList, String pinned,
+                                                              List<String> problems) {
+        TrustedKeys trusted = keys(pkg, keyList, pinned, problems);
+        return trusted == null ? Map.of() : byId(trusted.all());
+    }
+
     private static TrustedKeys keys(JsonNode pkg, JsonNode keyList, String pinned, List<String> problems) {
         Map<String, SigningKeys.PublicKeyInfo> listed = new LinkedHashMap<>();
         List<KeyRotation> rotations = new ArrayList<>();

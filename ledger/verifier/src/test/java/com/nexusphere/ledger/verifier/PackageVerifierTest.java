@@ -37,10 +37,10 @@ import static org.assertj.core.api.Assertions.assertThat;
 class PackageVerifierTest {
 
     private static final JsonMapper JSON = JsonMapper.builder().build();
-    private static final KeyPair KEYS = SigningKeys.generate();
+    static final KeyPair KEYS = SigningKeys.generate();
     private static final Instant NOW = Instant.parse("2026-10-07T08:00:00Z");
 
-    private static ObjectNode pkg(int length, int disclosed) {
+    static ObjectNode pkg(int length, int disclosed) {
         List<EvidenceEntry> entries = new ArrayList<>();
         String previous = Hashes.GENESIS;
         for (int i = 1; i <= length; i++) {

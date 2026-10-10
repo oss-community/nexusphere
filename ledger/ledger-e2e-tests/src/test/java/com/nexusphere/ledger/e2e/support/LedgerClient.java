@@ -109,6 +109,23 @@ public final class LedgerClient {
         return builder;
     }
 
+    public byte[] postBytes(String path, String jsonBody) {
+        try {
+            HttpResponse<byte[]> response = http.send(request(path).header("Content-Type", "application/json")
+                    .POST(HttpRequest.BodyPublishers.ofString(jsonBody)).build(),
+                    HttpResponse.BodyHandlers.ofByteArray());
+            if (response.statusCode() != 200) {
+                throw new IllegalStateException("POST " + path + " answered " + response.statusCode());
+            }
+            return response.body();
+        } catch (IOException e) {
+            throw new IllegalStateException(e);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new IllegalStateException(e);
+        }
+    }
+
     public byte[] getBytes(String path) {
         try {
             HttpResponse<byte[]> response = http.send(request(path).GET().build(),

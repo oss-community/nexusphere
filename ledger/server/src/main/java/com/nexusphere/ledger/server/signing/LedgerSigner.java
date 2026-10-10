@@ -127,6 +127,10 @@ public class LedgerSigner {
         return Jws.sign(type, publicKey.keyId(), payload, signer);
     }
 
+    public String signBytes(byte[] data) {
+        return SigningKeys.sign(signer, data);
+    }
+
     public Map<String, String> signHttp(String method, URI uri, byte[] body, Instant created) {
         byte[] nonce = new byte[16];
         RANDOM.nextBytes(nonce);

@@ -1,5 +1,5 @@
 import type {
-  Agent, Checkpoint, Erasure, Evidence, Exchange, Grant, GrantDraft, Head, IssuedAgent, LegalHold, Mandate, OidcInfo,
+  Agent, Checkpoint, OfferedReport, ReportScope, SignedReport, Erasure, Evidence, Exchange, Grant, GrantDraft, Head, IssuedAgent, LegalHold, Mandate, OidcInfo,
   PackageReport, Page, Principal, RetentionSweep, SigningKey, VerificationReport,
 } from './types'
 
@@ -37,8 +37,9 @@ export class LedgerApi {
     this.token = token
   }
 
-  async request<T>(method: string, path: string, body?: unknown, query?: Query): Promise<T> {
-    const headers: Record<string, string> = { Accept: 'application/json' }
+  private async send(method: string, path: string, body: unknown, query: Query | undefined,
+    accept: string): Promise<Response> {
+    const headers: Record<string, string> = { Accept: accept }
     if (this.token) {
       headers.Authorization = `Bearer ${this.token}`
     }
@@ -50,13 +51,23 @@ export class LedgerApi {
       headers,
       body: body === undefined ? undefined : JSON.stringify(body),
     })
-    const text = await response.text()
-    const json = text ? JSON.parse(text) : null
     if (!response.ok) {
+      const text = await response.text()
+      let json: { code?: string; message?: string } | null = null
+      try {
+        json = text ? JSON.parse(text) : null
+      } catch {
+        json = null
+      }
       throw new ApiError(response.status, json?.code ?? 'HTTP_' + response.status,
         json?.message ?? `The ledger answered ${response.status}.`)
     }
-    return json as T
+    return response
+  }
+
+  async request<T>(method: string, path: string, body?: unknown, query?: Query): Promise<T> {
+    const text = await (await this.send(method, path, body, query, 'application/json')).text()
+    return (text ? JSON.parse(text) : null) as T
   }
 
   head() {
@@ -145,6 +156,23 @@ export class LedgerApi {
 
   verifyPackage(pkg: unknown, publicKey?: string) {
     return this.request<PackageReport>('POST', '/api/v1/packages/verify', pkg, { publicKey })
+  }
+
+  reports() {
+    return this.request<OfferedReport[]>('GET', '/api/v1/reports')
+  }
+
+  createReport(id: string, scope: ReportScope) {
+    return this.request<SignedReport>('POST', `/api/v1/reports/${encodeURIComponent(id)}`, scope)
+  }
+
+  async reportHtml(id: string, scope: ReportScope) {
+    return (await this.send('POST', `/api/v1/reports/${encodeURIComponent(id)}`, scope, { format: 'html' },
+      'text/html')).text()
+  }
+
+  async dispute(request: ReportScope & { title: string; description?: string }) {
+    return (await this.send('POST', '/api/v1/disputes', request, undefined, 'application/zip')).blob()
   }
 
   principal() {

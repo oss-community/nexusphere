@@ -9,7 +9,7 @@ export function ErrorMessage({ error }: { error: unknown }) {
 }
 
 const TONES: Record<string, string> = {
-  ACTIVE: 'good', ALLOW: 'good', SUCCEEDED: 'good', VERIFIED: 'good', VALID: 'good', ISSUED: 'good',
+  ACTIVE: 'good', ALLOW: 'good', SHOWN: 'good', PARTLY_SHOWN: 'wait', NOT_SHOWN: 'bad', SUCCEEDED: 'good', VERIFIED: 'good', VALID: 'good', ISSUED: 'good',
   PENDING: 'wait', NOT_YET_VALID: 'wait',
   DENY: 'bad', DENIED: 'bad', FAILED: 'bad', REVOKED: 'bad', INVALID: 'bad', DISABLED: 'bad', MISSING: 'bad',
   EXPIRED: 'muted', EXHAUSTED: 'muted', RETIRED: 'muted',
