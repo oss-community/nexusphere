@@ -28,6 +28,8 @@ proof, its revocation list and the verifier the receiving side uses.
   failing closed
 * `TrackRecordClaims`, `TrackRecords` and `TrackRecordVerifier`: the agent track record as an SD-JWT VC with the
   agent's evidence counts up to a checkpoint, its selective claims and key binding, and its verifier
+* `ExchangeStatement` and `Reconciliation`: a ledger's signed statement of its A2A exchanges with a peer, and the
+  comparison of two such statements request by request
 * `ExchangeRequest` and `ExchangeReceipt`: the signed request proof and receipt of an A2A exchange between two ledgers
 
 ## Dependencies

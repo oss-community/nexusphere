@@ -41,6 +41,8 @@ database, so an auditor, a court or a counterparty can verify what a ledger hand
   index belongs to the package's checkpoint
 * Check an agent track record with `track-record`: the issuer's signature, validity, audience, key binding and, with
   `--index-proof`, that a proof for the agent at the same checkpoint gives the same index root and counts
+* Reconcile two ledgers' signed A2A statements with `reconcile`: each statement's signature, that they name each
+  other over the same window, and every exchange one side holds that the other lacks or records differently
 * Check entries in evidence format v2 from their personal values and salts, or from their commitments once erased
 * Check that the prompt texts of a package match their hashes and are named by the model of a disclosed entry
 * Run the [Conformance Vectors](../conformance/README.md) in `ConformanceVectorsTest`

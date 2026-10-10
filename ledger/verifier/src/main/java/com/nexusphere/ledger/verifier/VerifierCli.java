@@ -45,7 +45,9 @@ public final class VerifierCli {
             [--package <package.json>] [--json] <proof.json>
                    nexusphere-ledger-verify track-record --issuer <url> [--issuer <url>] [--audience <aud>] \
             [--public-key <key> | --public-key-file <file>] [--nonce <nonce>] [--require-key-binding] \
-            [--index-proof <proof.json>] [--json] <token | token file | ->""";
+            [--index-proof <proof.json>] [--json] <token | token file | ->
+                   nexusphere-ledger-verify reconcile [--public-key <key> | --public-key-file <file>] \
+            [--peer-public-key <key> | --peer-public-key-file <file>] [--json] <ours.jwt> <theirs.jwt>""";
 
     private static final int MAX_FILE = 256 * 1024 * 1024;
     private static final JsonMapper JSON = JsonMapper.builder().enable(SerializationFeature.INDENT_OUTPUT).build();
@@ -63,6 +65,9 @@ public final class VerifierCli {
         }
         if (args.length > 0 && "track-record".equals(args[0])) {
             return TrackRecordCli.run(Arrays.copyOfRange(args, 1, args.length), out, err, USAGE_TEXT);
+        }
+        if (args.length > 0 && "reconcile".equals(args[0])) {
+            return ReconcileCli.run(Arrays.copyOfRange(args, 1, args.length), out, err, USAGE_TEXT);
         }
         if (args.length > 0 && "statement".equals(args[0])) {
             return StatementCli.run(Arrays.copyOfRange(args, 1, args.length), out, err, USAGE_TEXT);

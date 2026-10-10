@@ -35,8 +35,8 @@ and `dev` profiles against a PostgreSQL 18 container. `LedgerClient` talks to it
 outside caller, and rebuilds evidence entries from the JSON so they can be checked with `ledger/chain` without trusting
 the server. `FakeMcpServer` is a small MCP server on a random port, configured as the `files` server of the gateway; it
 answers `initialize`, `tools/list` and `tools/call`, and streams the answer of tools ending in `_sse`.
-`A2aE2ETest` and `AgentKeyBindingE2ETest` start a second ledger, `SupplierLedger`, with its own PostgreSQL container
-and signing key, which trusts the first one and forwards to `FakeA2aAgent`, which streams `message/stream` and `tasks/resubscribe`, so mandates,
+`A2aE2ETest`, `AgentKeyBindingE2ETest` and `ReconciliationE2ETest` start a second ledger, `SupplierLedger`, with its
+own PostgreSQL container and signing key, which trusts the first one and forwards to `FakeA2aAgent`, which streams `message/stream` and `tasks/resubscribe`, so mandates,
 request proofs and receipts cross between two ledgers over HTTP.
 `PrincipalConsentE2ETest` starts a `StandaloneLedger` that trusts `FakeOidcProvider`, a small OpenID Connect provider
 on a random port that signs RS256 tokens for any principal.
@@ -121,6 +121,9 @@ other, which watches it, to cosign its log checkpoints over the C2SP witness pro
 |                           | An agent can present a mandate without revealing its principal                |
 |                           | The verifier sees a revocation as soon as the status list is refetched        |
 |                           | The verifier rejects what the mandate does not allow                          |
+| `ReconciliationE2ETest`   | Both ledgers reconcile the exchanges between them                             |
+|                           | A request sent around the sending ledger is found                             |
+|                           | Only the operator asks and only known peers are trusted                       |
 | `A2aE2ETest`              | An allowed message carries a mandate and both ledgers hold matching evidence  |
 |                           | A denied message never leaves the ledger                                      |
 |                           | A failed task is recorded as failed on both sides with a receipt              |

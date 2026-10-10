@@ -1181,6 +1181,110 @@ agent sees only the events of the task.
 curl -X POST http://localhost:8090/a2a/out/supplier -H "Authorization: Bearer {agentApiKey}" -H "X-Ledger-Principal: alice" -H "Content-Type: application/json" -d '{"jsonrpc":"2.0","id":"1","method":"message/send","params":{"message":{"role":"user","messageId":"1","parts":[{"kind":"text","text":"Order 40 pallets"}]}}}'
 ```
 
+### Reconciling Two Ledgers
+
+<p style="text-align: justify;">
+
+Each ledger holds its own side of every exchange, so two organizations can check that their records agree without
+sharing their evidence. `POST /api/v1/a2a/statements` (operator) takes a `peer`, a configured peer name or a trusted
+issuer, and a window `from` and `to` of at most 31 days, and answers a statement signed by the ledger
+(`typ` `nexusphere-a2a-statement+jwt`) of every exchange with that peer whose request proof was issued in the window:
+its direction, request ID, request time, method, mandate ID, request and response hashes, HTTP status, outcome and the
+SHA-256 of its receipt. It names no principal, agent or content.
+
+</p>
+
+<p style="text-align: justify;">
+
+The operator sends the statement to the peer by any channel. `POST /api/v1/a2a/reconciliations` takes the peer's
+`statement`, checks its signature with the peer's published keys and that it names this ledger, builds this ledger's
+own statement for the same window and compares them request by request. An exchange is `NOT_RECEIVED` when the sender
+has it and the receiver does not, unless the receiver refused it before recording it (HTTP 401) or could not be
+reached; `NOT_SENT` when the receiver holds a request the sender never sent, which only someone with the sender's key
+acting around the sender's ledger can cause; and `MISMATCH` with the fields that differ. The answer carries this
+ledger's signed statement, and the reconciliation is recorded as `a2a/reconcile` with the hashes of both statements.
+`nexusphere-ledger-verify reconcile` compares two statements offline.
+
+</p>
+
+Step 1. Start a stand-in sales agent on port 9000 that accepts every order:
+
+```shell
+cat > sales-agent.py <<'EOF'
+import json
+from http.server import BaseHTTPRequestHandler, HTTPServer
+
+class Agent(BaseHTTPRequestHandler):
+    def do_POST(self):
+        request = json.loads(self.rfile.read(int(self.headers["Content-Length"])))
+        answer = {"jsonrpc": "2.0", "id": request["id"], "result": {"kind": "message", "role": "agent",
+                  "messageId": "a-" + str(request["id"]), "parts": [{"kind": "text", "text": "Order accepted"}]}}
+        body = json.dumps(answer).encode()
+        self.send_response(200)
+        self.send_header("Content-Type", "application/json")
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
+
+HTTPServer(("localhost", 9000), Agent).serve_forever()
+EOF
+python3 sales-agent.py &
+```
+
+Step 2. Start the supplier's ledger on port 8092 with its own database and key, trusting the ledger on port 8090:
+
+```shell
+docker run -d --name supplier-ledger-db -e POSTGRES_DB=ledger -e POSTGRES_USER=ledger -e POSTGRES_PASSWORD=ledger -p 5435:5432 postgres:18-alpine && sleep 5
+openssl genpkey -algorithm ed25519 -out supplier.pem
+LEDGER_PORT=8092 LEDGER_DATABASE_PORT=5435 LEDGER_SIGNING_PRIVATE_KEY=$(openssl pkey -in supplier.pem -outform DER | base64 -w0) LEDGER_SIGNING_PUBLIC_KEY=$(openssl pkey -in supplier.pem -pubout -outform DER | base64 -w0) LEDGER_A2A_TRUSTED_ISSUERS=http://localhost:8090 LEDGER_A2A_AGENTS_SALES_URL=http://localhost:9000 java -jar ledger/server/target/server-1.0.0-SNAPSHOT-exec.jar --spring.profiles.active=postgresql,dev > supplier-ledger.log 2>&1 &
+until curl -sf http://localhost:8092/actuator/health > /dev/null; do sleep 1; done
+```
+
+Step 3. Start the buyer's ledger of [Run](#run) with the supplier as its peer:
+
+```shell
+LEDGER_PROFILES=postgresql,dev LEDGER_DATABASE_PORT=5433 LEDGER_A2A_PEERS_SUPPLIER_URL=http://localhost:8092/a2a/in/sales LEDGER_A2A_PEERS_SUPPLIER_ISSUER=http://localhost:8092 mvn -pl ledger/server spring-boot:start
+```
+
+Step 4. Register a buying agent, grant it `supplier/*` for alice and send two orders; the grant must be `ACTIVE`
+and both orders must answer `Order accepted`:
+
+```shell
+AGENT_KEY=$(curl -s -X POST http://localhost:8090/api/v1/agents -H "Authorization: Bearer nexusphere-ledger-development-key-change-me" -H "Content-Type: application/json" -d '{"agentId":"buyer-agent","name":"Buyer agent","ownerId":"acme"}' | jq -r .apiKey)
+curl -s -X POST http://localhost:8090/api/v1/grants -H "Authorization: Bearer nexusphere-ledger-development-key-change-me" -H "Content-Type: application/json" -d "{\"principalId\":\"alice\",\"agentId\":\"buyer-agent\",\"actions\":[\"a2a/send\"],\"targets\":[\"supplier/*\"],\"expiresAt\":\"$(date -u -d '+30 days' +%Y-%m-%dT00:00:00Z)\"}" | jq -r .status
+for id in 1 2; do curl -s -X POST http://localhost:8090/a2a/out/supplier -H "Authorization: Bearer $AGENT_KEY" -H "X-Ledger-Principal: alice" -H "Content-Type: application/json" -d "{\"jsonrpc\":\"2.0\",\"id\":\"$id\",\"method\":\"message/send\",\"params\":{\"message\":{\"role\":\"user\",\"messageId\":\"$id\",\"parts\":[{\"kind\":\"text\",\"text\":\"Order 40 pallets\"}]}}}" | jq -r '.result.parts[0].text'; done
+```
+
+Step 5. Let the buyer's ledger sign its statement of the exchanges with the supplier from an hour ago to an hour
+from now; it must count `2`:
+
+```shell
+FROM=$(date -u -d '-1 hour' +%Y-%m-%dT%H:%M:%SZ) TO=$(date -u -d '+1 hour' +%Y-%m-%dT%H:%M:%SZ)
+curl -s -X POST http://localhost:8090/api/v1/a2a/statements -H "Authorization: Bearer nexusphere-ledger-development-key-change-me" -H "Content-Type: application/json" -d "{\"peer\":\"supplier\",\"from\":\"$FROM\",\"to\":\"$TO\"}" > buyer-statement.json
+jq -r .statement buyer-statement.json > buyer.jwt && jq .exchanges buyer-statement.json
+```
+
+Step 6. Let the supplier's ledger reconcile it with its own; it must show `"reconciled":true`, `"matched":2` and no
+discrepancies:
+
+```shell
+curl -s -X POST http://localhost:8092/api/v1/a2a/reconciliations -H "Authorization: Bearer nexusphere-ledger-development-key-change-me" -H "Content-Type: application/json" -d "{\"statement\":\"$(cat buyer.jwt)\"}" > reconciliation.json
+jq -c '{reconciled, matched, discrepancies}' reconciliation.json && jq -r .statement reconciliation.json > supplier.jwt
+```
+
+Step 7. Compare both statements offline, as an auditor holding them; it must end with `Result: RECONCILED`:
+
+```shell
+java -jar ledger/verifier/target/verifier-1.0.0-SNAPSHOT-exec.jar reconcile buyer.jwt supplier.jwt
+```
+
+Step 8. Stop the supplier's ledger, its database and the sales agent:
+
+```shell
+kill %1 %2
+docker rm -f supplier-ledger-db
+```
+
 ## HTTP Message Signatures
 
 <p style="text-align: justify;">
@@ -1807,6 +1911,8 @@ API key, except `/api/v1/principal/**`, which requires a principal token from th
 | POST   | `/a2a/out/{peer}`                          | A2A gateway: decide, attach a mandate and request proof, forward and record with the peer's receipt     |
 | POST   | `/a2a/in/{agent}`                          | A2A inbound: verify the mandate and proof, forward to the agent, record and sign a receipt; no API key  |
 | GET    | `/api/v1/a2a/exchanges/{id}`               | Get an A2A exchange with its mandate, request proof and receipt                                         |
+| POST   | `/api/v1/a2a/statements`                   | A signed statement of the exchanges with a `peer` in a window `from` to `to` (operator)                 |
+| POST   | `/api/v1/a2a/reconciliations`              | Reconcile a peer's signed `statement` with this ledger's own and record the result (operator)           |
 | GET    | `/actuator/health`                         | Health, open for probes                                                                                 |
 
 ```json

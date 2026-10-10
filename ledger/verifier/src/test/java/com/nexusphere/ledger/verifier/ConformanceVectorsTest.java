@@ -20,6 +20,7 @@ import com.nexusphere.ledger.chain.SparseMerkleTree;
 import com.nexusphere.ledger.chain.TimestampToken;
 import com.nexusphere.ledger.chain.Timestamps;
 import com.nexusphere.ledger.chain.TrustedKeys;
+import com.nexusphere.ledger.mandate.ExchangeStatement;
 import com.nexusphere.ledger.mandate.HttpSignatures;
 import com.nexusphere.ledger.mandate.KeyBinding;
 import com.nexusphere.ledger.mandate.KeyResolver;
@@ -28,6 +29,7 @@ import com.nexusphere.ledger.mandate.MandateClaims;
 import com.nexusphere.ledger.mandate.MandateProblem;
 import com.nexusphere.ledger.mandate.MandateVerifier;
 import com.nexusphere.ledger.mandate.Mandates;
+import com.nexusphere.ledger.mandate.Reconciliation;
 import com.nexusphere.ledger.mandate.SdJwt;
 import com.nexusphere.ledger.mandate.TrackRecordCheck;
 import com.nexusphere.ledger.mandate.TrackRecordClaims;
@@ -602,6 +604,53 @@ class ConformanceVectorsTest {
                 claims.lastAt(), null, null, null, null);
         assertThat(IndexProofVerifier.matchTrackRecord(inflated, stored.path("indexProof"), index))
                 .containsExactly("The track record claims 3 entries but the index proves 2");
+    }
+
+    @Test
+    void a2aReconciliation() throws IOException {
+        String supplier = "https://supplier.example";
+        Instant from = T0.truncatedTo(ChronoUnit.SECONDS);
+        Instant to = from.plus(1, ChronoUnit.DAYS);
+        UUID mandate = UUID.fromString("00000000-0000-4000-8000-0000000000aa");
+        UUID matched = UUID.fromString("00000000-0000-4000-8000-000000000101");
+        UUID refused = UUID.fromString("00000000-0000-4000-8000-000000000102");
+        UUID smuggled = UUID.fromString("00000000-0000-4000-8000-000000000103");
+        String request = Hashes.sha256("request".getBytes(StandardCharsets.UTF_8));
+        String response = Hashes.sha256("response".getBytes(StandardCharsets.UTF_8));
+        String receipt = Hashes.sha256("receipt".getBytes(StandardCharsets.UTF_8));
+        ExchangeStatement ours = new ExchangeStatement(ISSUER, supplier, from, to, to.plusSeconds(60), List.of(
+                new ExchangeStatement.Item("OUTBOUND", matched, from.plusSeconds(10), "message/send", mandate,
+                        request, response, 200, "SUCCEEDED", receipt),
+                new ExchangeStatement.Item("OUTBOUND", refused, from.plusSeconds(20), "message/send", mandate,
+                        request, response, 401, "FAILED", null)));
+        ExchangeStatement theirs = new ExchangeStatement(supplier, ISSUER, from, to, to.plusSeconds(90), List.of(
+                new ExchangeStatement.Item("INBOUND", matched, from.plusSeconds(10), "message/send", mandate,
+                        request, response, 200, "SUCCEEDED", receipt),
+                new ExchangeStatement.Item("INBOUND", smuggled, from.plusSeconds(30), "message/send", mandate,
+                        request, response, 200, "SUCCEEDED", receipt)));
+        Reconciliation result = Reconciliation.of(ours, theirs);
+        Map<String, Object> vector = new LinkedHashMap<>();
+        vector.put("description", "Signed A2A statements of two ledgers: one exchange matches, one was refused"
+                + " before the receiver recorded it, and one the sender never sent");
+        vector.put("oursPublicKey", SigningKeys.encode(LEDGER));
+        vector.put("theirsPublicKey", SigningKeys.encode(WITNESS_PUBLIC_KEY));
+        vector.put("ours", ours.sign(KEY_ID, Signer.of(LEDGER_KEY)));
+        vector.put("theirs", theirs.sign(SigningKeys.keyIdOf(WITNESS_PUBLIC_KEY), Signer.of(WITNESS_KEY)));
+        vector.put("reconciliation", result);
+        JsonNode stored = check("a2a-reconciliation.json", vector);
+
+        ExchangeStatement verifiedOurs = ExchangeStatement.verified(stored.path("ours").asString(), ISSUER,
+                KeyResolver.fixed(ISSUER, LEDGER));
+        ExchangeStatement verifiedTheirs = ExchangeStatement.verified(stored.path("theirs").asString(), supplier,
+                KeyResolver.fixed(supplier, WITNESS_PUBLIC_KEY));
+
+        assertThat(Reconciliation.of(verifiedOurs, verifiedTheirs)).isEqualTo(result);
+        assertThat(result.matched()).isEqualTo(1);
+        assertThat(result.undelivered()).isEqualTo(1);
+        assertThat(result.discrepancies()).singleElement().satisfies(d -> {
+            assertThat(d.kind()).isEqualTo(Reconciliation.NOT_SENT);
+            assertThat(d.requestId()).isEqualTo(smuggled);
+        });
     }
 
     @Test
