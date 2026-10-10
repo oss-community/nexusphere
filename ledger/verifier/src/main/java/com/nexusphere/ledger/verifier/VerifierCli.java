@@ -42,7 +42,10 @@ public final class VerifierCli {
                    nexusphere-ledger-verify report [package options] --package <package.json> <report.json>
                    nexusphere-ledger-verify dispute [package options] <dispute.zip>
                    nexusphere-ledger-verify index [--public-key <key> | --public-key-file <file>] [--keys <keys.json>] \
-            [--package <package.json>] [--json] <proof.json>""";
+            [--package <package.json>] [--json] <proof.json>
+                   nexusphere-ledger-verify track-record --issuer <url> [--issuer <url>] [--audience <aud>] \
+            [--public-key <key> | --public-key-file <file>] [--nonce <nonce>] [--require-key-binding] \
+            [--index-proof <proof.json>] [--json] <token | token file | ->""";
 
     private static final int MAX_FILE = 256 * 1024 * 1024;
     private static final JsonMapper JSON = JsonMapper.builder().enable(SerializationFeature.INDENT_OUTPUT).build();
@@ -57,6 +60,9 @@ public final class VerifierCli {
     public static int run(String[] args, PrintStream out, PrintStream err) {
         if (args.length > 0 && "mandate".equals(args[0])) {
             return MandateCli.run(Arrays.copyOfRange(args, 1, args.length), out, err, USAGE_TEXT);
+        }
+        if (args.length > 0 && "track-record".equals(args[0])) {
+            return TrackRecordCli.run(Arrays.copyOfRange(args, 1, args.length), out, err, USAGE_TEXT);
         }
         if (args.length > 0 && "statement".equals(args[0])) {
             return StatementCli.run(Arrays.copyOfRange(args, 1, args.length), out, err, USAGE_TEXT);

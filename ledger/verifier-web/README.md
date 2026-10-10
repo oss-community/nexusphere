@@ -1,6 +1,6 @@
 # <p align="center">Nexusphere Package Verifier for the Browser</p>
 
-<p align="center">One HTML file that verifies an evidence package or an index proof in the browser, with no server and no network.</p>
+<p align="center">One HTML file that verifies an evidence package, an index proof or an agent track record in the browser, with no server and no network.</p>
 
 ## <p align="center">Table of Content</p>
 
@@ -8,6 +8,7 @@
 * [Build](#build)
 * [Verify a Package](#verify-a-package)
 * [Verify an Index Proof](#verify-an-index-proof)
+* [Verify a Track Record](#verify-a-track-record)
 * [What It Checks](#what-it-checks)
 * [Develop](#develop)
 * [Test](#test)
@@ -106,6 +107,30 @@ with its head hash, Signed by with the key ID, and the Finding `no entry up to s
 and last sequence when the term occurs. Change `files/delete` to `files/remove` in the file and verify again; the page
 must show `INVALID` and `the key does not belong to the term`.
 
+## Verify a Track Record
+
+<p style="text-align: justify;">
+
+The page also takes an [agent track record](../README.md#agent-track-records), which it recognises as an SD-JWT VC
+whose `vct` is `urn:nexusphere:vct:agent-track-record:1`. It checks the `dc+sd-jwt` type, the disclosures, the
+signature with the pinned ledger key or a key it endorsed in the key list, the validity period and, when the record
+names an agent key in `cnf`, its key binding. With an index proof for the `agent` term, it also checks that the proof
+verifies and gives the same checkpoint, index root, count and sequences, as `nexusphere-ledger-verify track-record
+--index-proof` does. The page has no issuer list: the pinned key is the trust anchor.
+
+</p>
+
+Step 1. Get a track record and an index proof for the agent at the same checkpoint, as in
+[Agent Track Records](../README.md#agent-track-records).
+
+Step 2. Open `ledger/verifier-web/dist/index.html`, choose or drop `track-record.jwt` or paste its text in Or paste a
+track record, paste the ledger's public key and choose `agent-proof.json` as the index proof.
+
+Step 3. Press Verify; the page must show `VALID` with the Credential, Issuer, Agent, Audience, Valid, Checkpoint,
+Index root, Entries, Outcomes, Principals and Actions, `withheld` for each claim the presentation does not disclose,
+and Index proof `N entries at checkpoint S, matches the track record`. Verify a proof for another agent; the page must
+show `INVALID` and `The index proof is not about the agent quote-agent`.
+
 ## What It Checks
 
 | Check                                                            | Shown as                      |
@@ -122,6 +147,9 @@ must show `INVALID` and `the key does not belong to the term`.
 | Prompt texts against their hash and the entries that name them   | Prompts                       |
 | The term, the signed index and the path of an index proof        | Term, Checkpoint, Signed by   |
 | The count and sequences of a term, or that it never occurred     | Finding                       |
+| Type, disclosures, signature and validity of a track record      | Credential, Signed by, Valid  |
+| The key binding of a track record bound to an agent key          | Agent key                     |
+| A track record against an index proof for its agent              | Index proof                   |
 
 <p style="text-align: justify;">
 
@@ -147,8 +175,8 @@ cd ledger/verifier-web && npm test
 ```
 
 Step 2. Build the page and run the browser tests, which open the built file from disk, verify a package, check that no
-request leaves the page, that the prompt texts and models show and that an index proof verifies; they must report
-`3 passed`:
+request leaves the page, that the prompt texts and models show, that an index proof verifies and that a track record
+matches its index proof; they must report `4 passed`:
 
 ```shell
 npm run build && npx playwright install chromium && npm run e2e

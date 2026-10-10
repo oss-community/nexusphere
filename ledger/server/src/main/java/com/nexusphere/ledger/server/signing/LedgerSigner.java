@@ -16,6 +16,8 @@ import com.nexusphere.ledger.mandate.Jws;
 import com.nexusphere.ledger.mandate.MandateClaims;
 import com.nexusphere.ledger.mandate.Mandates;
 import com.nexusphere.ledger.mandate.StatusList;
+import com.nexusphere.ledger.mandate.TrackRecordClaims;
+import com.nexusphere.ledger.mandate.TrackRecords;
 import com.nexusphere.ledger.server.config.LedgerProperties;
 import com.nexusphere.ledger.server.web.LedgerException;
 import org.springframework.stereotype.Component;
@@ -117,6 +119,10 @@ public class LedgerSigner {
 
     public String signMandate(MandateClaims claims) {
         return Mandates.issue(claims, publicKey.keyId(), signer);
+    }
+
+    public String signTrackRecord(TrackRecordClaims claims) {
+        return TrackRecords.issue(claims, publicKey.keyId(), signer);
     }
 
     public String signStatusList(StatusList statusList) {

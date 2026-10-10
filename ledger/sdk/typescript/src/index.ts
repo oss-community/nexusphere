@@ -20,5 +20,6 @@ export * from "./rekor.js";
 export * from "./report.js";
 export * from "./timestamp.js";
 export * from "./timestamps.js";
+export * from "./trackrecord.js";
 
 export const VERSION = "1.0.0";

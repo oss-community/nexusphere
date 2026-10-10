@@ -72,13 +72,9 @@ public class IndexService {
         SignedCheckpoint checkpoint = (sequence == null ? checkpoints.latest() : checkpoints.findBySequence(sequence))
                 .orElseThrow(() -> LedgerException.notFound(sequence == null ? "A checkpoint"
                         : "Checkpoint " + sequence));
-        long at = checkpoint.checkpoint().sequence();
-        catchUp(at);
-        Map<String, Leaf> leaves = leaves(at);
-        SortedMap<String, byte[]> values = new TreeMap<>();
-        leaves.forEach((key, leaf) -> values.put(key, SparseMerkleTree.valueHash(value(leaf))));
-        String root = HEX.formatHex(SparseMerkleTree.root(values));
-        SignedIndex index = signed(checkpoint, root);
+        Map<String, Leaf> leaves = indexed(checkpoint);
+        SortedMap<String, byte[]> values = values(leaves);
+        SignedIndex index = signed(checkpoint, HEX.formatHex(SparseMerkleTree.root(values)));
         byte[] key = SparseMerkleTree.key(term);
         SparseMerkleTree.Proof proof = SparseMerkleTree.proof(values, key);
         Leaf leaf = leaves.get(HEX.formatHex(key));
@@ -98,6 +94,23 @@ public class IndexService {
         }
         map.put("index", index.toMap());
         return map;
+    }
+
+    @Transactional
+    public SignedIndex root(SignedCheckpoint checkpoint) {
+        return signed(checkpoint, HEX.formatHex(SparseMerkleTree.root(values(indexed(checkpoint)))));
+    }
+
+    private Map<String, Leaf> indexed(SignedCheckpoint checkpoint) {
+        long at = checkpoint.checkpoint().sequence();
+        catchUp(at);
+        return leaves(at);
+    }
+
+    private static SortedMap<String, byte[]> values(Map<String, Leaf> leaves) {
+        SortedMap<String, byte[]> values = new TreeMap<>();
+        leaves.forEach((key, leaf) -> values.put(key, SparseMerkleTree.valueHash(value(leaf))));
+        return values;
     }
 
     private SignedIndex signed(SignedCheckpoint checkpoint, String root) {

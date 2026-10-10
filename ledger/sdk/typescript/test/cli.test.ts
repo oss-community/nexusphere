@@ -150,6 +150,33 @@ describe("nexusphere-ledger-verify", () => {
     expect(unbound.out).toContain("KEY_NOT_BOUND");
   });
 
+  it("verifies a track record with its index proof", async () => {
+    const v = vector("agent-track-record.json");
+    const proof = join(directory, "track-record-proof.json");
+    writeFileSync(proof, JSON.stringify(v.indexProof));
+    const common = ["track-record", "--issuer", ISSUER, "--public-key", LEDGER_KEY.publicKey.encoded];
+    const valid = await cli(...common, "--index-proof", proof, v.presentedWithOutcomesOnly);
+    expect(valid.code).toBe(VALID);
+    expect(valid.out).toContain("Agent       : invoice-agent");
+    expect(valid.out).toContain("Outcomes    : DENIED 1, SUCCEEDED 1");
+    expect(valid.out).toContain("Actions     : withheld");
+    expect(valid.out).toContain(
+      "Entries     : 2, sequences 1 to 2, 2026-10-01T08:00:00.128456Z to 2026-10-01T08:00:01.128456Z");
+    expect(valid.out).toContain("Index proof : 2 entries at checkpoint 3");
+    const other = join(directory, "other-agent-proof.json");
+    writeFileSync(other, JSON.stringify({ ...v.indexProof, term: { type: "agent", agentId: "sales-agent" } }));
+    const mismatch = await cli(...common, "--json", "--index-proof", other, v.token);
+    expect(mismatch.code).toBe(INVALID);
+    expect(JSON.parse(mismatch.out).problems).toContain(
+      "INDEX_MISMATCH: The index proof is not about the agent invoice-agent");
+    expect(JSON.parse(mismatch.out).claims).toEqual(v.claims);
+    const unbound = await cli(...common, "--require-key-binding", v.token);
+    expect(unbound.code).toBe(INVALID);
+    expect(unbound.out).toContain("KEY_NOT_BOUND");
+    expect((await cli("track-record", v.token)).code).toBe(USAGE);
+    expect((await cli(...common, "--index-proof", join(directory, "missing.json"), v.token)).code).toBe(USAGE);
+  });
+
   it("verifies a report against its package", async () => {
     const pkg = await buildPackage(await entries(4), [2], { witness: true });
     const packagePath = join(directory, "report-package.json");

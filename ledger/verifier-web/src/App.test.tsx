@@ -19,7 +19,10 @@ const PINNED = LEDGER_KEY.publicKey.encoded
 async function upload(pkg: unknown, name = 'package.json') {
   const user = userEvent.setup()
   render(<App />)
-  await user.upload(screen.getByLabelText('Package file'), new File([JSON.stringify(pkg)], name))
+  await user.upload(
+    screen.getByLabelText('Package file'),
+    new File([typeof pkg === 'string' ? pkg : JSON.stringify(pkg)], name),
+  )
   return user
 }
 
@@ -193,6 +196,75 @@ describe('App', async () => {
     await user.type(screen.getByLabelText('Ledger public key'), (await PrivateKey.generate()).publicKey.encoded)
     await user.click(screen.getByRole('button', { name: 'Verify' }))
     expect(await screen.findByText(/which the proof does not trust/)).toBeInTheDocument()
+  })
+
+  describe('track record', () => {
+    const record = vector('agent-track-record.json')
+
+    beforeEach(() => {
+      vi.useFakeTimers({ toFake: ['Date'] })
+      vi.setSystemTime(new Date('2026-10-10T00:00:00Z'))
+    })
+
+    afterEach(() => {
+      vi.useRealTimers()
+    })
+
+    it('verifies a track record and cross-checks it with the index proof', async () => {
+      const user = await upload(record.token, 'record.txt')
+      await user.type(screen.getByLabelText('Ledger public key'), PINNED)
+      await user.upload(
+        screen.getByLabelText('Index proof file'),
+        new File([JSON.stringify(record.indexProof)], 'proof.json'),
+      )
+      await user.click(screen.getByRole('button', { name: 'Verify' }))
+      expect(await screen.findByTestId('verdict')).toHaveTextContent('VALID')
+      expect(screen.queryByRole('note')).not.toBeInTheDocument()
+      expect(screen.getByText(record.claims.jti)).toBeInTheDocument()
+      expect(screen.getByText('https://ledger.example')).toBeInTheDocument()
+      expect(screen.getByText('invoice-agent')).toBeInTheDocument()
+      expect(screen.getByText('any')).toBeInTheDocument()
+      expect(screen.getByText('2026-10-01T08:10:00Z to 2027-10-01T08:00:00Z')).toBeInTheDocument()
+      expect(screen.getByText(record.claims.record.checkpoint.indexRoot)).toBeInTheDocument()
+      expect(
+        screen.getByText('2, sequences 1 to 2, 2026-10-01T08:00:00.128456Z to 2026-10-01T08:00:01.128456Z'),
+      ).toBeInTheDocument()
+      expect(screen.getByText('DENIED 1, SUCCEEDED 1')).toBeInTheDocument()
+      expect(screen.getByText('tools/call 2')).toBeInTheDocument()
+      expect(screen.getByText('none')).toBeInTheDocument()
+      expect(screen.getByText(LEDGER_KEY.keyId)).toBeInTheDocument()
+      expect(screen.getByText('2 entries at checkpoint 3, matches the track record')).toBeInTheDocument()
+    })
+
+    it('shows withheld claims of a pasted presentation and warns without a pinned key', async () => {
+      const user = userEvent.setup()
+      render(<App />)
+      await user.click(screen.getByLabelText('Or paste a track record'))
+      await user.paste(record.presentedWithOutcomesOnly)
+      await user.upload(screen.getByLabelText('Key list file'), new File([JSON.stringify([keyRecord(LEDGER_KEY)])], 'keys.json'))
+      await user.click(screen.getByRole('button', { name: 'Verify' }))
+      expect(await screen.findByTestId('verdict')).toHaveTextContent('VALID')
+      expect(screen.getByRole('note')).toHaveTextContent('Not pinned')
+      expect(screen.getAllByText('withheld')).toHaveLength(2)
+      expect(screen.getByText(`${LEDGER_KEY.keyId}, not pinned`)).toBeInTheDocument()
+    })
+
+    it('shows the problems of another key and of a proof that does not match', async () => {
+      const user = await upload(record.token, 'record.txt')
+      await user.type(screen.getByLabelText('Ledger public key'), PINNED)
+      await user.upload(
+        screen.getByLabelText('Index proof file'),
+        new File([JSON.stringify(vector('index-proof.json').proofs[2])], 'proof.json'),
+      )
+      await user.click(screen.getByRole('button', { name: 'Verify' }))
+      expect(await screen.findByTestId('verdict')).toHaveTextContent('INVALID')
+      expect(screen.getByText('The index proof is not about the agent invoice-agent')).toBeInTheDocument()
+      expect(screen.getByText('0 entries at checkpoint 3, does not match the track record')).toBeInTheDocument()
+      await user.clear(screen.getByLabelText('Ledger public key'))
+      await user.type(screen.getByLabelText('Ledger public key'), (await PrivateKey.generate()).publicKey.encoded)
+      await user.click(screen.getByRole('button', { name: 'Verify' }))
+      expect(await screen.findByText(/which the ledger keys do not reach/)).toBeInTheDocument()
+    })
   })
 
   it('reports files that are not packages', async () => {

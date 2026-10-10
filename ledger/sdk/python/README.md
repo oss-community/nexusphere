@@ -14,6 +14,7 @@
 * [Prove That Something Never Happened](#prove-that-something-never-happened)
 * [Verify a Mandate](#verify-a-mandate)
 * [Present a Key-Bound Mandate](#present-a-key-bound-mandate)
+* [Verify an Agent Track Record](#verify-an-agent-track-record)
 * [Check a Signed Request](#check-a-signed-request)
 * [Command Line](#command-line)
 * [Reference](#reference)
@@ -319,6 +320,48 @@ check = MandateVerifier("http://localhost:8090", audience="https://supplier.exam
 print(check.valid, check.claims.holder_key.key_id)
 ```
 
+## Verify an Agent Track Record
+
+<p style="text-align: justify;">
+
+An [agent track record](../../README.md#agent-track-records) is an SD-JWT VC that counts the evidence naming an agent
+up to a signed checkpoint, with its outcomes, principals and actions disclosed selectively. `TrackRecordVerifier`
+checks it like a mandate, with the same problem codes, but has no status list. `match_track_record` checks it against
+an index proof of the `agent` term at the same checkpoint and returns what does not match.
+
+</p>
+
+Step 1. Sign a checkpoint and let the agent ask for its track record for a supplier, as in
+[Record Evidence](#record-evidence):
+
+```python
+operator.create_checkpoint()
+issued = agent.issue_track_record("invoice-agent", "https://supplier.example", "P7D")
+```
+
+Step 2. Present only the outcomes, and ask, as the operator, for the index proof of the agent at the same checkpoint:
+
+```python
+from nexusphere_ledger import SdJwt
+
+presented = SdJwt.parse(issued["credential"]).present({"outcomes"})
+proof = operator.index_proof({"type": "agent", "agentId": "invoice-agent"}, issued["checkpoint"])
+```
+
+Step 3. Verify both pinned to the ledger's key; it must print `True`, the total, the outcome counts and `[]`, then
+`None` and `[]`:
+
+```python
+from nexusphere_ledger import PublicKey, StaticKeys, TrackRecordVerifier, match_track_record, verify_index_proof
+
+public_key = operator.active_public_key()
+keys = StaticKeys.fixed("http://localhost:8090", PublicKey.from_base64(public_key))
+check = TrackRecordVerifier("http://localhost:8090", keys=keys, audience="https://supplier.example").verify(presented)
+print(check.valid, check.claims.total, check.claims.outcomes, check.problems)
+print(check.claims.actions)
+print(match_track_record(check.claims, proof, verify_index_proof(proof, public_key)))
+```
+
 ## Check a Signed Request
 
 <p style="text-align: justify;">
@@ -410,25 +453,34 @@ with `json.dump(never, open("proof.json", "w"))` and verify it; the output must 
 nexusphere-ledger-verify index --public-key "$LEDGER_PUBLIC_KEY" proof.json
 ```
 
+Step 10. Save the track record of [Verify an Agent Track Record](#verify-an-agent-track-record) as
+`track-record.jwt` and the index proof as `proof.json`, and verify them together; the output must show
+`Index proof : ... entries at checkpoint ...` and `Result: VALID`:
+
+```shell
+nexusphere-ledger-verify track-record --issuer http://localhost:8090 --public-key "$LEDGER_PUBLIC_KEY" --audience https://supplier.example --index-proof proof.json track-record.jwt
+```
+
 ## Reference
 
-| Module      | Contents                                                                                         |
-|-------------|--------------------------------------------------------------------------------------------------|
-| `client`    | `LedgerClient` for evidence, batches, decisions, `act`, prompts, grants, mandates, packages, keys |
-| `package`   | `verify_package` and `PackageReport`                                                             |
-| `timestamp` | RFC 3161 `TimestampToken`, its verification against a pinned chain, and `read_certificates`      |
-| `rekor`     | Rekor v2 `hashedrekord` requests and `verify_rekor_entry` against a pinned log                   |
-| `report`    | Signed reports: `verify_report`, `ReportCheck`, `report_signed_bytes` and `entries_digest`       |
-| `index`     | Index proofs of presence and absence: `verify_index_proof`, `IndexCheck`, `index_signed_bytes`   |
-| `evidence`  | Content and link hashes, commitments, `ChainVerifier`, `Checkpoint` with its compliance profiles |
-| `merkle`    | RFC 9162 roots, inclusion and consistency proofs                                                 |
-| `note`      | C2SP signed notes, note keys and `tlog-cosignature/v1` cosignatures                              |
-| `cose`      | `CoseSign1`, SCITT `EvidenceStatement` and RFC 9942 `LogReceipt`                                 |
-| `mandate`   | SD-JWT VC mandates, `MandateVerifier`, status lists and JWKs                                     |
-| `httpsig`   | RFC 9421 HTTP message signatures: `sign_request`, `verify_request`, `content_digest`             |
-| `keys`      | Ed25519 keys, key IDs, key rotations and trusted keys from a pinned key                          |
-| `canonical` | Canonical JSON                                                                                   |
-| `cbor`      | Deterministic CBOR                                                                               |
+| Module        | Contents                                                                                          |
+|---------------|---------------------------------------------------------------------------------------------------|
+| `client`      | `LedgerClient` for evidence, batches, decisions, `act`, prompts, grants, mandates, packages, keys |
+| `package`     | `verify_package` and `PackageReport`                                                              |
+| `timestamp`   | RFC 3161 `TimestampToken`, its verification against a pinned chain, and `read_certificates`       |
+| `rekor`       | Rekor v2 `hashedrekord` requests and `verify_rekor_entry` against a pinned log                    |
+| `report`      | Signed reports: `verify_report`, `ReportCheck`, `report_signed_bytes` and `entries_digest`        |
+| `index`       | Index proofs of presence and absence: `verify_index_proof`, `IndexCheck`, `index_signed_bytes`    |
+| `evidence`    | Content and link hashes, commitments, `ChainVerifier`, `Checkpoint` with its compliance profiles  |
+| `merkle`      | RFC 9162 roots, inclusion and consistency proofs                                                  |
+| `note`        | C2SP signed notes, note keys and `tlog-cosignature/v1` cosignatures                               |
+| `cose`        | `CoseSign1`, SCITT `EvidenceStatement` and RFC 9942 `LogReceipt`                                  |
+| `mandate`     | SD-JWT VC mandates, `MandateVerifier`, status lists and JWKs                                      |
+| `trackrecord` | SD-JWT VC agent track records, `TrackRecordVerifier` and `match_track_record`                     |
+| `httpsig`     | RFC 9421 HTTP message signatures: `sign_request`, `verify_request`, `content_digest`              |
+| `keys`        | Ed25519 keys, key IDs, key rotations and trusted keys from a pinned key                           |
+| `canonical`   | Canonical JSON                                                                                    |
+| `cbor`        | Deterministic CBOR                                                                                |
 
 ## Test
 

@@ -29,6 +29,10 @@ import com.nexusphere.ledger.mandate.MandateProblem;
 import com.nexusphere.ledger.mandate.MandateVerifier;
 import com.nexusphere.ledger.mandate.Mandates;
 import com.nexusphere.ledger.mandate.SdJwt;
+import com.nexusphere.ledger.mandate.TrackRecordCheck;
+import com.nexusphere.ledger.mandate.TrackRecordClaims;
+import com.nexusphere.ledger.mandate.TrackRecordVerifier;
+import com.nexusphere.ledger.mandate.TrackRecords;
 import org.junit.jupiter.api.Test;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.SerializationFeature;
@@ -549,6 +553,55 @@ class ConformanceVectorsTest {
         assertThat(KeyBinding.sdHash(stored.path("token").asString())).isEqualTo(stored.path("sdHash").asString());
         assertThat(bare.has(MandateProblem.KEY_BINDING_MISSING)).isTrue();
         assertThat(replayed.has(MandateProblem.KEY_BINDING_INVALID)).isTrue();
+    }
+
+    @Test
+    void agentTrackRecord() throws IOException {
+        Path file = DIR.resolve("agent-track-record.json");
+        List<EvidenceEntry> entries = entries();
+        Map<String, Object> proof = indexProof(entries, IndexRoot.term(Map.of("type", "agent", "agentId",
+                "invoice-agent")), 3, LEDGER_KEY, KEY_ID, LEDGER);
+        String indexRoot = ((Map<?, ?>) proof.get("index")).get("root").toString();
+        TrackRecordClaims claims = new TrackRecordClaims(ISSUER,
+                UUID.fromString("00000000-0000-4000-8000-0000000000dd"), "invoice-agent", null,
+                T0.truncatedTo(ChronoUnit.SECONDS).plusSeconds(600), Instant.parse("2027-10-01T08:00:00Z"), 3,
+                entries.getLast().hash(), indexRoot, 2, 1L, 2L, entries.get(0).recordedAt(),
+                entries.get(1).recordedAt(), Map.of("SUCCEEDED", 1L, "DENIED", 1L), 1L, Map.of("tools/call", 2L),
+                null);
+        if (WRITE) {
+            String token = TrackRecords.issue(claims, KEY_ID, LEDGER_KEY);
+            Map<String, Object> vector = new LinkedHashMap<>();
+            vector.put("description", "SD-JWT VC agent track record that matches the agent term of index-proof.json;"
+                    + " salts are random, so check it rather than reproduce it");
+            vector.put("token", token);
+            vector.put("presentedWithOutcomesOnly", SdJwt.parse(token).present(Set.of("outcomes")));
+            vector.put("indexProof", proof);
+            vector.put("claims", claims.toPayload());
+            Files.writeString(file, JSON.writeValueAsString(vector) + "\n");
+        }
+        JsonNode stored = JSON.readTree(file.toFile());
+        TrackRecordVerifier verifier = TrackRecordVerifier.builder().trustIssuer(ISSUER)
+                .keys(KeyResolver.fixed(ISSUER, LEDGER)).clock(Clock.fixed(T0.plusSeconds(3600), ZoneOffset.UTC))
+                .build();
+
+        TrackRecordCheck full = verifier.verify(stored.path("token").asString());
+        TrackRecordCheck presented = verifier.verify(stored.path("presentedWithOutcomesOnly").asString());
+        IndexProofVerifier.IndexCheck index = IndexProofVerifier.verify(stored.path("indexProof"),
+                SigningKeys.encode(LEDGER), null);
+
+        assertThat(full.problems()).isEmpty();
+        assertThat(full.claims()).isEqualTo(claims);
+        assertThat(JSON.readTree(JSON.writeValueAsString(full.claims().toPayload()))).isEqualTo(stored.path("claims"));
+        assertThat(presented.problems()).isEmpty();
+        assertThat(presented.claims().actions()).isNull();
+        assertThat(presented.claims().outcomes()).isEqualTo(claims.outcomes());
+        assertThat(index.problems()).isEmpty();
+        assertThat(IndexProofVerifier.matchTrackRecord(full.claims(), stored.path("indexProof"), index)).isEmpty();
+        TrackRecordClaims inflated = new TrackRecordClaims(ISSUER, claims.id(), "invoice-agent", null,
+                claims.issuedAt(), claims.expiresAt(), 3, claims.headHash(), indexRoot, 3, 1L, 2L, claims.firstAt(),
+                claims.lastAt(), null, null, null, null);
+        assertThat(IndexProofVerifier.matchTrackRecord(inflated, stored.path("indexProof"), index))
+                .containsExactly("The track record claims 3 entries but the index proves 2");
     }
 
     @Test

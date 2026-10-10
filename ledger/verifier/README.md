@@ -39,6 +39,8 @@ database, so an auditor, a court or a counterparty can verify what a ledger hand
 * Check a signed report against its package with `report --package`, and a whole dispute package with `dispute`
 * Check an index proof with `index`: the term, the path to the signed index root and, with `--package`, that the
   index belongs to the package's checkpoint
+* Check an agent track record with `track-record`: the issuer's signature, validity, audience, key binding and, with
+  `--index-proof`, that a proof for the agent at the same checkpoint gives the same index root and counts
 * Check entries in evidence format v2 from their personal values and salts, or from their commitments once erased
 * Check that the prompt texts of a package match their hashes and are named by the model of a disclosed entry
 * Run the [Conformance Vectors](../conformance/README.md) in `ConformanceVectorsTest`

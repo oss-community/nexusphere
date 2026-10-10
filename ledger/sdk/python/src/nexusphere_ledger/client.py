@@ -3,6 +3,7 @@ import urllib.error
 import urllib.parse
 import urllib.request
 from contextlib import contextmanager
+from datetime import timedelta
 from typing import Iterator, List, Optional, Union
 
 from .canonical import sha256_hex
@@ -214,6 +215,12 @@ class LedgerClient:
 
     def revoke_mandate(self, mandate_id: str, reason: Optional[str] = None) -> dict:
         return self._post("/api/v1/mandates/%s/revoke" % _segment(mandate_id), _compact({"reason": reason}))
+
+    def issue_track_record(self, agent_id: str, audience: Optional[str] = None, valid_for=None) -> dict:
+        if isinstance(valid_for, timedelta):
+            valid_for = "PT%dS" % int(valid_for.total_seconds())
+        return self._post("/api/v1/agents/%s/track-record" % _segment(agent_id),
+                          _compact({"audience": audience, "validFor": valid_for}))
 
     def jwks(self) -> dict:
         return self._get("/public/v1/keys")

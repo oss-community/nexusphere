@@ -49,6 +49,10 @@ import {
   verifyReport,
   indexSignedBytes,
   verifyIndexProof,
+  TrackRecordVerifier,
+  matchTrackRecord,
+  trackRecordClaims,
+  trackRecordPayload,
 } from "../src/index.js";
 import { ISSUER, LEDGER_KEY, ORIGIN, WITNESS, WITNESS_KEY, buildPackage, vector } from "./support.js";
 
@@ -511,5 +515,29 @@ describe("index-proof.json", () => {
       problems: [],
     });
     expect(v.proofs.slice(2).map((proof: Json) => proof.leaf)).toEqual([null, null]);
+  });
+});
+
+describe("agent-track-record.json", () => {
+  const verifier = () =>
+    new TrackRecordVerifier(ISSUER, {
+      keys: StaticKeys.fixed(ISSUER, LEDGER_KEY.publicKey),
+      clock: () => 1790841600 + 3600,
+    });
+
+  it("checks the track record, its outcomes-only presentation and its index proof", async () => {
+    const v = vector("agent-track-record.json");
+    const full = await verifier().verify(v.token);
+    const presented = await verifier().verify(v.presentedWithOutcomesOnly);
+    const index = await verifyIndexProof(v.indexProof, { pinnedPublicKey: LEDGER_KEY.publicKey.encoded });
+    expect(full.problems).toEqual([]);
+    expect(full.claims).toEqual(trackRecordClaims(v.claims));
+    expect(trackRecordPayload(full.claims!)).toEqual(v.claims);
+    expect(presented.problems).toEqual([]);
+    expect(presented.claims!.actions).toBeNull();
+    expect(presented.claims!.principals).toBeNull();
+    expect(presented.claims!.outcomes).toEqual(full.claims!.outcomes);
+    expect(index.problems).toEqual([]);
+    expect(matchTrackRecord(full.claims!, v.indexProof, index)).toEqual([]);
   });
 });

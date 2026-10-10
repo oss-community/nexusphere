@@ -220,5 +220,33 @@ class Cli(unittest.TestCase):
         self.assertIn("KEY_NOT_BOUND", out)
 
 
+    def test_track_record(self):
+        v = vector("agent-track-record.json")
+        with tempfile.TemporaryDirectory() as directory:
+            proof = self.write(directory, "proof.json", json.dumps(v["indexProof"]))
+            common = ("track-record", "--issuer", ISSUER, "--public-key", LEDGER_KEY.public_key.encoded)
+            code, out, _ = self.run_cli(*common, "--index-proof", proof, v["presentedWithOutcomesOnly"])
+            self.assertEqual(VALID, code, out)
+            self.assertIn("Agent       : invoice-agent", out)
+            self.assertIn("Outcomes    : DENIED 1, SUCCEEDED 1", out)
+            self.assertIn("Actions     : withheld", out)
+            self.assertIn("Entries     : 2, sequences 1 to 2, 2026-10-01T08:00:00.128456Z to "
+                          "2026-10-01T08:00:01.128456Z", out)
+            self.assertIn("Index proof : 2 entries at checkpoint 3", out)
+            other = dict(v["indexProof"], term={"type": "agent", "agentId": "sales-agent"})
+            code, out, _ = self.run_cli(*common, "--json", "--index-proof",
+                                        self.write(directory, "other.json", json.dumps(other)), v["token"])
+            self.assertEqual(INVALID, code)
+            report = json.loads(out)
+            self.assertIn("INDEX_MISMATCH: The index proof is not about the agent invoice-agent", report["problems"])
+            self.assertEqual(v["claims"], report["claims"])
+            code, out, _ = self.run_cli(*common, "--require-key-binding", v["token"])
+            self.assertEqual(INVALID, code)
+            self.assertIn("KEY_NOT_BOUND", out)
+            self.assertEqual(USAGE, self.run_cli("track-record", v["token"])[0])
+            self.assertEqual(USAGE, self.run_cli(*common, "--index-proof", os.path.join(directory, "missing.json"),
+                                                 v["token"])[0])
+
+
 if __name__ == "__main__":
     unittest.main()
