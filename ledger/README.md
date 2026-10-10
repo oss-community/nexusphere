@@ -21,6 +21,7 @@
 * [Mandates](#mandates)
 * [Agent Keys and Key Binding](#agent-keys-and-key-binding)
 * [A2A Gateway](#a2a-gateway)
+* [HTTP Message Signatures](#http-message-signatures)
 * [Conformance Vectors](#conformance-vectors)
 * [API](#api)
 * [End-to-End Tests](ledger-e2e-tests/README.md)
@@ -749,13 +750,13 @@ it. The agent points its MCP client at `/mcp/{name}` with its own API key and na
 <p style="text-align: justify;">
 
 Every `tools/call` is decided first, with action `tools/call` and target `{name}/{tool}`, so a grant on `files/*` or
-`files/read_file` covers it. A denied call never reaches the server and is answered with JSON-RPC error `-32003` and
-the decision ID and reason code in `error.data`. An allowed call is forwarded, and its outcome is reported from the
-answer: a JSON-RPC error, `isError: true`, a non-2xx status or an unreachable server (`-32002`, HTTP 502) count as
-`FAILED`. The input hash is the SHA-256 of the request body, the output hash is the SHA-256 of the answer, the MCP
-session ID is the correlation ID, and every answer to a decided call carries the `X-Ledger-Decision` header. Other
-messages, such as `initialize`, `tools/list` and notifications, pass through unchanged with the `Mcp-Session-Id`
-header.
+`files/read_file` covers it. A denied call never reaches the server and is answered with JSON-RPC error `-32003` and the
+decision ID and reason code in `error.data`. An allowed call is forwarded, and its outcome is reported from the answer:
+a JSON-RPC error, `isError: true`, a non-2xx status or an unreachable server (`-32002`, HTTP 502) count as `FAILED`. The
+input hash is the SHA-256 of the request body, the output hash is the SHA-256 of the answer, the MCP session ID is the
+correlation ID, and every answer to a decided call carries the `X-Ledger-Decision` header. Other messages, such as
+`initialize`, `tools/list` and notifications, pass through unchanged with the `Mcp-Session-Id` header. Every request to
+the server carries the ledger's [HTTP message signature](#http-message-signatures).
 
 </p>
 
@@ -994,14 +995,15 @@ as the request ID.
 
 The receiving ledger answers on `/a2a/in/{agent}` without an API key. It verifies the mandate with `MandateVerifier`
 (trusted issuer, key from the issuer's JWKS, signature, time, its own issuer as audience, the `a2a/send` action, the
-revocation status and, for a mandate with `cnf`, the key binding with the body hash as nonce) and the request proof (same issuer, key, mandate and agent, its own issuer as audience, the method,
-the body hash and an `iat` within `LEDGER_A2A_REQUEST_MAX_AGE`). A request ID is accepted once. A mandate or proof
-that cannot be trusted is answered with HTTP 401 and is not recorded. A trusted mandate that is revoked, expired or for
-another audience is answered with HTTP 403 and recorded as an `a2a/receive` DENY entry. Otherwise the request goes to
-the local agent and one `a2a/receive` entry records it with the same input and output hashes as the sender, the
-mandate as delegation ID and the request ID as correlation ID. The answer carries `X-Nexusphere-Receipt`, a receipt
-signed by the receiving ledger (`typ` `nexusphere-a2a-receipt+jwt`) with the request and response hashes, the HTTP
-status, the outcome, and the sequence and hash of its evidence entry.
+revocation status and, for a mandate with `cnf`, the key binding with the body hash as nonce), the sender's [HTTP
+message signature](#http-message-signatures) and the request proof (same issuer, key, mandate and agent, its own issuer
+as audience, the method, the body hash and an `iat` within `LEDGER_A2A_REQUEST_MAX_AGE`). A request ID is accepted once.
+A mandate or proof that cannot be trusted is answered with HTTP 401 and is not recorded. A trusted mandate that is
+revoked, expired or for another audience is answered with HTTP 403 and recorded as an `a2a/receive` DENY entry.
+Otherwise the request goes to the local agent and one `a2a/receive` entry records it with the same input and output
+hashes as the sender, the mandate as delegation ID and the request ID as correlation ID. The answer carries
+`X-Nexusphere-Receipt`, a receipt signed by the receiving ledger (`typ` `nexusphere-a2a-receipt+jwt`) with the request
+and response hashes, the HTTP status, the outcome, and the sequence and hash of its evidence entry.
 
 </p>
 
@@ -1033,14 +1035,80 @@ agent sees only the events of the task.
 curl -X POST http://localhost:8090/a2a/out/supplier -H "Authorization: Bearer {agentApiKey}" -H "X-Ledger-Principal: alice" -H "Content-Type: application/json" -d '{"jsonrpc":"2.0","id":"1","method":"message/send","params":{"message":{"role":"user","messageId":"1","parts":[{"kind":"text","text":"Order 40 pallets"}]}}}'
 ```
 
+## HTTP Message Signatures
+
+<p style="text-align: justify;">
+
+Every request the ledger sends on, to an MCP server, to a peer ledger or to a local A2A agent, carries an RFC 9421
+HTTP message signature made with the ledger's signing key, so the receiver can check that the ledger sent it and that
+nothing changed on the way. The signature covers `@method`, `@authority` and `@path`, and, when there is a body, the
+RFC 9530 `Content-Digest` (`sha-256`). Its parameters are `created`, `expires` (five minutes later), a random `nonce`,
+`keyid` (the ledger key ID, as in `/public/v1/keys`), `alg` `ed25519` and `tag` `nexusphere-ledger`, under the label
+`nexusphere`:
+
+</p>
+
+```text
+Content-Digest: sha-256=:J5ADMGzC1HOdzr0zMO+g9eAsXJv5yEPKc6lRWCUkdvg=:
+Signature-Input: nexusphere=("@method" "@authority" "@path" "content-digest");created=1790841600;expires=1790841900;nonce="c2lnbmF0dXJlLW5vbmNl";keyid="06e3fd8fda29bb60";alg="ed25519";tag="nexusphere-ledger"
+Signature: nexusphere=:buTaWUXE/3h2wCIFRT7OWe2BLf1qwyqqz+5uHPOwjK/X4BsVeQ2CoHxhnCAQzwfEFquoEZdqxEaNFsoI98xlAQ==:
+```
+
+<p style="text-align: justify;">
+
+A receiving ledger requires the signature on `/a2a/in/{agent}`: it reads the key from the issuer named in the mandate
+and answers HTTP 401 with problem `HTTP_SIGNATURE` when the signature is missing, stale, made with an unknown key, or
+does not match the method, address or body. Behind a proxy, the address the receiver sees must be the one the sender
+called, so the proxy has to pass the original `Host` or `X-Forwarded-Host` and port. An MCP server or agent checks the
+signature with `HttpSignatures.verify` from `ledger/mandate`, `verify_request` from the Python SDK or `verifyRequest`
+from the TypeScript SDK, with the keys from `/public/v1/keys`, and can keep the nonces it has seen to refuse replays.
+
+</p>
+
+Step 1. Save a stand-in MCP server that checks each request with the Python SDK as `check_signature.py`:
+
+```python
+from http.server import BaseHTTPRequestHandler, HTTPServer
+from nexusphere_ledger import JwksKeys, verify_request
+from nexusphere_ledger.mandate import http_fetcher
+
+keys = JwksKeys(http_fetcher())
+
+class Handler(BaseHTTPRequestHandler):
+    def do_POST(self):
+        body = self.rfile.read(int(self.headers.get("Content-Length", 0)))
+        url = "http://%s%s" % (self.headers["Host"], self.path)
+        verified = verify_request("POST", url, dict(self.headers), body, lambda kid: keys.resolve("http://localhost:8090", kid))
+        print("verified", verified.key_id, flush=True)
+        self.send_response(200)
+        self.send_header("Content-Type", "application/json")
+        self.end_headers()
+        self.wfile.write(b'{"jsonrpc":"2.0","id":1,"result":{"content":[]}}')
+
+HTTPServer(("localhost", 3001), Handler).serve_forever()
+```
+
+Step 2. Start it, then start the ledger with `LEDGER_MCP_SERVERS_CHECK_URL=http://localhost:3001/mcp` set:
+
+```shell
+python3 check_signature.py
+```
+
+Step 3. Call a tool through the ledger with an agent that has a grant on `check/*`; the stand-in server must print
+`verified` and the ledger's active key ID from `/api/v1/keys`:
+
+```shell
+curl -s -X POST http://localhost:8090/mcp/check -H "Authorization: Bearer {agentApiKey}" -H "X-Ledger-Principal: alice" -H "Content-Type: application/json" -d '{"jsonrpc":"2.0","id":1,"method":"tools/call","params":{"name":"echo","arguments":{}}}'
+```
+
 ## Conformance Vectors
 
 <p style="text-align: justify;">
 
 [Conformance Vectors](conformance/README.md) hold fixed inputs and outputs for every format the ledger produces, made
 with the published RFC 8032 test keys: canonical JSON, the evidence chain and checkpoints, Merkle roots and proofs,
-signed notes and cosignatures, SCITT statements and receipts, an SD-JWT VC mandate and a key-bound mandate with its
-KB-JWT. Another implementation checks
+signed notes and cosignatures, SCITT statements and receipts, an SD-JWT VC mandate, a key-bound mandate with its
+KB-JWT and an HTTP message signature. Another implementation checks
 itself against them, and `ConformanceVectorsTest` in `ledger/verifier` fails when the ledger's own output changes.
 
 </p>

@@ -4,15 +4,24 @@ import com.nexusphere.ledger.chain.Hashes;
 import com.nexusphere.ledger.e2e.support.FakeMcpServer;
 import com.nexusphere.ledger.e2e.support.LedgerClient;
 import com.nexusphere.ledger.e2e.support.LedgerE2ETestBase;
+import com.nexusphere.ledger.mandate.HttpSignatures;
+import com.nexusphere.ledger.mandate.Jwk;
 import org.junit.jupiter.api.Test;
 import tools.jackson.databind.JsonNode;
 
+import java.net.URI;
 import java.nio.charset.StandardCharsets;
+import java.security.PublicKey;
+import java.time.Duration;
+import java.time.Instant;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
+import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 class McpGatewayE2ETest extends LedgerE2ETestBase {
 
@@ -56,6 +65,43 @@ class McpGatewayE2ETest extends LedgerE2ETestBase {
         assertThat(outcome.path("outcome").asString()).isEqualTo("SUCCEEDED");
         assertThat(outcome.path("outputHash").asString())
                 .isEqualTo(Hashes.sha256(response.body().getBytes(StandardCharsets.UTF_8)));
+    }
+
+    @Test
+    void theServerCanCheckThatTheLedgerSignedEveryRequest() {
+        RegisteredAgent agent = registerAgent("acme");
+        grant(grantBody("alice", agent.agentId(), List.of("tools/call"), List.of("files/*")));
+        String request = toolCall(8, "read_file");
+
+        agent.client().post(FILES, request, as("alice"));
+        FakeMcpServer.Received call = MCP.lastRequest();
+        HttpSignatures.Verified verified = HttpSignatures.verify(call.method(), URI.create(MCP.url()),
+                name -> call.headers().get(name.toLowerCase(Locale.ROOT)), call.body(), this::publishedKey,
+                Instant.now(), Duration.ofSeconds(60));
+        ledger().delete(FILES, Map.of("Mcp-Session-Id", FakeMcpServer.SESSION_ID));
+        FakeMcpServer.Received deleted = MCP.lastRequest();
+
+        assertThat(new String(call.body(), StandardCharsets.UTF_8)).isEqualTo(request);
+        assertThat(call.headers().get("content-digest")).isEqualTo(HttpSignatures.contentDigest(call.body()));
+        assertThat(ledger().get("/api/v1/keys").json().valueStream()
+                .filter(key -> "ACTIVE".equals(key.path("status").asString())).map(key -> key.path("keyId").asString()))
+                .containsExactly(verified.keyId());
+        assertThat(HttpSignatures.verify(deleted.method(), URI.create(MCP.url()),
+                name -> deleted.headers().get(name.toLowerCase(Locale.ROOT)), deleted.body(), this::publishedKey,
+                Instant.now(), Duration.ofSeconds(60)).keyId()).isEqualTo(verified.keyId());
+        assertThatThrownBy(() -> HttpSignatures.verify(call.method(), URI.create(MCP.url()),
+                name -> call.headers().get(name.toLowerCase(Locale.ROOT)), "{}".getBytes(StandardCharsets.UTF_8),
+                this::publishedKey, Instant.now(), Duration.ofSeconds(60)))
+                .isInstanceOf(HttpSignatures.InvalidSignature.class);
+    }
+
+    private Optional<PublicKey> publishedKey(String keyId) {
+        for (JsonNode jwk : anonymous().get("/public/v1/keys").json().path("keys")) {
+            if (keyId.equals(jwk.path("kid").asString())) {
+                return Optional.of(Jwk.publicKey(jwk));
+            }
+        }
+        return Optional.empty();
     }
 
     @Test

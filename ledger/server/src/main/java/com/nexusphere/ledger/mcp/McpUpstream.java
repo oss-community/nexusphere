@@ -1,6 +1,7 @@
 package com.nexusphere.ledger.mcp;
 
 import com.nexusphere.ledger.server.config.LedgerProperties;
+import com.nexusphere.ledger.server.signing.LedgerSigner;
 import com.nexusphere.ledger.server.web.EventStream;
 import org.springframework.stereotype.Component;
 import tools.jackson.databind.JsonNode;
@@ -12,6 +13,7 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
+import java.time.Clock;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
@@ -25,9 +27,13 @@ class McpUpstream {
 
     private final HttpClient http = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(10)).build();
     private final JsonMapper json;
+    private final LedgerSigner signer;
+    private final Clock clock;
 
-    McpUpstream(JsonMapper json) {
+    McpUpstream(JsonMapper json, LedgerSigner signer, Clock clock) {
         this.json = json;
+        this.signer = signer;
+        this.clock = clock;
     }
 
     UpstreamResponse post(LedgerProperties.Mcp.Server server, Duration timeout, String sessionId,
@@ -36,6 +42,7 @@ class McpUpstream {
                 .header("Content-Type", "application/json")
                 .header("Accept", "application/json, text/event-stream")
                 .POST(HttpRequest.BodyPublishers.ofByteArray(body));
+        sign(request, "POST", server, body);
         return open(request.build());
     }
 
@@ -44,6 +51,7 @@ class McpUpstream {
         HttpRequest.Builder request = request(server, timeout, sessionId, protocolVersion)
                 .header("Accept", EventStream.CONTENT_TYPE)
                 .GET();
+        sign(request, "GET", server, null);
         if (lastEventId != null) {
             request.header(LAST_EVENT_HEADER, lastEventId);
         }
@@ -52,8 +60,9 @@ class McpUpstream {
 
     UpstreamResponse delete(LedgerProperties.Mcp.Server server, Duration timeout, String sessionId,
                             String protocolVersion) throws IOException, InterruptedException {
-        HttpResponse<byte[]> response = http.send(request(server, timeout, sessionId, protocolVersion).DELETE().build(),
-                HttpResponse.BodyHandlers.ofByteArray());
+        HttpRequest.Builder request = request(server, timeout, sessionId, protocolVersion).DELETE();
+        sign(request, "DELETE", server, null);
+        HttpResponse<byte[]> response = http.send(request.build(), HttpResponse.BodyHandlers.ofByteArray());
         return new UpstreamResponse(response.statusCode(), null, response.body(), null);
     }
 
@@ -94,6 +103,10 @@ class McpUpstream {
         try (InputStream body = response.body()) {
             return new UpstreamResponse(response.statusCode(), sessionId, body.readAllBytes(), null);
         }
+    }
+
+    private void sign(HttpRequest.Builder request, String method, LedgerProperties.Mcp.Server server, byte[] body) {
+        signer.signHttp(method, server.url(), body, clock.instant()).forEach(request::header);
     }
 
     private static HttpRequest.Builder request(LedgerProperties.Mcp.Server server, Duration timeout,

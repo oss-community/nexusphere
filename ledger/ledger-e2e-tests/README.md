@@ -95,6 +95,7 @@ other, which watches it, to cosign its log checkpoints over the C2SP witness pro
 |                           | Other messages pass through with the session                                  |
 |                           | Bad requests are answered as JSON-RPC errors                                  |
 |                           | An unreachable server is recorded as a failed call                            |
+|                           | The server can check that the ledger signed every request                     |
 | `MandateE2ETest`          | An agent obtains a mandate that anyone can verify with the published key      |
 |                           | Revoking a mandate sets its bit in the signed status list                     |
 |                           | Revoking the grant revokes every mandate issued from it                       |
@@ -114,6 +115,7 @@ other, which watches it, to cosign its log checkpoints over the C2SP witness pro
 |                           | An unreachable peer is answered without delivery                              |
 |                           | A streamed task is relayed live and the receipt covers every event            |
 |                           | A stream that ends in a failed task is recorded as failed on both sides       |
+|                           | A request without a valid HTTP signature is rejected                          |
 | `AgentKeyBindingE2ETest`  | The agent registers its key and only an operator can replace it               |
 |                           | A mandate names the agent key in its confirmation claim                       |
 |                           | A key-bound presentation is accepted on both ledgers                          |

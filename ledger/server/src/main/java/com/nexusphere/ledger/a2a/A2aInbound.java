@@ -9,6 +9,7 @@ import com.nexusphere.ledger.evidence.domain.model.EvidenceSubmission;
 import com.nexusphere.ledger.evidence.domain.model.Outcome;
 import com.nexusphere.ledger.mandate.ExchangeReceipt;
 import com.nexusphere.ledger.mandate.ExchangeRequest;
+import com.nexusphere.ledger.mandate.HttpSignatures;
 import com.nexusphere.ledger.mandate.Jws;
 import com.nexusphere.ledger.mandate.MandateCheck;
 import com.nexusphere.ledger.mandate.MandateClaims;
@@ -43,6 +44,8 @@ class A2aInbound {
 
     static final String ACTION = "a2a/receive";
     static final String USES_EXHAUSTED = "USES_EXHAUSTED";
+    static final String HTTP_SIGNATURE = "HTTP_SIGNATURE";
+    private static final Duration CLOCK_SKEW = Duration.ofSeconds(60);
 
     private static final Logger log = LoggerFactory.getLogger(A2aInbound.class);
     private static final Set<MandateProblem> UNAUTHENTICATED = EnumSet.of(MandateProblem.MALFORMED,
@@ -72,7 +75,7 @@ class A2aInbound {
         this.clock = clock;
     }
 
-    A2aResponse receive(String agentName, String mandateToken, String requestToken, byte[] body) {
+    A2aResponse receive(String agentName, String mandateToken, String requestToken, byte[] body, A2aRequest signed) {
         LedgerProperties.A2a.Agent agent = agent(agentName);
         A2aResponse invalid = rpc.invalid(body);
         if (invalid != null) {
@@ -99,6 +102,13 @@ class A2aInbound {
         MandateClaims claims = check.claims();
         if (claims.principalId() == null) {
             return unauthenticated(id, "The mandate must disclose its principal.", List.of());
+        }
+        try {
+            HttpSignatures.verify(signed.method(), signed.uri(), signed.header(), body,
+                    keyId -> keys.resolve(claims.issuer(), keyId), clock.instant(), CLOCK_SKEW);
+        } catch (RuntimeException e) {
+            return unauthenticated(id, "The HTTP message signature cannot be trusted: " + e.getMessage(),
+                    List.of(HTTP_SIGNATURE));
         }
         Instant now = clock.instant().truncatedTo(ChronoUnit.SECONDS);
         ExchangeRequest request;

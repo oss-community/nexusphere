@@ -12,6 +12,7 @@
 * [Verify a Statement and Receipt](#verify-a-statement-and-receipt)
 * [Verify a Mandate](#verify-a-mandate)
 * [Present a Key-Bound Mandate](#present-a-key-bound-mandate)
+* [Check a Signed Request](#check-a-signed-request)
 * [Command Line](#command-line)
 * [Reference](#reference)
 * [Test](#test)
@@ -202,6 +203,26 @@ const check = await new MandateVerifier("http://localhost:8090", { audience: "ht
 console.log(check.valid, check.claims?.holderKey);
 ```
 
+## Check a Signed Request
+
+<p style="text-align: justify;">
+
+Every request the ledger forwards to an MCP server or an A2A agent carries an RFC 9421 HTTP message signature.
+`verifyRequest` checks it with the ledger's published keys and resolves to the key ID, `created` and `nonce`; it
+rejects with `InvalidHttpSignature` when the signature is missing, stale or does not match the method, address or
+body. `signRequest` makes the same headers.
+
+</p>
+
+```typescript
+import { JwksKeys, httpFetcher, verifyRequest } from "@nexusphere/ledger";
+
+const keys = new JwksKeys(httpFetcher());
+const verified = await verifyRequest("POST", "http://files-mcp:3000/mcp", request.headers, body,
+  (kid) => keys.resolve("http://localhost:8090", kid));
+console.log(verified.keyId, verified.nonce);
+```
+
 ## Command Line
 
 <p style="text-align: justify;">
@@ -235,6 +256,7 @@ npx nexusphere-ledger-verify mandate --issuer http://localhost:8090 --action a2a
 | `note`      | C2SP signed notes, note keys and `tlog-cosignature/v1` cosignatures                              |
 | `cose`      | `CoseSign1`, SCITT `EvidenceStatement` and RFC 9942 `LogReceipt`                                 |
 | `mandate`   | SD-JWT VC mandates, `MandateVerifier`, status lists and JWKs                                     |
+| `httpsig`   | RFC 9421 HTTP message signatures: `signRequest`, `verifyRequest`, `contentDigest`                |
 | `keys`      | Ed25519 keys, key IDs, key rotations and trusted keys from a pinned key                          |
 | `canonical` | Canonical JSON and SHA-256                                                                       |
 | `cbor`      | Deterministic CBOR, exported as `cbor`                                                           |

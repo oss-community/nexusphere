@@ -47,6 +47,9 @@ agent platforms and gateways.
   them with an SD-JWT key binding (KB-JWT) for the audience and the request body hash; the A2A gateway and the
   receiving ledger refuse a bound mandate without a valid key binding, and the verifiers in Java, Python and
   TypeScript check it, with a `mandate-key-binding.json` conformance vector
+* RFC 9421 HTTP message signatures with an RFC 9530 `Content-Digest` on every request the ledger sends to MCP
+  servers, peer ledgers and A2A agents; the receiving ledger requires them, and the Java, Python and TypeScript SDKs
+  sign and verify them, with an `http-signature.json` conformance vector
 * Browser verifier: one self-contained HTML page in React and TypeScript that verifies a package with the
   TypeScript SDK, pinned to the ledger key and optional witnesses, with a Content Security Policy that blocks every
   connection

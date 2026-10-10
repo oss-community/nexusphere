@@ -1,0 +1,15 @@
+{
+  "description" : "RFC 9421 HTTP message signature of an outbound request, signed with test key 1",
+  "method" : "POST",
+  "url" : "https://ledger.supplier.example/a2a/in/sales",
+  "body" : "{\"jsonrpc\":\"2.0\",\"id\":\"1\",\"method\":\"message/send\"}",
+  "keyId" : "06e3fd8fda29bb60",
+  "created" : 1790841600,
+  "nonce" : "c2lnbmF0dXJlLW5vbmNl",
+  "headers" : {
+    "Content-Digest" : "sha-256=:J5ADMGzC1HOdzr0zMO+g9eAsXJv5yEPKc6lRWCUkdvg=:",
+    "Signature-Input" : "nexusphere=(\"@method\" \"@authority\" \"@path\" \"content-digest\");created=1790841600;expires=1790841900;nonce=\"c2lnbmF0dXJlLW5vbmNl\";keyid=\"06e3fd8fda29bb60\";alg=\"ed25519\";tag=\"nexusphere-ledger\"",
+    "Signature" : "nexusphere=:buTaWUXE/3h2wCIFRT7OWe2BLf1qwyqqz+5uHPOwjK/X4BsVeQ2CoHxhnCAQzwfEFquoEZdqxEaNFsoI98xlAQ==:"
+  },
+  "signatureBase" : "\"@method\": POST\n\"@authority\": ledger.supplier.example\n\"@path\": /a2a/in/sales\n\"content-digest\": sha-256=:J5ADMGzC1HOdzr0zMO+g9eAsXJv5yEPKc6lRWCUkdvg=:\n\"@signature-params\": (\"@method\" \"@authority\" \"@path\" \"content-digest\");created=1790841600;expires=1790841900;nonce=\"c2lnbmF0dXJlLW5vbmNl\";keyid=\"06e3fd8fda29bb60\";alg=\"ed25519\";tag=\"nexusphere-ledger\""
+}

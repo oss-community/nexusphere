@@ -11,6 +11,7 @@ import com.nexusphere.ledger.chain.NoteKey;
 import com.nexusphere.ledger.chain.SignedCheckpoint;
 import com.nexusphere.ledger.chain.Signer;
 import com.nexusphere.ledger.chain.SigningKeys;
+import com.nexusphere.ledger.mandate.HttpSignatures;
 import com.nexusphere.ledger.mandate.Jws;
 import com.nexusphere.ledger.mandate.MandateClaims;
 import com.nexusphere.ledger.mandate.Mandates;
@@ -20,15 +21,20 @@ import com.nexusphere.ledger.server.web.LedgerException;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.support.TransactionTemplate;
 
+import java.net.URI;
 import java.security.PrivateKey;
+import java.security.SecureRandom;
 import java.time.Clock;
 import java.time.Instant;
+import java.util.Base64;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
 @Component
 public class LedgerSigner {
+
+    private static final SecureRandom RANDOM = new SecureRandom();
 
     private final SigningProvider provider;
     private final Signer signer;
@@ -119,6 +125,13 @@ public class LedgerSigner {
 
     public String sign(String type, Map<String, ?> payload) {
         return Jws.sign(type, publicKey.keyId(), payload, signer);
+    }
+
+    public Map<String, String> signHttp(String method, URI uri, byte[] body, Instant created) {
+        byte[] nonce = new byte[16];
+        RANDOM.nextBytes(nonce);
+        return HttpSignatures.sign(method, uri, body, publicKey.keyId(), signer, created,
+                Base64.getUrlEncoder().withoutPadding().encodeToString(nonce));
     }
 
     public SigningKeys.PublicKeyInfo publicKey() {

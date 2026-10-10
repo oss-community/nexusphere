@@ -1,5 +1,6 @@
 package com.nexusphere.ledger.a2a;
 
+import com.nexusphere.ledger.server.signing.LedgerSigner;
 import com.nexusphere.ledger.server.web.EventStream;
 import org.springframework.stereotype.Component;
 
@@ -9,6 +10,7 @@ import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
+import java.time.Clock;
 import java.time.Duration;
 import java.util.HashMap;
 import java.util.Map;
@@ -25,6 +27,13 @@ class A2aHttp {
 
     private final HttpClient http = HttpClient.newBuilder().connectTimeout(Duration.ofSeconds(10))
             .followRedirects(HttpClient.Redirect.NEVER).build();
+    private final LedgerSigner signer;
+    private final Clock clock;
+
+    A2aHttp(LedgerSigner signer, Clock clock) {
+        this.signer = signer;
+        this.clock = clock;
+    }
 
     Reply post(URI url, Duration timeout, Map<String, String> headers, byte[] body, String... wanted)
             throws IOException, InterruptedException {
@@ -37,6 +46,7 @@ class A2aHttp {
                 request.header(name, value);
             }
         });
+        signer.signHttp("POST", url, body, clock.instant()).forEach(request::header);
         HttpResponse<InputStream> response = http.send(request.build(), HttpResponse.BodyHandlers.ofInputStream());
         Map<String, String> found = new HashMap<>();
         for (String name : wanted) {
