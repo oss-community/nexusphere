@@ -138,4 +138,44 @@ class ComplianceTest {
         assertThatThrownBy(() -> new Compliance(ComplianceProfiles.select(available, List.of("ch", "eu")), "ch"))
                 .isInstanceOf(IllegalStateException.class).hasMessageContaining("no common region");
     }
+
+    @Test
+    void theShortestMaximumRetentionWinsAndMayNotUndercutAMinimum(@TempDir Path directory) throws IOException {
+        Files.writeString(directory.resolve("short.json"), """
+                {"id": "short", "version": 1, "name": "Short",
+                 "retention": [{"actions": "tools/*", "minimum": "P1M", "maximum": "P2Y"}]}
+                """);
+        Files.writeString(directory.resolve("shorter.json"), """
+                {"id": "shorter", "version": 1, "name": "Shorter",
+                 "retention": [{"actions": "*", "minimum": "P1M", "maximum": "P1Y"}]}
+                """);
+        Map<String, ComplianceProfile> available = ComplianceProfiles.available(json, directory);
+        Compliance compliance = new Compliance(ComplianceProfiles.select(available, List.of("short", "shorter")),
+                null);
+
+        assertThat(compliance.maximum("tools/call")).contains(Period.ofYears(1));
+        assertThat(compliance.shortestMaximum()).contains(Period.ofYears(1));
+        assertThat(compliance.retentionRules()).contains(new Compliance.Rule("tools/*", "P1M", "P1Y"));
+        assertThat(available.get("short").definition().toString()).contains("maximum=P2Y");
+        assertThat(builtIn.get("eu").definition().toString()).doesNotContain("maximum");
+        assertThatThrownBy(() -> new Compliance(ComplianceProfiles.select(available, List.of("shorter", "us")),
+                null)).isInstanceOf(IllegalStateException.class).hasMessageContaining("at most P1Y");
+    }
+
+    @Test
+    void aMaximumBelowItsMinimumOrAnUnknownRetentionFieldIsRefused(@TempDir Path directory) throws IOException {
+        Files.writeString(directory.resolve("bad.json"), """
+                {"id": "bad", "version": 1, "name": "Bad",
+                 "retention": [{"actions": "*", "minimum": "P1Y", "maximum": "P6M"}]}
+                """);
+        assertThatThrownBy(() -> ComplianceProfiles.available(json, directory))
+                .isInstanceOf(IllegalStateException.class).hasMessageContaining("no shorter than the minimum");
+
+        Files.writeString(directory.resolve("bad.json"), """
+                {"id": "bad", "version": 1, "name": "Bad",
+                 "retention": [{"actions": "*", "minimum": "P1Y", "maximun": "P2Y"}]}
+                """);
+        assertThatThrownBy(() -> ComplianceProfiles.available(json, directory))
+                .isInstanceOf(IllegalStateException.class).hasMessageContaining("retention.maximun");
+    }
 }

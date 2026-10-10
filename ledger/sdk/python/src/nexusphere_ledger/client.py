@@ -197,6 +197,18 @@ class LedgerClient:
     def erase_principal(self, principal_id: str, reason: Optional[str] = None) -> dict:
         return self._post("/api/v1/principals/" + _segment(principal_id) + "/erasure", _compact({"reason": reason}))
 
+    def place_legal_hold(self, principal_id: str, reason: str) -> dict:
+        return self._post("/api/v1/legal-holds", {"principalId": principal_id, "reason": reason})
+
+    def release_legal_hold(self, hold_id: str, reason: str) -> dict:
+        return self._post("/api/v1/legal-holds/" + _segment(hold_id) + "/release", {"reason": reason})
+
+    def legal_holds(self, active: bool = False) -> dict:
+        return self._get("/api/v1/legal-holds", active="true" if active else None)
+
+    def sweep_retention(self) -> dict:
+        return self._post("/api/v1/retention/sweep", {})
+
     def compliance(self) -> dict:
         return self._request("GET", "/public/v1/compliance")
 

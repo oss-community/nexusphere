@@ -43,7 +43,10 @@ public class ErasureService {
     }
 
     public record Erasure(UUID principalRef, long erasedEntries, long retainedEntries, Instant retainedUntil,
-                          boolean completed, UUID evidenceId) {
+                          boolean legalHold, boolean completed, UUID evidenceId) {
+    }
+
+    private record Pass(long erased, long retained, Instant retainedUntil) {
     }
 
     @Transactional
@@ -60,15 +63,84 @@ public class ErasureService {
             throw LedgerException.notFound("Evidence about the principal");
         }
         UUID ref = refs.getFirst();
-        Integer open = jdbc.queryForObject("""
-                select count(*) from ledger.grant_record
-                where principal_id = :principalId and status in ('ACTIVE', 'PENDING')
-                """, Map.of("principalId", principalId), Integer.class);
-        if (open != null && open > 0) {
+        int open = openGrants(principalId);
+        if (open > 0) {
             throw LedgerException.conflict("GRANTS_OPEN", "The principal still has " + open
                     + " active or pending grants; revoke or deny them first.");
         }
         Instant now = clock.instant();
+        boolean held = held(ref);
+        Pass pass = held ? retainAll(ref) : shred(ref, now);
+        boolean completed = !held && pass.retained() == 0;
+        jdbc.update("""
+                insert into ledger.principal_erasure (id, principal_ref, requested_at, reason, completed_at)
+                values (:id, :ref, :now, :reason, :completed)
+                """, new MapSqlParameterSource("id", UUID.randomUUID()).addValue("ref", ref)
+                .addValue("now", Timestamp.from(now)).addValue("reason", reason)
+                .addValue("completed", completed ? Timestamp.from(now) : null));
+        if (completed) {
+            complete(principalId, ref, now);
+        }
+        EvidenceEntry entry = record(ref, reason, pass, held, completed, now);
+        return new Erasure(ref, pass.erased(), pass.retained(), pass.retainedUntil(), held, completed, entry.id());
+    }
+
+    @Transactional
+    public List<Erasure> continuePending() {
+        repository.lockHead();
+        Instant now = clock.instant();
+        List<Erasure> done = new ArrayList<>();
+        for (Map<String, Object> row : jdbc.queryForList("""
+                select distinct e.principal_ref, k.principal_id from ledger.principal_erasure e
+                join ledger.principal_key k on k.principal_ref = e.principal_ref
+                where e.completed_at is null and k.principal_id is not null
+                and not exists (select 1 from ledger.legal_hold h
+                                where h.principal_ref = e.principal_ref and h.released_at is null)
+                """, Map.of())) {
+            UUID ref = (UUID) row.get("principal_ref");
+            String principalId = (String) row.get("principal_id");
+            Pass pass = shred(ref, now);
+            boolean completed = pass.retained() == 0 && openGrants(principalId) == 0;
+            if (pass.erased() == 0 && !completed) {
+                continue;
+            }
+            if (completed) {
+                jdbc.update("""
+                        update ledger.principal_erasure set completed_at = :now
+                        where principal_ref = :ref and completed_at is null
+                        """, Map.of("ref", ref, "now", Timestamp.from(now)));
+                complete(principalId, ref, now);
+            }
+            EvidenceEntry entry = record(ref, "retention ended", pass, false, completed, now);
+            done.add(new Erasure(ref, pass.erased(), pass.retained(), pass.retainedUntil(), false, completed,
+                    entry.id()));
+        }
+        return done;
+    }
+
+    boolean held(UUID ref) {
+        Integer holds = jdbc.queryForObject("""
+                select count(*) from ledger.legal_hold where principal_ref = :ref and released_at is null
+                """, Map.of("ref", ref), Integer.class);
+        return holds != null && holds > 0;
+    }
+
+    private int openGrants(String principalId) {
+        Integer open = jdbc.queryForObject("""
+                select count(*) from ledger.grant_record
+                where principal_id = :principalId and status in ('ACTIVE', 'PENDING')
+                """, Map.of("principalId", principalId), Integer.class);
+        return open == null ? 0 : open;
+    }
+
+    private Pass retainAll(UUID ref) {
+        Long count = jdbc.queryForObject("""
+                select count(*) from ledger.evidence_personal where principal_ref = :ref
+                """, Map.of("ref", ref), Long.class);
+        return new Pass(0, count == null ? 0 : count, null);
+    }
+
+    private Pass shred(UUID ref, Instant now) {
         List<UUID> erasable = new ArrayList<>();
         long retained = 0;
         Instant retainedUntil = null;
@@ -90,25 +162,22 @@ public class ErasureService {
         if (!erasable.isEmpty()) {
             jdbc.update("delete from ledger.evidence_personal where evidence_id in (:ids)", Map.of("ids", erasable));
         }
-        boolean completed = retained == 0;
-        jdbc.update("""
-                insert into ledger.principal_erasure (id, principal_ref, requested_at, reason, completed_at)
-                values (:id, :ref, :now, :reason, :completed)
-                """, new MapSqlParameterSource("id", UUID.randomUUID()).addValue("ref", ref)
-                .addValue("now", Timestamp.from(now)).addValue("reason", reason)
-                .addValue("completed", completed ? Timestamp.from(now) : null));
-        if (completed) {
-            complete(principalId, ref, now);
-        }
+        return new Pass(erasable.size(), retained, retainedUntil);
+    }
+
+    private EvidenceEntry record(UUID ref, String reason, Pass pass, boolean held, boolean completed, Instant now) {
         Map<String, String> attributes = new LinkedHashMap<>();
-        attributes.put("erasedEntries", Long.toString(erasable.size()));
-        attributes.put("retainedEntries", Long.toString(retained));
-        if (retainedUntil != null) {
-            attributes.put("retainedUntil", retainedUntil.toString());
+        attributes.put("erasedEntries", Long.toString(pass.erased()));
+        attributes.put("retainedEntries", Long.toString(pass.retained()));
+        if (pass.retainedUntil() != null) {
+            attributes.put("retainedUntil", pass.retainedUntil().toString());
         }
-        EvidenceEntry entry = evidence.record(new EvidenceSubmission(now, "ledger", "operator", ACTION,
-                "principal:" + ref, null, reason, null, null, null, Outcome.SUCCEEDED, null, attributes));
-        return new Erasure(ref, erasable.size(), retained, retainedUntil, completed, entry.id());
+        if (held) {
+            attributes.put("legalHold", "true");
+        }
+        attributes.put("completed", Boolean.toString(completed));
+        return evidence.record(new EvidenceSubmission(now, "ledger", "operator", ACTION, "principal:" + ref, null,
+                reason, null, null, null, Outcome.SUCCEEDED, null, attributes));
     }
 
     private void complete(String principalId, UUID ref, Instant now) {

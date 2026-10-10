@@ -60,6 +60,10 @@ agent platforms and gateways.
   deletes them past the retention of the active profiles and pseudonymizes the principal in grants, decisions,
   mandates and exchanges, while the chain, log, checkpoints and packages stay valid; format v2 replaces v1, so a
   ledger database with v1 evidence must be recreated
+* Retention and legal holds: a profile's retention rule can set a `maximum`, the ledger erases personal data past the
+  shortest maximum on a schedule and completes pending erasures once their retention ends, and a legal hold on a
+  principal stops both until it is released; holds, expiries and erasures are recorded as evidence, and the web UI
+  has a Privacy page for them
 * Browser verifier: one self-contained HTML page in React and TypeScript that verifies a package with the
   TypeScript SDK, pinned to the ledger key and optional witnesses, with a Content Security Policy that blocks every
   connection

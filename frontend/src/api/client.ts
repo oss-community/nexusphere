@@ -1,6 +1,6 @@
 import type {
-  Agent, Checkpoint, Evidence, Exchange, Grant, GrantDraft, Head, IssuedAgent, Mandate, OidcInfo, PackageReport,
-  Page, Principal, SigningKey, VerificationReport,
+  Agent, Checkpoint, Erasure, Evidence, Exchange, Grant, GrantDraft, Head, IssuedAgent, LegalHold, Mandate, OidcInfo,
+  PackageReport, Page, Principal, RetentionSweep, SigningKey, VerificationReport,
 } from './types'
 
 export class ApiError extends Error {
@@ -117,6 +117,26 @@ export class LedgerApi {
 
   exchange(id: string) {
     return this.request<Exchange>('GET', `/api/v1/a2a/exchanges/${id}`)
+  }
+
+  erasePrincipal(principalId: string, reason?: string) {
+    return this.request<Erasure>('POST', `/api/v1/principals/${encodeURIComponent(principalId)}/erasure`, { reason })
+  }
+
+  legalHolds(active: boolean) {
+    return this.request<{ items: LegalHold[] }>('GET', '/api/v1/legal-holds', undefined, { active: active ? 'true' : undefined })
+  }
+
+  placeLegalHold(principalId: string, reason: string) {
+    return this.request<LegalHold>('POST', '/api/v1/legal-holds', { principalId, reason })
+  }
+
+  releaseLegalHold(id: string, reason: string) {
+    return this.request<LegalHold>('POST', `/api/v1/legal-holds/${id}/release`, { reason })
+  }
+
+  sweepRetention() {
+    return this.request<RetentionSweep>('POST', '/api/v1/retention/sweep')
   }
 
   exportPackage(scope: { agentId?: string; principalId?: string; fromSequence?: number; toSequence?: number }) {

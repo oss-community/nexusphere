@@ -101,6 +101,11 @@ class LiveLedger(unittest.TestCase):
         recorded = self.agent.record(self.agent_id, principal, "tools/call", "SUCCEEDED", target="read_invoice",
                                      attributes={"note": "personal"})
         self.assertEqual("personal", self.operator.evidence(recorded["id"])["attributes"]["note"])
+        hold = self.operator.place_legal_hold(principal, "dispute")
+        self.assertIn(hold["id"], [h["id"] for h in self.operator.legal_holds(active=True)["items"]])
+        self.assertTrue(self.operator.erase_principal(principal)["legalHold"])
+        self.assertIsNotNone(self.operator.release_legal_hold(hold["id"], "settled")["releasedAt"])
+        self.operator.sweep_retention()
         erasure = self.operator.erase_principal(principal, "request of the principal")
         if not erasure["completed"]:
             self.skipTest("the active compliance profiles still retain the evidence")

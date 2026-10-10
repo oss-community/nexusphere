@@ -7,6 +7,7 @@ import com.nexusphere.ledger.chain.Hashes;
 import tools.jackson.databind.JsonNode;
 
 import java.net.URI;
+import java.time.LocalDate;
 import java.time.Period;
 import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
@@ -27,6 +28,8 @@ public record ComplianceProfile(String id, int version, String name, String desc
 
     private static final Set<String> KEYS = Set.of("id", "version", "name", "description", "retention", "erasure",
             "residency", "requiredFields", "timestampAuthorities", "reports");
+    private static final Set<String> RETENTION_KEYS = Set.of("actions", "minimum", "maximum");
+    private static final LocalDate REFERENCE = LocalDate.of(2000, 1, 1);
     private static final Pattern ID = Pattern.compile("[a-z0-9][a-z0-9-]{0,62}");
     private static final Pattern REGION = Pattern.compile("[a-z0-9][a-z0-9-]{0,31}");
     private static final Pattern REPORT = Pattern.compile("[a-z0-9][a-z0-9-]{0,62}");
@@ -72,7 +75,13 @@ public record ComplianceProfile(String id, int version, String name, String desc
         }
         List<Retention> retention = new ArrayList<>();
         for (JsonNode rule : array(node, "retention")) {
-            retention.add(new Retention(text(rule, "actions"), period(text(rule, "minimum"), "retention.minimum")));
+            for (String key : rule.propertyNames()) {
+                if (!RETENTION_KEYS.contains(key)) {
+                    throw new IllegalArgumentException("unknown field retention." + key);
+                }
+            }
+            retention.add(new Retention(text(rule, "actions"), period(text(rule, "minimum"), "retention.minimum"),
+                    rule.hasNonNull("maximum") ? period(text(rule, "maximum"), "retention.maximum") : null));
         }
         JsonNode erasure = node.path("erasure");
         Erasure erasureRule = erasure.isMissingNode() ? null : new Erasure(erasure.path("onRequest").asBoolean(false),
@@ -105,7 +114,7 @@ public record ComplianceProfile(String id, int version, String name, String desc
         return new Checkpoint.Profile(id, digest());
     }
 
-    public record Retention(String actions, Period minimum) {
+    public record Retention(String actions, Period minimum, Period maximum) {
 
         public Retention {
             if (actions == null || actions.isBlank()) {
@@ -114,6 +123,14 @@ public record ComplianceProfile(String id, int version, String name, String desc
             if (minimum == null || minimum.isNegative()) {
                 throw new IllegalArgumentException("retention.minimum must be a positive ISO-8601 period");
             }
+            if (maximum != null && (maximum.isNegative() || maximum.isZero()
+                    || REFERENCE.plus(maximum).isBefore(REFERENCE.plus(minimum)))) {
+                throw new IllegalArgumentException("retention.maximum must be a period no shorter than the minimum");
+            }
+        }
+
+        public Retention(String actions, Period minimum) {
+            this(actions, minimum, null);
         }
 
         public boolean covers(String action) {
@@ -124,6 +141,9 @@ public record ComplianceProfile(String id, int version, String name, String desc
             Map<String, Object> map = new LinkedHashMap<>();
             map.put("actions", actions);
             map.put("minimum", minimum.toString());
+            if (maximum != null) {
+                map.put("maximum", maximum.toString());
+            }
             return map;
         }
     }

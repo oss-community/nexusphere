@@ -24,7 +24,8 @@ same origin, so it needs no CORS on the ledger.
 
 * Operator pages: the ledger head, checkpoints and signing keys, full verification, evidence with filters and entry
   details, erased entries marked with their commitments, agents, grants with their mandates, evidence package export
-  and verification, and A2A exchanges
+  and verification, A2A exchanges, and a Privacy page to erase principals, place and release legal holds and run the
+  retention pass
 * Principal pages: sign-in with the ledger's OpenID Connect provider (authorization code with PKCE), the grants
   waiting for approval, approve, deny, revoke and create grants, and the evidence about the principal
 

@@ -181,3 +181,28 @@ export interface OidcInfo {
   issuer: string
   clientId: string
 }
+
+export interface Erasure {
+  principalRef: string
+  erasedEntries: number
+  retainedEntries: number
+  retainedUntil: string | null
+  legalHold: boolean
+  completed: boolean
+  evidenceId: string
+}
+
+export interface LegalHold {
+  id: string
+  principalRef: string
+  principalId: string | null
+  reason: string
+  placedAt: string
+  releasedAt: string | null
+  releaseReason: string | null
+}
+
+export interface RetentionSweep {
+  expiredEntries: number
+  erasures: Erasure[]
+}
