@@ -32,7 +32,7 @@ class ChainVerifierTest {
     static EvidenceEntry withAgent(EvidenceEntry e, String agentId) {
         return new EvidenceEntry(e.id(), e.sequence(), e.occurredAt(), e.recordedAt(), agentId, e.principalId(),
                 e.action(), e.target(), e.decision(), e.reason(), e.delegationId(), e.inputHash(), e.outputHash(),
-                e.outcome(), e.correlationId(), e.attributes(), e.previousHash(), e.hash());
+                e.outcome(), e.correlationId(), e.attributes(), e.salts(), null, e.previousHash(), e.hash());
     }
 
     @Test

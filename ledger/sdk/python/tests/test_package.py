@@ -6,7 +6,7 @@ from nexusphere_ledger import verify_package
 from nexusphere_ledger.evidence import Checkpoint
 from nexusphere_ledger.keys import KeyRevocation, KeyRotation, PrivateKey
 
-from .support import LEDGER_KEY, entries, key_record, package, witness_note_key
+from .support import LEDGER_KEY, entries, erase, key_record, package, witness_note_key
 
 PINNED = LEDGER_KEY.public_key.encoded
 
@@ -57,6 +57,17 @@ class PackageVerification(unittest.TestCase):
         report = verify_package(package(self.chain, {2}, scope=scope), PINNED)
         self.assertFalse(report.valid)
         self.assertIn("sequence 2: the disclosed entry is outside the scope of the package", report.problems)
+
+    def test_erased_entry_still_proves_its_place(self):
+        pkg = package(self.chain, {1, 3}, scope={"agentId": None, "principalId": "acme", "fromSequence": 1,
+                                                 "toSequence": 6})
+        pkg["links"][2]["entry"] = erase(self.chain[2])
+        report = verify_package(pkg, PINNED)
+        self.assertTrue(report.valid, report.problems)
+        self.assertEqual(2, report.disclosed_entries)
+        pkg["links"][2]["entry"]["commitments"]["target"] = "00" * 32
+        self.assertIn("sequence 3: the disclosed entry does not match its content hash",
+                      verify_package(pkg, PINNED).problems)
 
     def test_changed_entry(self):
         pkg = package(self.chain, {3})

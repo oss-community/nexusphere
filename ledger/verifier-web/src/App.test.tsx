@@ -2,7 +2,7 @@ import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { App } from './App'
 import { KeyRevocation, KeyRotation, PrivateKey } from '@nexusphere/ledger'
-import { LEDGER_KEY, buildPackage, entries, keyRecord, witnessNoteKey } from '../../sdk/typescript/test/support'
+import { LEDGER_KEY, buildPackage, entries, erase, keyRecord, witnessNoteKey } from '../../sdk/typescript/test/support'
 
 const PINNED = LEDGER_KEY.publicKey.encoded
 
@@ -34,6 +34,16 @@ describe('App', async () => {
     await user.click(screen.getByRole('button', { name: 'Verify' }))
     expect(await screen.findByTestId('verdict')).toHaveTextContent('VALID')
     expect(screen.getByRole('note')).toHaveTextContent('Not pinned')
+  })
+
+  it('marks erased entries and keeps the package valid', async () => {
+    const pkg = (await buildPackage(chain, [2, 3])) as any
+    pkg.links[2].entry = await erase(chain[2])
+    const user = await upload(pkg)
+    await user.type(screen.getByLabelText('Ledger public key'), PINNED)
+    await user.click(screen.getByRole('button', { name: 'Verify' }))
+    expect(await screen.findByTestId('verdict')).toHaveTextContent('VALID')
+    expect(screen.getAllByText('erased')).toHaveLength(2)
   })
 
   it('shows the problems of a changed package', async () => {

@@ -212,6 +212,15 @@ chain and checkpoint and still refused changes to evidence.
 
 </p>
 
+<p style="text-align: justify;">
+
+A backup also holds the encrypted personal data and the principal keys that an [erasure](../ledger/README.md#erasure)
+destroys in the live database. Keep backups and WAL archives no longer than the shortest erasure deadline of your
+compliance profiles, one month with `eu`, so an erased principal is gone from every copy in time. A restore from an
+older backup brings back principals erased since then: erase them again before the ledger serves anyone.
+
+</p>
+
 ### No Lost Evidence
 
 <p style="text-align: justify;">
@@ -349,7 +358,8 @@ to the internet, since it can also stop floods before they reach Java.
 * A signing key generated for this ledger, with an offline copy, or a non-exportable Vault transit key
 * TLS at a reverse proxy or ingress in front of the ledger; it speaks plain HTTP
 * Management port reachable only inside the cluster
-* WAL archiving with point-in-time recovery, plus a regular logical dump, and a restore tested once
+* WAL archiving with point-in-time recovery, plus a regular logical dump, and a restore tested once, kept no longer
+  than the erasure deadline of your profiles
 * Signed checkpoints copied outside the ledger, and at least one independent witness cosigning the log
 * Prometheus scraping the ledger, and at least one alert channel on
 * Rate limits sized for the expected traffic, plus a limit at the reverse proxy for internet-facing deployments

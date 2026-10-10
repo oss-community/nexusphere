@@ -296,6 +296,10 @@ export class LedgerClient {
     return new TextDecoder().decode(await this.bytes("/public/v1/witness/key")).trim();
   }
 
+  erasePrincipal(principalId: string, reason?: string): Promise<Json> {
+    return this.post(`/api/v1/principals/${encodeURIComponent(principalId)}/erasure`, compact({ reason }));
+  }
+
   compliance(): Promise<Json> {
     return this.get("/public/v1/compliance");
   }

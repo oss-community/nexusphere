@@ -5,6 +5,7 @@ import {
   EvidenceLink,
   EvidenceStatement,
   LedgerClient,
+  Json,
   LedgerError,
   LogReceipt,
   MandateVerifier,
@@ -139,6 +140,31 @@ describe.skipIf(!URL)("a running ledger", async () => {
     expect(check.problems).toEqual([]);
     const replaced = await client.setSigningKey(keyedId, (await PrivateKey.generate()).publicKey).catch((e) => e);
     expect(replaced).toMatchObject({ status: 403 });
+  });
+
+  it("erases a principal and keeps the chain", async (context) => {
+    const principal = "erase-" + Math.random().toString(16).slice(2, 10);
+    const recorded = await agent.record({
+      agentId,
+      principalId: principal,
+      action: "tools/call",
+      outcome: "SUCCEEDED",
+      target: "read_invoice",
+      attributes: { note: "personal" },
+    });
+    expect(((await operator.evidence(recorded.id as string)).attributes as Json).note).toBe("personal");
+    const erasure = await operator.erasePrincipal(principal, "request of the principal");
+    if (!erasure.completed) {
+      context.skip();
+    }
+    expect(erasure.erasedEntries).toBe(1);
+    const erased = await operator.evidence(recorded.id as string);
+    expect(erased).toMatchObject({ erased: true, principalId: null, hash: recorded.hash });
+    expect((await operator.listEvidence({ principalId: principal })).items).toEqual([]);
+    await operator.createCheckpoint();
+    const report = await verifyPackage(await operator.exportPackage({ agentId }), await operator.activePublicKey());
+    expect(report.problems).toEqual([]);
+    expect(await operator.erasePrincipal(principal).catch((e) => e)).toMatchObject({ status: 404 });
   });
 
   it("raises ledger errors", async () => {

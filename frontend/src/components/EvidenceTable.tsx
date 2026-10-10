@@ -29,9 +29,9 @@ export function EvidenceTable({ items }: { items: Evidence[] }) {
               <td>{e.sequence}</td>
               <td><Time value={e.recordedAt} /></td>
               <td>{e.agentId}</td>
-              <td>{e.principalId ?? '-'}</td>
+              <td>{e.erased ? <em>erased</em> : (e.principalId ?? '-')}</td>
               <td>{e.action}</td>
-              <td>{e.target ?? '-'}</td>
+              <td>{e.erased ? <em>erased</em> : (e.target ?? '-')}</td>
               <td><Badge value={e.decision} /></td>
               <td><Badge value={e.outcome} /></td>
               <td><Hash value={e.hash} /></td>
@@ -52,6 +52,14 @@ export function EvidenceTable({ items }: { items: Evidence[] }) {
                     {Object.entries(e.attributes ?? {}).map(([key, value]) => (
                       <Fragment key={key}><dt>{key}</dt><dd><code>{value}</code></dd></Fragment>
                     ))}
+                    {e.erased && (
+                      <>
+                        <dt>Erased</dt><dd>The personal fields were erased; their commitments keep the hash.</dd>
+                        {Object.entries(e.commitments ?? {}).map(([key, value]) => (
+                          <Fragment key={key}><dt>{key}</dt><dd><code>{value}</code></dd></Fragment>
+                        ))}
+                      </>
+                    )}
                   </dl>
                 </td>
               </tr>

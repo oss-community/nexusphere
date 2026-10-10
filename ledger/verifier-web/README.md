@@ -64,8 +64,8 @@ Step 3. Choose or drop `package.json`, paste the public key, and add witness key
 cosignatures. To apply key revocations, also choose the key list saved from `GET /api/v1/keys`.
 
 Step 4. Press Verify; the page must show `VALID` with the signing key, the checkpoint, the log, the proofs and the
-disclosed entries. Change one character of an entry in the file and verify again; the page must show `INVALID` and
-name the entry.
+disclosed entries, with `erased` in place of the principal and target of an entry whose personal fields were erased.
+Change one character of an entry in the file and verify again; the page must show `INVALID` and name the entry.
 
 <p style="text-align: justify;">
 

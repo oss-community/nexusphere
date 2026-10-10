@@ -1,10 +1,12 @@
+import base64
+import hashlib
 import json
 import os
 from pathlib import Path
 
 from nexusphere_ledger import merkle
 from nexusphere_ledger.cose import EvidenceStatement, LogReceipt
-from nexusphere_ledger.evidence import GENESIS, Checkpoint, content_hash, link_hash
+from nexusphere_ledger.evidence import GENESIS, Checkpoint, commitments, content_hash, link_hash
 from nexusphere_ledger.keys import PrivateKey
 from nexusphere_ledger.note import COSIGNATURE, ED25519, LogCheckpoint, NoteKey, cosign
 
@@ -32,8 +34,7 @@ def entries(count: int, agents=("invoice-agent", "sales-agent"), principals=("ac
     for index in range(count):
         sequence = index + 1
         entry = {
-            "format": "nexusphere-ledger/evidence/v1",
-            "id": "00000000-0000-4000-8000-%012d" % sequence,
+                        "id": "00000000-0000-4000-8000-%012d" % sequence,
             "sequence": sequence,
             "occurredAt": "2026-10-01T08:00:%02d.123456Z" % index,
             "recordedAt": "2026-10-01T08:00:%02d.128456Z" % index,
@@ -51,10 +52,22 @@ def entries(count: int, agents=("invoice-agent", "sales-agent"), principals=("ac
             "attributes": {"tool": "read_invoice"},
             "previousHash": previous,
         }
+        entry["salts"] = salts(sequence, ("principalId", "target", "reason", "correlationId", "attributes.tool"))
         entry["hash"] = link_hash(sequence, previous, content_hash(entry))
         previous = entry["hash"]
         chain.append(entry)
     return chain
+
+
+def salts(sequence: int, fields) -> dict:
+    return {field: base64.urlsafe_b64encode(hashlib.sha256(("salt/%d/%s" % (sequence, field)).encode())
+                                            .digest()[:16]).rstrip(b"=").decode("ascii") for field in fields}
+
+
+def erase(entry: dict) -> dict:
+    erased = dict(entry, principalId=None, target=None, reason=None, correlationId=None, attributes={}, salts=None)
+    erased["commitments"] = commitments(entry)
+    return erased
 
 
 def checkpoint(sequence: int, head_hash: str, key: PrivateKey = LEDGER_KEY,

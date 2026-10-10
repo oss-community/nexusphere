@@ -151,7 +151,9 @@ Pass `{ witnesses: [verifierKey], requiredWitnesses: 1 }` as the third argument 
 [Ledger README](../../README.md#key-revocation) describes; the command takes it as `--keys keys.json`. The report has
 the same fields as the Java `PackageReport`. `report.complianceProfiles` lists the id and digest of each
 [compliance profile](../../README.md#compliance-profiles) the checkpoint signs, and `client.compliance()` returns the
-active profiles and their combined rules from the ledger.
+active profiles and their combined rules from the ledger. An entry whose personal fields were
+[erased](../../README.md#erasure) still verifies from its commitments, and `client.erasePrincipal(principalId, reason)`
+asks the ledger to erase a principal.
 
 </p>
 
@@ -253,7 +255,7 @@ npx nexusphere-ledger-verify mandate --issuer http://localhost:8090 --action a2a
 |-------------|--------------------------------------------------------------------------------------------------|
 | `client`    | `LedgerClient` for evidence, batches, decisions, `act`, grants, mandates, packages, keys, proofs |
 | `package`   | `verifyPackage` and `PackageReport`                                                              |
-| `evidence`  | Content and link hashes, `ChainVerifier`, `Checkpoint` with its compliance profiles              |
+| `evidence`  | Content and link hashes, commitments, `ChainVerifier`, `Checkpoint` with its compliance profiles |
 | `merkle`    | RFC 9162 roots, inclusion and consistency proofs, exported as `merkle`                           |
 | `note`      | C2SP signed notes, note keys and `tlog-cosignature/v1` cosignatures                              |
 | `cose`      | `CoseSign1`, SCITT `EvidenceStatement` and RFC 9942 `LogReceipt`                                 |

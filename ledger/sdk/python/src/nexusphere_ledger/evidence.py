@@ -1,3 +1,5 @@
+import base64
+import os
 import re
 import uuid
 from dataclasses import dataclass
@@ -7,15 +9,16 @@ from .canonical import canonical_bytes, sha256_hex
 from .keys import PrivateKey, PublicKey
 from .timestamps import format_instant
 
-FORMAT = "nexusphere-ledger/evidence/v1"
+FORMAT = "nexusphere-ledger/evidence/v2"
 CHECKPOINT_FORMAT = "nexusphere-ledger/checkpoint/v1"
 CHECKPOINT_FORMAT_WITH_PROFILES = "nexusphere-ledger/checkpoint/v2"
 GENESIS = "0" * 64
 
 _SHA256_HEX = re.compile(r"^[0-9a-f]{64}$")
 
-CONTENT_FIELDS = ("agentId", "principalId", "action", "target", "decision", "reason", "delegationId", "inputHash",
-                  "outputHash", "outcome", "correlationId")
+CONTENT_FIELDS = ("agentId", "action", "decision", "delegationId", "inputHash", "outputHash", "outcome")
+PERSONAL_FIELDS = ("principalId", "target", "reason", "correlationId")
+ATTRIBUTE = "attributes."
 
 
 def is_sha256(value) -> bool:
@@ -32,8 +35,43 @@ def canonical_content(entry: dict) -> dict:
     for field in CONTENT_FIELDS:
         value = entry.get(field)
         content[field] = value if isinstance(value, str) else None
-    content["attributes"] = {key: _text(value) for key, value in (entry.get("attributes") or {}).items()}
+    content["commitments"] = commitments(entry)
     return content
+
+
+def personal_values(entry: dict) -> dict:
+    values = {field: _nullable_text(entry.get(field)) for field in PERSONAL_FIELDS}
+    for name, value in (entry.get("attributes") or {}).items():
+        values[ATTRIBUTE + name] = _nullable_text(value)
+    return values
+
+
+def commitment(field: str, salt: str, value) -> str:
+    return sha256_hex(canonical_bytes({"field": field, "salt": salt, "value": value}))
+
+
+def commitments(entry: dict) -> dict:
+    salts = entry.get("salts")
+    if not isinstance(salts, dict):
+        if any(entry.get(field) is not None for field in PERSONAL_FIELDS) or entry.get("attributes"):
+            raise ValueError("an erased entry has no personal values")
+        stored = entry.get("commitments")
+        if not isinstance(stored, dict) or not all(is_sha256(value) for value in stored.values()):
+            raise ValueError("commitments is missing")
+        return dict(stored)
+    values = personal_values(entry)
+    if set(salts) != set(values):
+        raise ValueError("the salts must cover exactly " + ", ".join(sorted(values)))
+    return {field: commitment(field, _required(salts, field), value) for field, value in values.items()}
+
+
+def new_salts(attributes=None) -> dict:
+    fields = list(PERSONAL_FIELDS) + [ATTRIBUTE + name for name in (attributes or {})]
+    return {field: base64.urlsafe_b64encode(os.urandom(16)).rstrip(b"=").decode("ascii") for field in fields}
+
+
+def erased(entry: dict) -> bool:
+    return not isinstance(entry.get("salts"), dict)
 
 
 def content_hash(entry: dict) -> str:
@@ -185,6 +223,10 @@ def _long(value) -> int:
     if isinstance(value, bool) or not isinstance(value, (int, float)):
         return 0
     return int(value)
+
+
+def _nullable_text(value):
+    return None if value is None else _text(value)
 
 
 def _text(value) -> str:

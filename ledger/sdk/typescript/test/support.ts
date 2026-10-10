@@ -13,11 +13,13 @@ import {
   LogReceipt,
   NoteKey,
   PrivateKey,
+  commitments,
   contentHash,
   cosign,
   fromHex,
   linkHash,
   merkle,
+  sha256,
   toBase64,
 } from "../src/index.js";
 
@@ -50,7 +52,6 @@ export async function entries(count: number, agents = ["invoice-agent", "sales-a
     const sequence = index + 1;
     const second = String(index).padStart(2, "0");
     const entry: Json = {
-      format: "nexusphere-ledger/evidence/v1",
       id: "00000000-0000-4000-8000-" + String(sequence).padStart(12, "0"),
       sequence,
       occurredAt: `2026-10-01T08:00:${second}.123456Z`,
@@ -69,11 +70,34 @@ export async function entries(count: number, agents = ["invoice-agent", "sales-a
       attributes: { tool: "read_invoice" },
       previousHash: previous,
     };
+    entry.salts = await salts(sequence, ["principalId", "target", "reason", "correlationId", "attributes.tool"]);
     entry.hash = await linkHash(sequence, previous, await contentHash(entry));
     previous = entry.hash as string;
     chain.push(entry);
   }
   return chain;
+}
+
+export async function salts(sequence: number, fields: string[]): Promise<Record<string, string>> {
+  const result: Record<string, string> = {};
+  for (const field of fields) {
+    const digest = await sha256(`salt/${sequence}/${field}`);
+    result[field] = toBase64(digest.slice(0, 16)).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+  }
+  return result;
+}
+
+export async function erase(entry: Json): Promise<Json> {
+  return {
+    ...entry,
+    principalId: null,
+    target: null,
+    reason: null,
+    correlationId: null,
+    attributes: {},
+    salts: null,
+    commitments: await commitments(entry),
+  };
 }
 
 export async function checkpoint(sequence: number, headHash: string, key = LEDGER_KEY) {

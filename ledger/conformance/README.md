@@ -36,7 +36,7 @@ use them for real evidence.
 |------------------------------|-------------------------------------------------------------------------------------------------------------------|
 | `keys.json`                  | Seeds, PKCS#8 and X.509 keys, the key ID and the C2SP verifier keys of the log and the witness                    |
 | `canonical-json.json`        | An object and its canonical JSON with sorted keys, no whitespace and escaped text, and its SHA-256                |
-| `evidence-chain.json`        | Three entries with canonical content, content hash and link hash, and a signed checkpoint of the head             |
+| `evidence-chain.json`        | Three entries with values, salts, commitments, canonical content and hashes, and a signed head checkpoint         |
 | `merkle-tree.json`           | RFC 9162 roots, inclusion proofs and consistency proofs for every size up to 8                                    |
 | `signed-note.json`           | The C2SP signed-note log checkpoint over the three entries and its `tlog-cosignature/v1` cosignature              |
 | `key-history.json`           | A rotation from test key 1 to test key 2, and the revocation of key 1 signed by key 2                             |

@@ -194,6 +194,9 @@ class LedgerClient:
     def witness_key(self) -> str:
         return self._request("GET", "/public/v1/witness/key", raw=True).decode("utf-8").strip()
 
+    def erase_principal(self, principal_id: str, reason: Optional[str] = None) -> dict:
+        return self._post("/api/v1/principals/" + _segment(principal_id) + "/erasure", _compact({"reason": reason}))
+
     def compliance(self) -> dict:
         return self._request("GET", "/public/v1/compliance")
 

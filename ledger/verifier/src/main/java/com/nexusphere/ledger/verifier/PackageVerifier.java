@@ -268,17 +268,23 @@ public final class PackageVerifier {
     }
 
     public static EvidenceEntry entry(JsonNode node) {
-        TreeMap<String, String> attributes = new TreeMap<>();
-        for (Map.Entry<String, JsonNode> e : node.path("attributes").properties()) {
-            attributes.put(e.getKey(), e.getValue().asString());
-        }
+        TreeMap<String, String> salts = node.path("salts").isObject() ? strings(node.path("salts")) : null;
+        TreeMap<String, String> commitments = salts == null ? strings(node.path("commitments")) : null;
         return new EvidenceEntry(UUID.fromString(text(node, "id")), node.path("sequence").asLong(),
                 Instant.parse(text(node, "occurredAt")), Instant.parse(text(node, "recordedAt")),
                 nullable(node, "agentId"), nullable(node, "principalId"), nullable(node, "action"),
                 nullable(node, "target"), nullable(node, "decision"), nullable(node, "reason"),
                 nullable(node, "delegationId"), nullable(node, "inputHash"), nullable(node, "outputHash"),
-                nullable(node, "outcome"), nullable(node, "correlationId"), attributes,
-                text(node, "previousHash"), text(node, "hash"));
+                nullable(node, "outcome"), nullable(node, "correlationId"), strings(node.path("attributes")), salts,
+                commitments, text(node, "previousHash"), text(node, "hash"));
+    }
+
+    private static TreeMap<String, String> strings(JsonNode node) {
+        TreeMap<String, String> values = new TreeMap<>();
+        for (Map.Entry<String, JsonNode> e : node.properties()) {
+            values.put(e.getKey(), e.getValue().isNull() ? null : e.getValue().asString());
+        }
+        return values;
     }
 
     private static String disclosedMismatch(JsonNode node, EvidenceLink link, String agentId, String principalId,
@@ -298,7 +304,7 @@ public final class PackageVerifier {
         }
         if (entry.sequence() < from || entry.sequence() > to
                 || agentId != null && !agentId.equals(entry.agentId())
-                || principalId != null && !principalId.equals(entry.principalId())) {
+                || principalId != null && !entry.erased() && !principalId.equals(entry.principalId())) {
             return "the disclosed entry is outside the scope of the package";
         }
         return null;

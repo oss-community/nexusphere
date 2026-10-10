@@ -78,6 +78,9 @@ class PackageVerifierTest {
                 .put("target", e.target()).put("decision", e.decision()).put("outcome", e.outcome())
                 .put("previousHash", e.previousHash()).put("hash", e.hash());
         node.putObject("attributes");
+        node.put("erased", false);
+        node.set("salts", JSON.valueToTree(e.salts()));
+        node.set("commitments", JSON.valueToTree(e.commitments()));
         return node;
     }
 
@@ -113,6 +116,24 @@ class PackageVerifierTest {
 
         assertThat(PackageVerifier.verify(pkg, SigningKeys.encode(KEYS.getPublic())).problems())
                 .anyMatch(p -> p.contains("signature of checkpoint 3"));
+    }
+
+    @Test
+    void anErasedEntryStillProvesItsPlaceInTheChain() {
+        ObjectNode pkg = pkg(4, 2);
+        ObjectNode entry = (ObjectNode) pkg.path("links").get(1).path("entry");
+        entry.putNull("principalId").putNull("target").put("erased", true).putNull("salts");
+        entry.putObject("attributes");
+
+        PackageReport report = PackageVerifier.verify(pkg, SigningKeys.encode(KEYS.getPublic()));
+
+        assertThat(report.problems()).isEmpty();
+        assertThat(report.disclosedEntries()).isEqualTo(1);
+
+        ((ObjectNode) entry.path("commitments")).put("principalId", Hashes.sha256(new byte[]{9}));
+
+        assertThat(PackageVerifier.verify(pkg, null).problems())
+                .anyMatch(p -> p.contains("sequence 2") && p.contains("content hash"));
     }
 
     @Test

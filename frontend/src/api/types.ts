@@ -21,6 +21,9 @@ export interface Evidence {
   outcome: string
   correlationId: string | null
   attributes: Record<string, string>
+  erased: boolean
+  salts: Record<string, string> | null
+  commitments: Record<string, string>
   previousHash: string
   hash: string
 }

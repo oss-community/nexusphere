@@ -46,6 +46,8 @@ transit key signs, and `KeyRevocationE2ETest` adds a witness `StandaloneLedger` 
 checkpoints of a revoked key came before its compromise.
 `ComplianceE2ETest` restarts a `StandaloneLedger` with different compliance profiles and regions against one
 PostgreSQL container, so profile changes are recorded once and a disallowed region stops the start.
+`ErasureE2ETest` erases principals on the shared ledger and on a `StandaloneLedger` with the `us` profile, whose
+retention keeps recent entries.
 `WitnessE2ETest` starts two `StandaloneLedger`s with their own PostgreSQL containers: one is the log and asks the
 other, which watches it, to cosign its log checkpoints over the C2SP witness protocol.
 
@@ -64,6 +66,9 @@ other, which watches it, to cosign its log checkpoints over the C2SP witness pro
 | `VerificationE2ETest`     | The ledger verifies its own chain and checkpoints                             |
 |                           | A checkpoint is verified offline with the published key                       |
 |                           | An outsider rebuilds and verifies the whole chain from the API                |
+| `ErasureE2ETest`          | Erasing a principal removes its personal data and keeps the chain             |
+|                           | Open grants block the erasure and are then pseudonymized                      |
+|                           | The retention of the profiles keeps recent entries                            |
 | `PackageE2ETest`          | A package discloses only the requested evidence and verifies offline          |
 |                           | A package starts at the last checkpoint before the evidence                   |
 |                           | Any change to a package is detected                                           |

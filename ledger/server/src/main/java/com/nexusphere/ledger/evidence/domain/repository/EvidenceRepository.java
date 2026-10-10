@@ -21,6 +21,8 @@ public interface EvidenceRepository {
 
     Optional<EvidenceEntry> findBySequence(long sequence);
 
+    Optional<EvidenceEntry> latestByAction(String action);
+
     List<EvidenceEntry> find(EvidenceQuery query);
 
     List<EvidenceEntry> range(long afterSequence, int limit);

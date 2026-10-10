@@ -96,6 +96,28 @@ class LiveLedger(unittest.TestCase):
             agent.set_signing_key(agent_id, PrivateKey.generate().public_key)
         self.assertEqual(403, error.exception.status)
 
+    def test_erase_principal(self):
+        principal = "erase-" + uuid.uuid4().hex[:8]
+        recorded = self.agent.record(self.agent_id, principal, "tools/call", "SUCCEEDED", target="read_invoice",
+                                     attributes={"note": "personal"})
+        self.assertEqual("personal", self.operator.evidence(recorded["id"])["attributes"]["note"])
+        erasure = self.operator.erase_principal(principal, "request of the principal")
+        if not erasure["completed"]:
+            self.skipTest("the active compliance profiles still retain the evidence")
+        self.assertEqual(1, erasure["erasedEntries"])
+        erased = self.operator.evidence(recorded["id"])
+        self.assertTrue(erased["erased"])
+        self.assertIsNone(erased["principalId"])
+        self.assertEqual(recorded["hash"], erased["hash"])
+        self.assertEqual([], self.operator.list_evidence(principal_id=principal)["items"])
+        self.operator.create_checkpoint()
+        report = verify_package(self.operator.export_package(agent_id=self.agent_id),
+                                self.operator.active_public_key())
+        self.assertTrue(report.valid, report.problems)
+        with self.assertRaises(LedgerError) as error:
+            self.operator.erase_principal(principal)
+        self.assertEqual(404, error.exception.status)
+
     def test_errors(self):
         with self.assertRaises(LedgerError) as error:
             self.agent.record(self.agent_id, None, "tools/call", "SUCCEEDED")

@@ -23,7 +23,8 @@ same origin, so it needs no CORS on the ledger.
 ## Responsibilities
 
 * Operator pages: the ledger head, checkpoints and signing keys, full verification, evidence with filters and entry
-  details, agents, grants with their mandates, evidence package export and verification, and A2A exchanges
+  details, erased entries marked with their commitments, agents, grants with their mandates, evidence package export
+  and verification, and A2A exchanges
 * Principal pages: sign-in with the ledger's OpenID Connect provider (authorization code with PKCE), the grants
   waiting for approval, approve, deny, revoke and create grants, and the evidence about the principal
 

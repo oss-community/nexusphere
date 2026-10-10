@@ -197,9 +197,9 @@ function Result({ verification }: { verification: Verification }) {
                   <td>{entry.sequence}</td>
                   <td>{entry.occurredAt}</td>
                   <td>{entry.agentId}</td>
-                  <td>{entry.principalId}</td>
+                  <td>{entry.erased ? <em>erased</em> : entry.principalId}</td>
                   <td>{entry.action}</td>
-                  <td>{entry.target ?? ''}</td>
+                  <td>{entry.erased ? <em>erased</em> : (entry.target ?? '')}</td>
                   <td>{entry.decision ?? ''}</td>
                   <td>{entry.outcome}</td>
                 </tr>

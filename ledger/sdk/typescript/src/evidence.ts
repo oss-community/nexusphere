@@ -2,7 +2,7 @@ import { canonicalBytes, sha256Hex } from "./canonical.js";
 import { PrivateKey, PublicKey } from "./keys.js";
 import { formatInstant } from "./timestamps.js";
 
-export const FORMAT = "nexusphere-ledger/evidence/v1";
+export const FORMAT = "nexusphere-ledger/evidence/v2";
 export const CHECKPOINT_FORMAT = "nexusphere-ledger/checkpoint/v1";
 export const CHECKPOINT_FORMAT_WITH_PROFILES = "nexusphere-ledger/checkpoint/v2";
 
@@ -14,17 +14,16 @@ export const GENESIS = "0".repeat(64);
 
 export const CONTENT_FIELDS = [
   "agentId",
-  "principalId",
   "action",
-  "target",
   "decision",
-  "reason",
   "delegationId",
   "inputHash",
   "outputHash",
   "outcome",
-  "correlationId",
 ] as const;
+
+export const PERSONAL_FIELDS = ["principalId", "target", "reason", "correlationId"] as const;
+export const ATTRIBUTE = "attributes.";
 
 const UUID = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
 
@@ -34,7 +33,7 @@ export function isSha256(value: unknown): boolean {
   return typeof value === "string" && /^[0-9a-f]{64}$/.test(value);
 }
 
-export function canonicalContent(entry: Json): Json {
+export async function canonicalContent(entry: Json): Promise<Json> {
   const id = required(entry, "id");
   if (!UUID.test(id)) {
     throw new Error("id is not a UUID");
@@ -49,19 +48,77 @@ export function canonicalContent(entry: Json): Json {
     const value = entry[field];
     content[field] = typeof value === "string" ? value : null;
   }
-  const attributes: Record<string, string> = {};
-  const given = entry.attributes;
-  if (given && typeof given === "object") {
-    for (const [key, value] of Object.entries(given as Json)) {
-      attributes[key] = text(value);
-    }
-  }
-  content.attributes = attributes;
+  content.commitments = await commitments(entry);
   return content;
 }
 
-export function contentHash(entry: Json): Promise<string> {
-  return sha256Hex(canonicalBytes(canonicalContent(entry)));
+export async function contentHash(entry: Json): Promise<string> {
+  return sha256Hex(canonicalBytes(await canonicalContent(entry)));
+}
+
+export function personalValues(entry: Json): Record<string, string | null> {
+  const values: Record<string, string | null> = {};
+  for (const field of PERSONAL_FIELDS) {
+    values[field] = nullableText(entry[field]);
+  }
+  const given = entry.attributes;
+  if (given && typeof given === "object") {
+    for (const [name, value] of Object.entries(given as Json)) {
+      values[ATTRIBUTE + name] = nullableText(value);
+    }
+  }
+  return values;
+}
+
+export function commitment(field: string, salt: string, value: string | null): Promise<string> {
+  return sha256Hex(canonicalBytes({ field, salt, value }));
+}
+
+export function erased(entry: Json): boolean {
+  return !isObject(entry.salts);
+}
+
+export async function commitments(entry: Json): Promise<Record<string, string>> {
+  if (erased(entry)) {
+    const attributes = entry.attributes;
+    if (PERSONAL_FIELDS.some((field) => entry[field] !== null && entry[field] !== undefined)
+      || (isObject(attributes) && Object.keys(attributes).length > 0)) {
+      throw new Error("an erased entry has no personal values");
+    }
+    const stored = entry.commitments;
+    if (!isObject(stored) || !Object.values(stored).every(isSha256)) {
+      throw new Error("commitments is missing");
+    }
+    return { ...(stored as Record<string, string>) };
+  }
+  const salts = entry.salts as Json;
+  const values = personalValues(entry);
+  const fields = Object.keys(values).sort();
+  if (fields.join("\n") !== Object.keys(salts).sort().join("\n")) {
+    throw new Error("the salts must cover exactly " + fields.join(", "));
+  }
+  const result: Record<string, string> = {};
+  for (const field of fields) {
+    result[field] = await commitment(field, required(salts, field), values[field]);
+  }
+  return result;
+}
+
+export function newSalts(attributes: Record<string, unknown> = {}): Record<string, string> {
+  const salts: Record<string, string> = {};
+  for (const field of [...PERSONAL_FIELDS, ...Object.keys(attributes).map((name) => ATTRIBUTE + name)]) {
+    const bytes = crypto.getRandomValues(new Uint8Array(16));
+    salts[field] = btoa(String.fromCharCode(...bytes)).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+  }
+  return salts;
+}
+
+function isObject(value: unknown): value is Json {
+  return value !== null && typeof value === "object" && !Array.isArray(value);
+}
+
+function nullableText(value: unknown): string | null {
+  return value === null || value === undefined ? null : text(value);
 }
 
 export function linkHash(sequence: number, previousHash: string, contentHash: string): Promise<string> {
