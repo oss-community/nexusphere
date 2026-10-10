@@ -11,8 +11,10 @@ import com.nexusphere.ledger.server.config.LedgerProperties;
 import com.nexusphere.ledger.server.security.Caller;
 import com.nexusphere.ledger.server.web.EventStream;
 import com.nexusphere.ledger.server.web.LedgerException;
+import com.nexusphere.ledger.server.web.ModelFields;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.http.HttpHeaders;
 import org.springframework.stereotype.Service;
 import tools.jackson.core.JacksonException;
 import tools.jackson.databind.JsonNode;
@@ -55,7 +57,7 @@ class McpGateway {
     }
 
     GatewayResponse post(Caller caller, String serverName, String principalId, String sessionId,
-                         String protocolVersion, boolean acceptsStream, byte[] body) {
+                         String protocolVersion, boolean acceptsStream, HttpHeaders headers, byte[] body) {
         LedgerProperties.Mcp.Server server = server(serverName);
         JsonNode message;
         try {
@@ -83,7 +85,7 @@ class McpGateway {
         try {
             decision = decisions.decide(new DecisionRequest(caller.agentId(), principalId, TOOLS_CALL,
                     serverName + "/" + tool, Hashes.sha256(body), correlation(sessionId),
-                    Map.of("mcp.server", serverName, "mcp.tool", truncate(tool, 1024))));
+                    Map.of("mcp.server", serverName, "mcp.tool", truncate(tool, 1024)), ModelFields.headers(headers)));
         } catch (LedgerException e) {
             return error(400, id, INVALID_PARAMS, e.getMessage(), e.details());
         }

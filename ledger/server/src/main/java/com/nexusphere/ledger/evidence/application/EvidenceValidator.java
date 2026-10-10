@@ -40,6 +40,10 @@ final class EvidenceValidator {
         v.text("correlationId", s.correlationId(), false, 128);
         v.hash("inputHash", s.inputHash());
         v.hash("outputHash", s.outputHash());
+        if (s.model() != null) {
+            v.text("model.name", s.model().name(), false, 200);
+            v.text("model.version", s.model().version(), false, 120);
+        }
         if (s.outcome() == null) {
             v.errors.put("outcome", "must be one of SUCCEEDED, FAILED, DENIED, PENDING");
         }
@@ -79,6 +83,10 @@ final class EvidenceValidator {
             case "outputHash" -> s.outputHash() == null;
             case "correlationId" -> s.correlationId() == null;
             case "occurredAt" -> s.occurredAt() == null;
+            case "model" -> s.model() == null || s.model().name() == null;
+            case "modelVersion" -> s.model() == null || s.model().version() == null;
+            case "promptHash" -> s.model() == null || s.model().promptHash() == null;
+            case "configHash" -> s.model() == null || s.model().configHash() == null;
             default -> false;
         };
     }

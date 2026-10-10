@@ -108,6 +108,7 @@ public class EvidenceService {
                 submission.inputHash(),
                 submission.outputHash(),
                 submission.outcome().name(),
+                submission.model(),
                 submission.correlationId(),
                 new TreeMap<>(submission.attributes() == null ? Map.of() : submission.attributes()),
                 previousHash,

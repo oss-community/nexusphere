@@ -1,5 +1,6 @@
 package com.nexusphere.ledger.verifier;
 
+import com.nexusphere.ledger.chain.AgentModel;
 import com.nexusphere.ledger.chain.CanonicalJson;
 import com.nexusphere.ledger.chain.Checkpoint;
 import com.nexusphere.ledger.chain.EvidenceEntry;
@@ -116,7 +117,7 @@ class ConformanceVectorsTest {
             }
             EvidenceEntry entry = new EvidenceEntry(UUID.fromString("00000000-0000-4000-8000-00000000000" + (i + 1)),
                     i + 1, T0.plusSeconds(i), T0.plusSeconds(i).plusMillis(5), a[0], a[1], a[2], a[3], a[4], a[5],
-                    null, Hashes.sha256(a[3].getBytes()), null, a[6], "conversation-1", attributes, salts, null,
+                    null, Hashes.sha256(a[3].getBytes()), null, a[6], null, "conversation-1", attributes, salts, null,
                     previous, null).sealed();
             entries.add(entry);
             previous = entry.hash();
@@ -209,6 +210,42 @@ class ConformanceVectorsTest {
         check("evidence-chain.json", vector);
 
         assertThat(signed.verify(SigningKeys.PublicKeyInfo.of(LEDGER))).isTrue();
+    }
+
+    @Test
+    void evidenceModel() throws IOException {
+        String prompt = "You pay approved invoices of Acme up to 500 EUR. Ask before anything else.";
+        String config = "{\"temperature\":0,\"tools\":[\"read_invoice\",\"pay_invoice\"]}";
+        String promptHash = Hashes.sha256(prompt.getBytes(StandardCharsets.UTF_8));
+        String configHash = Hashes.sha256(config.getBytes(StandardCharsets.UTF_8));
+        AgentModel model = new AgentModel("claude-sonnet-5-5", "2026-09-01", promptHash, configHash);
+        TreeMap<String, String> salts = new TreeMap<>();
+        for (String field : List.of("principalId", "target", "reason", "correlationId")) {
+            byte[] digest = HEX.parseHex(Hashes.sha256(("salt/model/" + field).getBytes(StandardCharsets.UTF_8)));
+            salts.put(field, Base64.getUrlEncoder().withoutPadding().encodeToString(Arrays.copyOf(digest, 16)));
+        }
+        EvidenceEntry entry = new EvidenceEntry(UUID.fromString("00000000-0000-4000-8000-000000000010"), 1, T0,
+                T0.plusMillis(5), "invoice-agent", "acme", "tools/call", "billing/pay_invoice", "ALLOW", null, null,
+                Hashes.sha256("pay_invoice".getBytes(StandardCharsets.UTF_8)), null, "SUCCEEDED", model,
+                "conversation-1", new TreeMap<>(), salts, null, Hashes.GENESIS, null).sealed();
+        Map<String, Object> vector = new LinkedHashMap<>();
+        vector.put("model", model.toMap());
+        vector.put("prompts", List.of(Map.of("hash", promptHash, "text", prompt),
+                Map.of("hash", configHash, "text", config)));
+        vector.put("values", values(entry));
+        vector.put("salts", entry.salts());
+        vector.put("content", entry.canonicalContent());
+        vector.put("canonicalContent", CanonicalJson.write(entry.canonicalContent()));
+        vector.put("previousHash", entry.previousHash());
+        vector.put("contentHash", entry.contentHash());
+        vector.put("hash", entry.hash());
+        check("evidence-model.json", vector);
+
+        EvidenceEntry unnamed = new EvidenceEntry(entry.id(), 1, T0, T0.plusMillis(5), "invoice-agent", "acme",
+                "tools/call", "billing/pay_invoice", "ALLOW", null, null, entry.inputHash(), null, "SUCCEEDED", null,
+                "conversation-1", new TreeMap<>(), salts, null, Hashes.GENESIS, null).sealed();
+        assertThat(unnamed.contentHash()).isNotEqualTo(entry.contentHash());
+        assertThat(unnamed.canonicalContent()).doesNotContainKey("model");
     }
 
     @Test

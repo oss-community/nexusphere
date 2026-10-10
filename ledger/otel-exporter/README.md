@@ -35,48 +35,53 @@ later prove which input and output belonged to the call without holding them.
 
 ## Mapping
 
-| Evidence field  | Taken from                                                                                                   |
-|-----------------|--------------------------------------------------------------------------------------------------------------|
-| selected spans  | `gen_ai.operation.name` or `mcp.method.name` listed in `operations` (default `execute_tool`, `invoke_agent`, `tools/call`) |
-| `agentId`       | The first of `agent_attributes` (default `gen_ai.agent.id`, `gen_ai.agent.name`), else `default_agent`       |
-| `principalId`   | The first of `principal_attributes` (default `nexusphere.principal.id`, `user.id`, `enduser.id`), else `default_principal` |
-| `action`        | `mcp.method.name`; `tools/call` for `execute_tool`; `agents/invoke` for `invoke_agent`; else `gen_ai/{operation}` |
-| `target`        | `gen_ai.tool.name`; the invoked `gen_ai.agent.name` for `invoke_agent`; else the span name                   |
-| `occurredAt`    | The span start time                                                                                          |
-| `decision`      | `nexusphere.decision` (`ALLOW` or `DENY`) when the gateway sets it                                           |
-| `outcome`       | `DENIED` after a `DENY`, `FAILED` when the span status is an error or `mcp.error.code` is set, else `SUCCEEDED` |
-| `reason`        | `nexusphere.reason`, else `error.type` or the status message of a failed span                                |
-| `delegationId`  | `nexusphere.delegation.id`                                                                                   |
-| `inputHash`     | `nexusphere.input.hash`, else the SHA-256 of `gen_ai.tool.call.arguments`                                    |
-| `outputHash`    | `nexusphere.output.hash`, else the SHA-256 of `gen_ai.tool.call.result`                                      |
-| `correlationId` | `gen_ai.conversation.id`, else the trace ID                                                                  |
-| `attributes`    | `otel.trace_id`, `otel.span_id`, `otel.span_name`, `otel.duration_ms`, the model, provider, tool call ID, `mcp.session.id`, `mcp.target` and `service.name`, and the keys in `attributes` |
+| Evidence field     | Taken from                                                                                                |
+|--------------------|-----------------------------------------------------------------------------------------------------------|
+| selected spans     | `gen_ai.operation.name` or `mcp.method.name` listed in `operations` (default `execute_tool`, `invoke_agent`, `tools/call`) |
+| `agentId`          | The first of `agent_attributes` (default `gen_ai.agent.id`, `gen_ai.agent.name`), else `default_agent`    |
+| `principalId`      | The first of `principal_attributes` (default `nexusphere.principal.id`, `user.id`, `enduser.id`), else `default_principal` |
+| `action`           | `mcp.method.name`; `tools/call` for `execute_tool`; `agents/invoke` for `invoke_agent`; else `gen_ai/{operation}` |
+| `target`           | `gen_ai.tool.name`; the invoked `gen_ai.agent.name` for `invoke_agent`; else the span name                |
+| `occurredAt`       | The span start time                                                                                       |
+| `decision`         | `nexusphere.decision` (`ALLOW` or `DENY`) when the gateway sets it                                        |
+| `outcome`          | `DENIED` after a `DENY`, `FAILED` when the span status is an error or `mcp.error.code` is set, else `SUCCEEDED` |
+| `reason`           | `nexusphere.reason`, else `error.type` or the status message of a failed span                             |
+| `delegationId`     | `nexusphere.delegation.id`                                                                                |
+| `inputHash`        | `nexusphere.input.hash`, else the SHA-256 of `gen_ai.tool.call.arguments`                                 |
+| `outputHash`       | `nexusphere.output.hash`, else the SHA-256 of `gen_ai.tool.call.result`                                   |
+| `correlationId`    | `gen_ai.conversation.id`, else the trace ID                                                               |
+| `model.name`       | `gen_ai.response.model`, else `gen_ai.request.model`                                                      |
+| `model.version`    | `nexusphere.model.version`                                                                                |
+| `model.promptHash` | `nexusphere.prompt.hash`, lowercased, only when it is a hex SHA-256                                       |
+| `model.configHash` | `nexusphere.config.hash`, lowercased, only when it is a hex SHA-256                                       |
+| `attributes`       | `otel.trace_id`, `otel.span_id`, `otel.span_name`, `otel.duration_ms`, the model, provider, tool call ID, `mcp.session.id`, `mcp.target` and `service.name`, and the keys in `attributes` |
 
 <p style="text-align: justify;">
 
 Span attributes win over resource attributes. A selected span without an agent or a principal is skipped and logged at
 debug level. Text is cut to the ledger's limits and control characters are replaced, so one odd span never makes the
-ledger refuse a whole batch. A batch the ledger still refuses (HTTP 4xx) is dropped and logged; network errors, 429 and
-5xx are retried with the Collector's retry and queue settings. A batch that reached the ledger but whose answer was
-lost is sent again, so the same span can be recorded twice; `otel.span_id` tells such entries apart.
+ledger refuse a whole batch. `model` is sent only when one of its fields is present, and a prompt or config hash that
+is not a hex SHA-256 is left out. A batch the ledger still refuses (HTTP 4xx) is dropped and logged; network errors,
+429 and 5xx are retried with the Collector's retry and queue settings. A batch that reached the ledger but whose
+answer was lost is sent again, so the same span can be recorded twice; `otel.span_id` tells such entries apart.
 
 </p>
 
 ## Configuration
 
-| Setting                | Default                                               | Meaning                                                                  |
-|------------------------|-------------------------------------------------------|--------------------------------------------------------------------------|
-| `endpoint`             | none, required                                        | Base URL of the ledger, such as `http://localhost:8090`                   |
-| `api_key`              | none, required                                        | An agent API key, which records only that agent, or the operator key      |
-| `operations`           | `execute_tool`, `invoke_agent`, `tools/call`          | Values of `gen_ai.operation.name` or `mcp.method.name` that become evidence |
-| `agent_attributes`     | `gen_ai.agent.id`, `gen_ai.agent.name`                | Attributes that name the agent, first match wins                         |
-| `default_agent`        | empty                                                 | Agent for spans without one                                              |
-| `principal_attributes` | `nexusphere.principal.id`, `user.id`, `enduser.id`    | Attributes that name the principal, first match wins                     |
-| `default_principal`    | empty                                                 | Principal for spans without one                                          |
-| `attributes`           | empty                                                 | More span or resource attributes to copy into the evidence attributes    |
-| `hash_content`         | `true`                                                | Hash tool arguments and results into `inputHash` and `outputHash`         |
-| `batch_size`           | `500`                                                 | Entries per request, at most 500                                         |
-| `timeout`, `headers`, `tls`, `sending_queue`, `retry_on_failure` | Collector defaults, 30 s timeout | The standard Collector HTTP client, queue and retry settings |
+| Setting                                                          | Default                                            | Meaning                                                                     |
+|------------------------------------------------------------------|----------------------------------------------------|-----------------------------------------------------------------------------|
+| `endpoint`                                                       | none, required                                     | Base URL of the ledger, such as `http://localhost:8090`                     |
+| `api_key`                                                        | none, required                                     | An agent API key, which records only that agent, or the operator key        |
+| `operations`                                                     | `execute_tool`, `invoke_agent`, `tools/call`       | Values of `gen_ai.operation.name` or `mcp.method.name` that become evidence |
+| `agent_attributes`                                               | `gen_ai.agent.id`, `gen_ai.agent.name`             | Attributes that name the agent, first match wins                            |
+| `default_agent`                                                  | empty                                              | Agent for spans without one                                                 |
+| `principal_attributes`                                           | `nexusphere.principal.id`, `user.id`, `enduser.id` | Attributes that name the principal, first match wins                        |
+| `default_principal`                                              | empty                                              | Principal for spans without one                                             |
+| `attributes`                                                     | empty                                              | More span or resource attributes to copy into the evidence attributes       |
+| `hash_content`                                                   | `true`                                             | Hash tool arguments and results into `inputHash` and `outputHash`           |
+| `batch_size`                                                     | `500`                                              | Entries per request, at most 500                                            |
+| `timeout`, `headers`, `tls`, `sending_queue`, `retry_on_failure` | Collector defaults, 30 s timeout                   | The standard Collector HTTP client, queue and retry settings                |
 
 ```yaml
 exporters:

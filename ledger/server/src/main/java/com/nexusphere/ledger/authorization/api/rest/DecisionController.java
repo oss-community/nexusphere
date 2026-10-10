@@ -5,10 +5,12 @@ import com.nexusphere.ledger.authorization.domain.model.DecisionRecord;
 import com.nexusphere.ledger.authorization.domain.model.DecisionRequest;
 import com.nexusphere.ledger.authorization.domain.model.DecisionResult;
 import com.nexusphere.ledger.authorization.domain.model.OutcomeReport;
+import com.nexusphere.ledger.chain.AgentModel;
 import com.nexusphere.ledger.chain.EvidenceEntry;
 import com.nexusphere.ledger.evidence.domain.model.Outcome;
 import com.nexusphere.ledger.server.security.Caller;
 import com.nexusphere.ledger.server.web.LedgerException;
+import com.nexusphere.ledger.server.web.ModelFields;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -27,7 +29,14 @@ import java.util.UUID;
 class DecisionController {
 
     record DecideRequest(String agentId, String principalId, String action, String target, String inputHash,
-                         String correlationId, Map<String, String> attributes) {
+                         String correlationId, Map<String, String> attributes, ModelRequest model) {
+    }
+
+    record ModelRequest(String name, String version, String promptHash, String configHash) {
+
+        AgentModel toModel() {
+            return ModelFields.of(name, version, promptHash, configHash, "The decision request has invalid fields.");
+        }
     }
 
     record OutcomeRequest(Outcome outcome, String outputHash, String reason, Map<String, String> attributes) {
@@ -78,7 +87,7 @@ class DecisionController {
         }
         DecisionResult result = decisions.decide(new DecisionRequest(agentId, request.principalId(),
                 request.action(), request.target(), request.inputHash(), request.correlationId(),
-                request.attributes()));
+                request.attributes(), request.model() == null ? null : request.model().toModel()));
         return ResponseEntity.created(URI.create("/api/v1/decisions/" + result.decision().id()))
                 .body(DecisionResultResponse.of(result));
     }

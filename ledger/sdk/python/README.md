@@ -8,6 +8,7 @@
 * [Install](#install)
 * [Record Evidence](#record-evidence)
 * [Decide and Report](#decide-and-report)
+* [Record the Model and Prompt](#record-the-model-and-prompt)
 * [Verify a Package](#verify-a-package)
 * [Verify a Statement and Receipt](#verify-a-statement-and-receipt)
 * [Verify a Mandate](#verify-a-mandate)
@@ -122,6 +123,56 @@ Step 3. Check the outcome; it must print `SUCCEEDED`:
 print(action.reported["outcome"])
 ```
 
+## Record the Model and Prompt
+
+<p style="text-align: justify;">
+
+An entry can name the [model and prompt](../../README.md#model-and-prompt) the agent acted with: `model` is a dict with
+any of `name`, `version`, `promptHash` and `configHash`, the two hashes being lowercase hex SHA-256. The model is part
+of the content hash of the entry. The prompt text itself stays out of the chain; the ledger keeps it apart, and a
+package carries it only when asked for.
+
+</p>
+
+Step 1. Store the system prompt; the answer is its hash, the same for the same text:
+
+```python
+prompt_hash = agent.store_prompt("You read the invoices of Acme. Ask before paying anything.")
+```
+
+Step 2. Record evidence and act under a grant with the model:
+
+```python
+model = {"name": "claude-sonnet-5-5", "version": "2026-09-01", "promptHash": prompt_hash}
+agent.record("invoice-agent", "acme", "tools/call", "SUCCEEDED", target="read_invoice", model=model)
+with agent.act("alice", "tools/call", "read_invoice", model=model) as action:
+    action.output("invoice text")
+```
+
+Step 3. Read the prompt back, as the operator; it must print the stored text:
+
+```python
+print(operator.prompt(prompt_hash)["text"])
+```
+
+Step 4. Export a package with the prompt texts and verify it; `disclosed_prompts` must be `1`:
+
+```python
+from nexusphere_ledger import verify_package
+
+package = operator.export_package(agent_id="invoice-agent", include_prompts=True)
+report = verify_package(package, operator.active_public_key())
+print(report.valid, report.disclosed_prompts)
+```
+
+<p style="text-align: justify;">
+
+`decide` and `record_batch` items take `model` too, and `create_report` and `create_dispute` take
+`include_prompts=True`. The verifier checks that each prompt text in a package hashes to its hash and that a
+disclosed entry names that hash as its `promptHash` or `configHash`.
+
+</p>
+
 ## Verify a Package
 
 Step 1. Export a package and read the ledger's public key, as the operator:
@@ -157,7 +208,7 @@ and the retention pass. `timestamp_certificates`, a list of certificates or PEM 
 one, and `report.timestamped_at` and `report.timestamp_authority` say when and by whom it was timestamped.
 `rekor_keys`, a list of verifier keys, pins the log of the [Rekor entry](../../README.md#rekor-anchoring),
 `require_rekor=True` refuses a checkpoint without one, and `report.rekor_log_index` and `report.rekor_origin` say
-where it was anchored.
+where it was anchored. `report.disclosed_prompts` counts the prompt texts that match the hashes their entries name.
 
 </p>
 
@@ -299,11 +350,18 @@ must show `Nexusphere Ledger report` and `Result: VALID`:
 nexusphere-ledger-verify dispute --public-key "$LEDGER_PUBLIC_KEY" dispute.zip
 ```
 
+Step 8. Verify the package of [Record the Model and Prompt](#record-the-model-and-prompt), saved as `package.json`;
+the output must show `Prompts     : 1 prompt texts match the hashes their entries name` and `Result: VALID`:
+
+```shell
+nexusphere-ledger-verify --public-key "$LEDGER_PUBLIC_KEY" package.json
+```
+
 ## Reference
 
 | Module      | Contents                                                                                         |
 |-------------|--------------------------------------------------------------------------------------------------|
-| `client`    | `LedgerClient` for evidence, batches, decisions, `act`, grants, mandates, packages, keys, proofs |
+| `client`    | `LedgerClient` for evidence, batches, decisions, `act`, prompts, grants, mandates, packages, keys |
 | `package`   | `verify_package` and `PackageReport`                                                             |
 | `timestamp` | RFC 3161 `TimestampToken`, its verification against a pinned chain, and `read_certificates`      |
 | `rekor`     | Rekor v2 `hashedrekord` requests and `verify_rekor_entry` against a pinned log                   |
@@ -328,7 +386,7 @@ PYTHONPATH=src python3 -m unittest discover -s tests -t .
 ```
 
 Step 2. Run the same tests against a running ledger, as in the [Quick Start](../../../README.md#quick-start); the
-three `LiveLedger` tests must pass instead of being skipped:
+six `LiveLedger` tests must pass instead of being skipped:
 
 ```shell
 NEXUSPHERE_LEDGER_URL=http://localhost:8090 PYTHONPATH=src python3 -m unittest discover -s tests -t . -v

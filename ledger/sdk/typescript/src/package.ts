@@ -1,5 +1,5 @@
 import { equal, fromBase64, fromHex } from "./bytes.js";
-import { sha256 } from "./canonical.js";
+import { sha256, sha256Hex } from "./canonical.js";
 import { EvidenceStatement, LogReceipt } from "./cose.js";
 import {
   ChainVerifier,
@@ -47,6 +47,7 @@ export interface PackageReport {
   timestampAuthority: string | null;
   rekorLogIndex: number | null;
   rekorOrigin: string | null;
+  disclosedPrompts: number;
   problems: string[];
 }
 
@@ -127,6 +128,7 @@ export async function verifyPackage(
   const first = anchor ? anchor.sequence + 1 : 1;
   const chain = new ChainVerifier(first, anchor ? anchor.headHash : GENESIS);
   let disclosed = 0;
+  const named = new Set<string>();
   const agentId = nullable(scope, "agentId");
   const principalId = nullable(scope, "principalId");
   const low = long(scope.fromSequence, 1);
@@ -146,6 +148,12 @@ export async function verifyPackage(
     }
     if (isObject(node.entry)) {
       disclosed++;
+      const model = (node.entry as Json).model;
+      for (const field of ["promptHash", "configHash"]) {
+        if (isObject(model) && typeof model[field] === "string") {
+          named.add(model[field] as string);
+        }
+      }
       const mismatch = await disclosedMismatch(node.entry as Json, link, agentId, principalId, low, high);
       if (mismatch) {
         problems.push(`sequence ${link.sequence}: ${mismatch}`);
@@ -170,6 +178,7 @@ export async function verifyPackage(
   if (disclosed === 0 && !unreadable) {
     problems.push("the package discloses no evidence");
   }
+  const prompts = await verifyPrompts(pkg, named, problems);
   const log = keys
     ? await verifyLog(pkg, [...keys.values()], checkpoint.sequence, witnessKeys, requiredWitnesses, problems)
     : NO_LOG;
@@ -194,7 +203,24 @@ export async function verifyPackage(
     problems,
     stamp,
     anchored,
+    prompts,
   );
+}
+
+async function verifyPrompts(pkg: Json, named: Set<string>, problems: string[]): Promise<number> {
+  let verified = 0;
+  for (const prompt of Array.isArray(pkg.prompts) ? (pkg.prompts as unknown[]) : []) {
+    const hash = nullable(prompt, "hash");
+    const text = nullable(prompt, "text");
+    if (hash === null || text === null || (await sha256Hex(text)) !== hash) {
+      problems.push(`prompt ${hash} does not match its text`);
+    } else if (!named.has(hash)) {
+      problems.push(`prompt ${hash} is not named by a disclosed entry`);
+    } else {
+      verified++;
+    }
+  }
+  return verified;
 }
 
 async function verifyRekorOf(
@@ -569,6 +595,7 @@ function report(
   problems: string[],
   stamp: TimestampVerification | null = null,
   anchored: RekorVerification | null = null,
+  disclosedPrompts = 0,
 ): PackageReport {
   return {
     valid,
@@ -593,6 +620,7 @@ function report(
     timestampAuthority: stamp ? stamp.authority : null,
     rekorLogIndex: anchored ? anchored.logIndex : null,
     rekorOrigin: anchored ? anchored.origin : null,
+    disclosedPrompts,
     problems: [...problems],
   };
 }

@@ -3,6 +3,7 @@ package nexusphereexporter
 import (
 	"crypto/sha256"
 	"encoding/hex"
+	"encoding/json"
 	"strings"
 	"testing"
 	"time"
@@ -193,5 +194,52 @@ func TestHashesAndLimits(t *testing.T) {
 	}
 	if truncate("a\U0001F600b", 2) != "a" || truncate("abc", 3) != "abc" {
 		t.Errorf("truncate counts UTF-16 units wrongly")
+	}
+}
+
+func TestModel(t *testing.T) {
+	cfg := defaults()
+	prompt := strings.Repeat("ab", 32)
+	config := strings.Repeat("cd", 32)
+	e, _ := mapOne(t, cfg, tool(map[string]any{
+		"gen_ai.request.model":     "claude-sonnet",
+		"gen_ai.response.model":    "claude-sonnet-20261001",
+		"nexusphere.model.version": "2026-10-01",
+		"nexusphere.prompt.hash":   prompt,
+		"nexusphere.config.hash":   config,
+	}), nil)
+	want := model{Name: "claude-sonnet-20261001", Version: "2026-10-01", PromptHash: prompt, ConfigHash: config}
+	if e.Model == nil || *e.Model != want {
+		t.Errorf("model = %+v, want %+v", e.Model, want)
+	}
+	e, _ = mapOne(t, cfg, tool(map[string]any{"gen_ai.request.model": "claude-sonnet"}), nil)
+	if e.Model == nil || *e.Model != (model{Name: "claude-sonnet"}) {
+		t.Errorf("request model not used: %+v", e.Model)
+	}
+	e, _ = mapOne(t, cfg, tool(map[string]any{
+		"nexusphere.model.version": "v2",
+		"nexusphere.prompt.hash":   strings.ToUpper(prompt),
+		"nexusphere.config.hash":   "not-a-hash",
+	}), nil)
+	if e.Model == nil || *e.Model != (model{Version: "v2", PromptHash: prompt}) {
+		t.Errorf("hashes not lowercased or invalid ones not dropped: %+v", e.Model)
+	}
+	e, _ = mapOne(t, cfg, tool(nil), nil)
+	if e.Model != nil {
+		t.Errorf("model sent without model attributes: %+v", e.Model)
+	}
+	e, _ = mapOne(t, cfg, tool(map[string]any{"nexusphere.prompt.hash": "abc"}), nil)
+	if e.Model != nil {
+		t.Errorf("model sent with only an invalid hash: %+v", e.Model)
+	}
+	body, err := json.Marshal(evidence{Model: &model{Name: "claude-sonnet", PromptHash: prompt}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(body), `"model":{"name":"claude-sonnet","promptHash":"`+prompt+`"}`) {
+		t.Errorf("model JSON = %s", body)
+	}
+	if body, _ := json.Marshal(evidence{}); strings.Contains(string(body), "model") {
+		t.Errorf("empty model serialized: %s", body)
 	}
 }

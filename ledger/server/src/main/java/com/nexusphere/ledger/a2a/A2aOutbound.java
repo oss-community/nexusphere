@@ -23,8 +23,10 @@ import com.nexusphere.ledger.server.security.Caller;
 import com.nexusphere.ledger.server.signing.LedgerSigner;
 import com.nexusphere.ledger.server.web.EventStream;
 import com.nexusphere.ledger.server.web.LedgerException;
+import com.nexusphere.ledger.server.web.ModelFields;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.http.HttpHeaders;
 import org.springframework.stereotype.Service;
 import tools.jackson.databind.JsonNode;
 
@@ -85,7 +87,8 @@ class A2aOutbound {
         this.clock = clock;
     }
 
-    A2aResponse send(Caller caller, String peerName, String principalId, String presented, byte[] body) {
+    A2aResponse send(Caller caller, String peerName, String principalId, String presented, HttpHeaders request,
+                     byte[] body) {
         LedgerProperties.A2a.Peer peer = peer(peerName);
         A2aResponse invalid = rpc.invalid(body);
         if (invalid != null) {
@@ -125,7 +128,8 @@ class A2aOutbound {
         DecisionResult decision;
         try {
             decision = decisions.decide(new DecisionRequest(caller.agentId(), principalId, ACTION,
-                    peerName + "/" + method, requestHash, null, Map.of("a2a.peer", peerName, "a2a.method", method)));
+                    peerName + "/" + method, requestHash, null, Map.of("a2a.peer", peerName, "a2a.method", method),
+                    ModelFields.headers(request)));
         } catch (LedgerException e) {
             return rpc.error(400, id, JsonRpc.INVALID_PARAMS, e.getMessage(), e.details(), Map.of());
         }

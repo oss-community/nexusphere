@@ -36,7 +36,15 @@ type evidence struct {
 	OutputHash    string            `json:"outputHash,omitempty"`
 	Outcome       string            `json:"outcome"`
 	CorrelationID string            `json:"correlationId,omitempty"`
+	Model         *model            `json:"model,omitempty"`
 	Attributes    map[string]string `json:"attributes"`
+}
+
+type model struct {
+	Name       string `json:"name,omitempty"`
+	Version    string `json:"version,omitempty"`
+	PromptHash string `json:"promptHash,omitempty"`
+	ConfigHash string `json:"configHash,omitempty"`
 }
 
 type skip string
@@ -118,6 +126,7 @@ func toEvidence(cfg *Config, resource pcommon.Resource, span ptrace.Span) (evide
 	e.CorrelationID = text(firstNonEmpty(attrs.get("gen_ai.conversation.id"), span.TraceID().String()), 128)
 	e.InputHash = contentHash(cfg, attrs, "nexusphere.input.hash", "gen_ai.tool.call.arguments")
 	e.OutputHash = contentHash(cfg, attrs, "nexusphere.output.hash", "gen_ai.tool.call.result")
+	e.Model = modelOf(attrs)
 	e.Attributes["otel.trace_id"] = span.TraceID().String()
 	e.Attributes["otel.span_id"] = span.SpanID().String()
 	e.Attributes["otel.span_name"] = text(span.Name(), 1024)
@@ -157,6 +166,26 @@ func target(attrs lookup, operation, spanName string) string {
 		}
 	}
 	return spanName
+}
+
+func modelOf(attrs lookup) *model {
+	m := model{
+		Name:       text(firstNonEmpty(attrs.get("gen_ai.response.model"), attrs.get("gen_ai.request.model")), 200),
+		Version:    text(attrs.get("nexusphere.model.version"), 120),
+		PromptHash: givenHash(attrs, "nexusphere.prompt.hash"),
+		ConfigHash: givenHash(attrs, "nexusphere.config.hash"),
+	}
+	if m == (model{}) {
+		return nil
+	}
+	return &m
+}
+
+func givenHash(attrs lookup, key string) string {
+	if value := strings.ToLower(strings.TrimSpace(attrs.get(key))); sha256Hex.MatchString(value) {
+		return value
+	}
+	return ""
 }
 
 func contentHash(cfg *Config, attrs lookup, given, content string) string {

@@ -1,6 +1,5 @@
 package com.nexusphere.ledger.evidence.api.rest;
 
-import com.nexusphere.ledger.evidence.domain.model.PackageRequest;
 import com.nexusphere.ledger.server.security.Caller;
 import com.nexusphere.ledger.verifier.PackageReport;
 import org.springframework.http.HttpHeaders;
@@ -25,10 +24,8 @@ class PackageController {
                                                             @RequestBody(required = false)
                                                             PackageDocuments.ExportRequest request) {
         caller.requireOperator();
-        PackageDocuments.ExportRequest r = request == null ? new PackageDocuments.ExportRequest(null, null, null, null)
-                : request;
-        PackageDocuments.PackageResponse body = documents.export(new PackageRequest(r.agentId(), r.principalId(),
-                r.fromSequence(), r.toSequence()));
+        PackageDocuments.ExportRequest r = request == null ? PackageDocuments.ExportRequest.empty() : request;
+        PackageDocuments.PackageResponse body = documents.export(r.toRequest(), r.prompts());
         return ResponseEntity.ok()
                 .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"evidence-package-"
                         + body.checkpoint().sequence() + ".json\"")

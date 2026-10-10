@@ -1,0 +1,57 @@
+{
+  "model" : {
+    "name" : "claude-sonnet-5-5",
+    "version" : "2026-09-01",
+    "promptHash" : "00e270f93591c1a9b03a4e7a5e8f9ca64eeb8d2023980088397f0135ccb5d19c",
+    "configHash" : "e03f1e24faff00c605e15e22ea5e8f5b07fd1cdec96523c8120413393b13689b"
+  },
+  "prompts" : [ {
+    "hash" : "00e270f93591c1a9b03a4e7a5e8f9ca64eeb8d2023980088397f0135ccb5d19c",
+    "text" : "You pay approved invoices of Acme up to 500 EUR. Ask before anything else."
+  }, {
+    "hash" : "e03f1e24faff00c605e15e22ea5e8f5b07fd1cdec96523c8120413393b13689b",
+    "text" : "{\"temperature\":0,\"tools\":[\"read_invoice\",\"pay_invoice\"]}"
+  } ],
+  "values" : {
+    "principalId" : "acme",
+    "target" : "billing/pay_invoice",
+    "reason" : null,
+    "correlationId" : "conversation-1",
+    "attributes" : { }
+  },
+  "salts" : {
+    "correlationId" : "5vtpstb89XCPxXIDBb3oSw",
+    "principalId" : "q117Se0kKPw6NxnRIV2PCA",
+    "reason" : "cHeC2iwHjf8-stOSb3yiJg",
+    "target" : "sPWyvfMDodFrkLV5jN02mg"
+  },
+  "content" : {
+    "format" : "nexusphere-ledger/evidence/v2",
+    "id" : "00000000-0000-4000-8000-000000000010",
+    "occurredAt" : "2026-10-01T08:00:00.123456Z",
+    "recordedAt" : "2026-10-01T08:00:00.128456Z",
+    "agentId" : "invoice-agent",
+    "action" : "tools/call",
+    "decision" : "ALLOW",
+    "delegationId" : null,
+    "inputHash" : "8e5a014d886c935a5d6061c7fb5d19f2036c72f8b0d60ab0ea08c8996a80bcb5",
+    "outputHash" : null,
+    "outcome" : "SUCCEEDED",
+    "model" : {
+      "name" : "claude-sonnet-5-5",
+      "version" : "2026-09-01",
+      "promptHash" : "00e270f93591c1a9b03a4e7a5e8f9ca64eeb8d2023980088397f0135ccb5d19c",
+      "configHash" : "e03f1e24faff00c605e15e22ea5e8f5b07fd1cdec96523c8120413393b13689b"
+    },
+    "commitments" : {
+      "correlationId" : "30c96517f38c54cfe001b060b050a192c10bdb2547e3f5625ab7ef76af0c6226",
+      "principalId" : "477f5ab6c8dad878cf90b5fa905f9cca5f79fb596aeb6518ba88e0d6490fa68e",
+      "reason" : "d0e03ae0e12dc656b49c3a1e9a2bcb2c422f5d82e31de4ccfcdbc57b939b66f4",
+      "target" : "d7525ac98f3835e23530d269ab43c855ab98f8ee10113bac962ae2c4a16ef10f"
+    }
+  },
+  "canonicalContent" : "{\"action\":\"tools/call\",\"agentId\":\"invoice-agent\",\"commitments\":{\"correlationId\":\"30c96517f38c54cfe001b060b050a192c10bdb2547e3f5625ab7ef76af0c6226\",\"principalId\":\"477f5ab6c8dad878cf90b5fa905f9cca5f79fb596aeb6518ba88e0d6490fa68e\",\"reason\":\"d0e03ae0e12dc656b49c3a1e9a2bcb2c422f5d82e31de4ccfcdbc57b939b66f4\",\"target\":\"d7525ac98f3835e23530d269ab43c855ab98f8ee10113bac962ae2c4a16ef10f\"},\"decision\":\"ALLOW\",\"delegationId\":null,\"format\":\"nexusphere-ledger/evidence/v2\",\"id\":\"00000000-0000-4000-8000-000000000010\",\"inputHash\":\"8e5a014d886c935a5d6061c7fb5d19f2036c72f8b0d60ab0ea08c8996a80bcb5\",\"model\":{\"configHash\":\"e03f1e24faff00c605e15e22ea5e8f5b07fd1cdec96523c8120413393b13689b\",\"name\":\"claude-sonnet-5-5\",\"promptHash\":\"00e270f93591c1a9b03a4e7a5e8f9ca64eeb8d2023980088397f0135ccb5d19c\",\"version\":\"2026-09-01\"},\"occurredAt\":\"2026-10-01T08:00:00.123456Z\",\"outcome\":\"SUCCEEDED\",\"outputHash\":null,\"recordedAt\":\"2026-10-01T08:00:00.128456Z\"}",
+  "previousHash" : "0000000000000000000000000000000000000000000000000000000000000000",
+  "contentHash" : "2c8f5c7800b63563f0f00acf4cfa67f4d593fa739bb584a01e1f6e440e6af3f3",
+  "hash" : "5620d67593b3642f5e3573c437df66f6caae664516f354dddcace3ad6faa9091"
+}

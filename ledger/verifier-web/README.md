@@ -68,7 +68,9 @@ Rekor log keys and tick Require a Rekor entry.
 
 Step 4. Press Verify; the page must show `VALID` with the signing key, the checkpoint, its timestamp and Rekor entry, the log, the
 proofs and the disclosed entries, with `erased` in place of the principal and target of an entry whose personal fields were erased.
-Change one character of an entry in the file and verify again; the page must show `INVALID` and name the entry.
+When the entries name their [model](../README.md#model-and-prompt), the table adds a Model column with its name and
+version, and a package exported with `"includePrompts": true` adds a Prompts line with the number of prompt texts
+that match the hashes their entries name. Change one character of an entry in the file and verify again; the page must show `INVALID` and name the entry.
 
 <p style="text-align: justify;">
 
@@ -91,6 +93,7 @@ Crypto: Chrome or Edge 137, Firefox 129, Safari 17 or later.
 | Revoked keys, valid only where witnesses predate the compromise  | Revoked keys                  |
 | The RFC 3161 timestamp of the checkpoint and the authority chain | Timestamp                     |
 | The Rekor entry of the checkpoint and its inclusion proof        | Rekor                         |
+| Prompt texts against their hash and the entries that name them   | Prompts                       |
 
 <p style="text-align: justify;">
 
@@ -115,8 +118,8 @@ Step 1. Run the unit tests; they must all pass:
 cd ledger/verifier-web && npm test
 ```
 
-Step 2. Build the page and run the browser test, which opens the built file from disk, verifies a package and checks
-that no request leaves the page; it must report `1 passed`:
+Step 2. Build the page and run the browser tests, which open the built file from disk, verify a package, check that no
+request leaves the page and that the prompt texts and models show; they must report `2 passed`:
 
 ```shell
 npm run build && npx playwright install chromium && npm run e2e

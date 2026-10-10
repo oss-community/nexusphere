@@ -49,6 +49,26 @@ public record ReportFacts(List<JsonNode> entries, long links, PackageReport veri
         return entry -> value.equals(entry.path(field).asString(null));
     }
 
+    public static Predicate<JsonNode> model(String field) {
+        return entry -> !entry.path("model").path(field).asString("").isEmpty();
+    }
+
+    public Set<String> models() {
+        Set<String> models = new TreeSet<>();
+        entries.stream().filter(model("name")).forEach(entry -> {
+            JsonNode model = entry.path("model");
+            models.add(model.path("name").asString() + (model.hasNonNull("version")
+                    ? " " + model.path("version").asString() : ""));
+        });
+        return models;
+    }
+
+    public Set<String> modelValues(String field) {
+        Set<String> values = new TreeSet<>();
+        entries.stream().filter(model(field)).forEach(entry -> values.add(entry.path("model").path(field).asString()));
+        return values;
+    }
+
     public static Predicate<JsonNode> erased() {
         return entry -> entry.path("erased").asBoolean(false);
     }

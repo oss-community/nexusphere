@@ -80,6 +80,11 @@ agent platforms and gateways.
   the dispute report, keys and profiles, the verifiers in Java, Python and TypeScript check reports and dispute
   packages with `report` and `dispute`, the web UI has a Reports page, and a `report.json` conformance vector holds a
   signed report
+* Model and prompt in evidence: an entry names the model, version, prompt hash and config hash the agent ran,
+  covered by the content hash, sent through the gateways as `X-Ledger-Model*` headers and through the OpenTelemetry
+  exporter, and required by a profile when it lists them; `PUT /api/v1/prompts` stores prompt texts by hash, packages,
+  reports and disputes carry them with `includePrompts`, every verifier checks them, the EU AI Act and dispute
+  reports have a model section, and an `evidence-model.json` conformance vector holds an entry with its model
 * Browser verifier: one self-contained HTML page in React and TypeScript that verifies a package with the
   TypeScript SDK, pinned to the ledger key and optional witnesses, with a Content Security Policy that blocks every
   connection

@@ -240,8 +240,11 @@ curl -X POST http://localhost:8090/api/v1/evidence -H "Authorization: Bearer {ag
 
 When the platform already sends OpenTelemetry traces, nothing has to call the API: point its OTLP exporter at the
 Collector of the [OpenTelemetry Exporter](../ledger/otel-exporter/README.md), or add the `nexusphere` exporter to an
-existing Collector. Every `execute_tool`, `invoke_agent` and MCP `tools/call` span becomes an evidence entry, with
-the trace id as its correlation id, and other spans are ignored.
+existing Collector. Every `execute_tool`, `invoke_agent` and MCP `tools/call` span becomes an evidence entry, with the
+trace id as its correlation id, and other spans are ignored. Add the model, its version and the hash of the system
+prompt to each entry with `model` in the evidence, the `X-Ledger-Model` headers of the gateways, or the span
+attributes `gen_ai.response.model`, `nexusphere.model.version` and `nexusphere.prompt.hash`, so a change of model or
+prompt shows up in the evidence.
 
 </p>
 

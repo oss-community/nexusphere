@@ -1,9 +1,12 @@
 package com.nexusphere.ledger.evidence.api.rest;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
+import com.nexusphere.ledger.chain.AgentModel;
 import com.nexusphere.ledger.chain.Checkpoint;
 import com.nexusphere.ledger.chain.EvidenceLink;
 import com.nexusphere.ledger.chain.SignedCheckpoint;
 import com.nexusphere.ledger.evidence.application.PackageService;
+import com.nexusphere.ledger.evidence.application.PromptService;
 import com.nexusphere.ledger.evidence.domain.model.EvidencePackage;
 import com.nexusphere.ledger.evidence.domain.model.PackageRequest;
 import com.nexusphere.ledger.server.signing.KeyController;
@@ -20,11 +23,29 @@ import tools.jackson.databind.json.JsonMapper;
 import java.time.Instant;
 import java.util.Base64;
 import java.util.List;
+import java.util.Set;
+import java.util.TreeSet;
 
 @Component
 public class PackageDocuments {
 
-    public record ExportRequest(String agentId, String principalId, Long fromSequence, Long toSequence) {
+    public record ExportRequest(String agentId, String principalId, Long fromSequence, Long toSequence,
+                                Boolean includePrompts) {
+
+        public static ExportRequest empty() {
+            return new ExportRequest(null, null, null, null, null);
+        }
+
+        public PackageRequest toRequest() {
+            return new PackageRequest(agentId, principalId, fromSequence, toSequence);
+        }
+
+        public boolean prompts() {
+            return Boolean.TRUE.equals(includePrompts);
+        }
+    }
+
+    public record PromptResponse(String hash, String text) {
     }
 
     public record Scope(String agentId, String principalId, long fromSequence, long toSequence) {
@@ -74,7 +95,8 @@ public class PackageDocuments {
 
     public record PackageResponse(String format, Instant createdAt, Scope scope, List<KeyController.KeyResponse> keys,
                            CheckpointResponse anchor, CheckpointResponse checkpoint, long disclosed,
-                           List<LinkResponse> links, LogResponse log) {
+                           List<LinkResponse> links, LogResponse log,
+                           @JsonInclude(JsonInclude.Include.NON_NULL) List<PromptResponse> prompts) {
     }
 
     private final PackageService packages;
@@ -82,10 +104,12 @@ public class PackageDocuments {
     private final WitnessCollector witnesses;
     private final TimestampService timestamps;
     private final RekorService rekor;
+    private final PromptService promptTexts;
     private final JsonMapper json;
 
     PackageDocuments(PackageService packages, LedgerSigner signer, WitnessCollector witnesses,
-                     TimestampService timestamps, RekorService rekor, JsonMapper json) {
+                     TimestampService timestamps, RekorService rekor, PromptService promptTexts, JsonMapper json) {
+        this.promptTexts = promptTexts;
         this.packages = packages;
         this.signer = signer;
         this.witnesses = witnesses;
@@ -95,11 +119,33 @@ public class PackageDocuments {
     }
 
     public PackageResponse export(PackageRequest request) {
+        return export(request, false);
+    }
+
+    public PackageResponse export(PackageRequest request, boolean includePrompts) {
         EvidencePackage p = packages.export(request);
         return new PackageResponse(EvidencePackage.FORMAT, p.createdAt(),
                 new Scope(p.agentId(), p.principalId(), p.fromSequence(), p.toSequence()),
                 keys(), CheckpointResponse.of(p.anchor()), CheckpointResponse.of(p.checkpoint()), p.disclosed(),
-                p.items().stream().map(LinkResponse::of).toList(), LogResponse.of(p.log()));
+                p.items().stream().map(LinkResponse::of).toList(), LogResponse.of(p.log()),
+                includePrompts ? prompts(p) : null);
+    }
+
+    private List<PromptResponse> prompts(EvidencePackage p) {
+        Set<String> hashes = new TreeSet<>();
+        for (EvidencePackage.Item item : p.items()) {
+            AgentModel model = item.entry() == null ? null : item.entry().model();
+            if (model != null) {
+                if (model.promptHash() != null) {
+                    hashes.add(model.promptHash());
+                }
+                if (model.configHash() != null) {
+                    hashes.add(model.configHash());
+                }
+            }
+        }
+        return promptTexts.texts(hashes).entrySet().stream()
+                .map(e -> new PromptResponse(e.getKey(), e.getValue())).toList();
     }
 
     public JsonNode tree(Object value) {

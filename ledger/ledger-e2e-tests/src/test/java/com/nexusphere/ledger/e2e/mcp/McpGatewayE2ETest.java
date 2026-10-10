@@ -68,6 +68,38 @@ class McpGatewayE2ETest extends LedgerE2ETestBase {
     }
 
     @Test
+    void theModelHeadersAreRecordedWithTheDecisionAndItsOutcome() {
+        RegisteredAgent agent = registerAgent("acme");
+        grant(grantBody("alice", agent.agentId(), List.of("tools/call"), List.of("files/*")));
+        String promptHash = Hashes.sha256("Read reports only.".getBytes(StandardCharsets.UTF_8));
+        Map<String, String> headers = new HashMap<>(as("alice"));
+        headers.put("X-Ledger-Model", "claude-sonnet-5-5");
+        headers.put("X-Ledger-Model-Version", "2026-09-01");
+        headers.put("X-Ledger-Prompt-Hash", promptHash);
+
+        String decisionId = agent.client().post(FILES, toolCall(11, "read_file"), headers)
+                .header("X-Ledger-Decision").orElseThrow();
+        JsonNode decision = ledger().get("/api/v1/evidence/" + decisionId).json();
+        JsonNode outcome = ledger().get("/api/v1/evidence/" + ledger().get("/api/v1/decisions/" + decisionId).json()
+                .path("outcomeEvidenceId").asString()).json();
+
+        assertThat(decision.path("model").path("name").asString()).isEqualTo("claude-sonnet-5-5");
+        assertThat(decision.path("model").path("version").asString()).isEqualTo("2026-09-01");
+        assertThat(decision.path("model").path("promptHash").asString()).isEqualTo(promptHash);
+        assertThat(decision.path("model").path("configHash").isNull()).isTrue();
+        assertThat(outcome.path("model")).isEqualTo(decision.path("model"));
+
+        headers.put("X-Ledger-Prompt-Hash", "not-a-hash");
+        int calls = MCP.calls("read_file");
+        LedgerClient.Response invalid = agent.client().post(FILES, toolCall(12, "read_file"), headers);
+
+        assertThat(invalid.status()).isEqualTo(400);
+        assertThat(invalid.json().path("error").path("data").path("fields").path("model.promptHash").asString())
+                .isEqualTo("must be a lowercase hex SHA-256 digest");
+        assertThat(MCP.calls("read_file")).isEqualTo(calls);
+    }
+
+    @Test
     void theServerCanCheckThatTheLedgerSignedEveryRequest() {
         RegisteredAgent agent = registerAgent("acme");
         grant(grantBody("alice", agent.agentId(), List.of("tools/call"), List.of("files/*")));

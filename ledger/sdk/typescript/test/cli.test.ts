@@ -3,7 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { INVALID, USAGE, VALID, run } from "../src/cli.js";
-import { PrivateKey, fromHex, presentBound } from "../src/index.js";
+import { PrivateKey, fromHex, presentBound, sha256Hex } from "../src/index.js";
 import {
   ISSUER,
   LEDGER_KEY,
@@ -41,6 +41,19 @@ describe("nexusphere-ledger-verify", () => {
     expect(JSON.parse(json.out).valid).toBe(false);
     expect((await cli()).code).toBe(USAGE);
     expect((await cli(join(directory, "missing.json"))).code).toBe(USAGE);
+  });
+
+  it("prints the prompt texts a package discloses", async () => {
+    const prompt = "Pay approved invoices only.";
+    const promptHash = await sha256Hex(prompt);
+    const pkg = await buildPackage(await entries(3, undefined, undefined, { 2: { name: "model-a", promptHash } }), [2]);
+    const path = join(directory, "prompts.json");
+    writeFileSync(path, JSON.stringify(pkg));
+    expect((await cli(path)).out).not.toContain("Prompts");
+    writeFileSync(path, JSON.stringify({ ...pkg, prompts: [{ hash: promptHash, text: prompt }] }));
+    const result = await cli(path);
+    expect(result.code).toBe(VALID);
+    expect(result.out).toMatch(/ {2}Disclosed {3}: 1 entries\n {2}Prompts {5}: 1 prompt texts match the hashes their entries name\n/);
   });
 
   it("verifies the timestamp of a package", async () => {

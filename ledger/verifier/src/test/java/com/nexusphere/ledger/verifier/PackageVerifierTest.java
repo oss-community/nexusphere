@@ -1,5 +1,6 @@
 package com.nexusphere.ledger.verifier;
 
+import com.nexusphere.ledger.chain.AgentModel;
 import com.nexusphere.ledger.chain.Checkpoint;
 import com.nexusphere.ledger.chain.EvidenceEntry;
 import com.nexusphere.ledger.chain.Hashes;
@@ -41,12 +42,16 @@ class PackageVerifierTest {
     private static final Instant NOW = Instant.parse("2026-10-07T08:00:00Z");
 
     static ObjectNode pkg(int length, int disclosed) {
+        return pkg(length, disclosed, null);
+    }
+
+    static ObjectNode pkg(int length, int disclosed, AgentModel model) {
         List<EvidenceEntry> entries = new ArrayList<>();
         String previous = Hashes.GENESIS;
         for (int i = 1; i <= length; i++) {
             EvidenceEntry entry = new EvidenceEntry(UUID.randomUUID(), i, NOW, NOW, i == disclosed ? "agent-a" : "agent-b",
-                    "alice", "tools/call", "search", "ALLOW", null, null, null, null, "SUCCEEDED", null,
-                    new TreeMap<>(), previous, null).sealed();
+                    "alice", "tools/call", "search", "ALLOW", null, null, null, null, "SUCCEEDED",
+                    i == disclosed ? model : null, null, new TreeMap<>(), previous, null).sealed();
             entries.add(entry);
             previous = entry.hash();
         }
@@ -83,6 +88,9 @@ class PackageVerifierTest {
         node.put("erased", false);
         node.set("salts", JSON.valueToTree(e.salts()));
         node.set("commitments", JSON.valueToTree(e.commitments()));
+        if (e.model() != null) {
+            node.set("model", JSON.valueToTree(e.model().toMap()));
+        }
         return node;
     }
 
@@ -90,6 +98,37 @@ class PackageVerifierTest {
     void aPackageWithoutAFormatIsInvalid() {
         assertThat(PackageVerifier.verify(JSON.createObjectNode(), null).problems())
                 .containsExactly("unknown package format null");
+    }
+
+    @Test
+    void theModelIsBoundToTheEntryAndPromptTextsMatchTheirHashes() {
+        String prompt = "Pay approved invoices only.";
+        String promptHash = Hashes.sha256(prompt.getBytes(StandardCharsets.UTF_8));
+        ObjectNode pkg = pkg(3, 2, new AgentModel("model-a", "1", promptHash, null));
+        pkg.putArray("prompts").addObject().put("hash", promptHash).put("text", prompt);
+
+        PackageReport report = PackageVerifier.verify(pkg, SigningKeys.encode(KEYS.getPublic()));
+
+        assertThat(report.problems()).isEmpty();
+        assertThat(report.disclosedPrompts()).isEqualTo(1);
+
+        ((ObjectNode) pkg.path("links").get(1).path("entry").path("model")).put("version", "2");
+
+        assertThat(PackageVerifier.verify(pkg, SigningKeys.encode(KEYS.getPublic())).valid()).isFalse();
+    }
+
+    @Test
+    void aPromptTextMustMatchItsHashAndBeNamedByAnEntry() {
+        String promptHash = Hashes.sha256("Pay approved invoices only.".getBytes(StandardCharsets.UTF_8));
+        String other = Hashes.sha256("Something else.".getBytes(StandardCharsets.UTF_8));
+        ObjectNode pkg = pkg(3, 2, new AgentModel("model-a", "1", promptHash, null));
+        ArrayNode prompts = pkg.putArray("prompts");
+        prompts.addObject().put("hash", promptHash).put("text", "Pay every invoice.");
+        prompts.addObject().put("hash", other).put("text", "Something else.");
+
+        assertThat(PackageVerifier.verify(pkg, SigningKeys.encode(KEYS.getPublic())).problems())
+                .containsExactly("prompt " + promptHash + " does not match its text",
+                        "prompt " + other + " is not named by a disclosed entry");
     }
 
     @Test

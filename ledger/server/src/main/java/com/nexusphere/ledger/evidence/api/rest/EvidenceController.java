@@ -1,6 +1,8 @@
 package com.nexusphere.ledger.evidence.api.rest;
 
+import com.nexusphere.ledger.chain.AgentModel;
 import com.nexusphere.ledger.chain.EvidenceEntry;
+import com.nexusphere.ledger.chain.Hashes;
 import com.nexusphere.ledger.evidence.application.EvidenceService;
 import com.nexusphere.ledger.evidence.domain.model.Decision;
 import com.nexusphere.ledger.evidence.domain.model.EvidenceQuery;
@@ -9,6 +11,7 @@ import com.nexusphere.ledger.evidence.domain.model.LedgerHead;
 import com.nexusphere.ledger.evidence.domain.model.Outcome;
 import com.nexusphere.ledger.server.security.Caller;
 import com.nexusphere.ledger.server.web.LedgerException;
+import com.nexusphere.ledger.server.web.ModelFields;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -21,6 +24,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 import java.net.URI;
 import java.time.Instant;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -42,11 +46,20 @@ class EvidenceController {
             String outputHash,
             Outcome outcome,
             String correlationId,
-            Map<String, String> attributes) {
+            Map<String, String> attributes,
+            ModelRequest model) {
 
         EvidenceSubmission toSubmission() {
             return new EvidenceSubmission(occurredAt, agentId, principalId, action, target, decision, reason,
-                    delegationId, inputHash, outputHash, outcome, correlationId, attributes);
+                    delegationId, inputHash, outputHash, outcome, correlationId, attributes,
+                    model == null ? null : model.toModel());
+        }
+    }
+
+    record ModelRequest(String name, String version, String promptHash, String configHash) {
+
+        AgentModel toModel() {
+            return ModelFields.of(name, version, promptHash, configHash, "The evidence has invalid fields.");
         }
     }
 
@@ -66,6 +79,7 @@ class EvidenceController {
             String inputHash,
             String outputHash,
             String outcome,
+            AgentModel model,
             String correlationId,
             Map<String, String> attributes,
             boolean erased,
@@ -77,7 +91,7 @@ class EvidenceController {
         static EvidenceResponse of(EvidenceEntry e) {
             return new EvidenceResponse(EvidenceEntry.FORMAT, e.id(), e.sequence(), e.occurredAt(), e.recordedAt(),
                     e.agentId(), e.principalId(), e.action(), e.target(), e.decision(), e.reason(), e.delegationId(),
-                    e.inputHash(), e.outputHash(), e.outcome(), e.correlationId(), e.attributes(), e.erased(),
+                    e.inputHash(), e.outputHash(), e.outcome(), e.model(), e.correlationId(), e.attributes(), e.erased(),
                     e.salts(), e.commitments(), e.previousHash(), e.hash());
         }
     }

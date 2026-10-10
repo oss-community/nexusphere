@@ -1,4 +1,5 @@
 import { sha256Hex } from "./canonical.js";
+import { AgentModel } from "./evidence.js";
 import { formatInstant } from "./timestamps.js";
 
 type Json = Record<string, unknown>;
@@ -55,6 +56,7 @@ export interface EvidenceInput {
   outputHash?: string;
   correlationId?: string;
   attributes?: Record<string, string>;
+  model?: AgentModel;
   input?: unknown;
   output?: unknown;
 }
@@ -68,6 +70,7 @@ export interface DecideInput {
   correlationId?: string;
   attributes?: Record<string, string>;
   agentId?: string;
+  model?: AgentModel;
 }
 
 export class Action {
@@ -181,7 +184,21 @@ export class LedgerClient {
     return key.publicKey as string;
   }
 
-  exportPackage(scope: { agentId?: string; principalId?: string; fromSequence?: number; toSequence?: number } = {}) {
+  async storePrompt(text: string): Promise<string> {
+    return ((await this.request("PUT", "/api/v1/prompts", undefined, { text })) as Json).hash as string;
+  }
+
+  prompt(hash: string): Promise<Json> {
+    return this.get("/api/v1/prompts/" + encodeURIComponent(hash));
+  }
+
+  exportPackage(scope: {
+    agentId?: string;
+    principalId?: string;
+    fromSequence?: number;
+    toSequence?: number;
+    includePrompts?: boolean;
+  } = {}) {
     return this.post("/api/v1/packages", compact(scope));
   }
 
@@ -191,14 +208,26 @@ export class LedgerClient {
 
   createReport(
     id: string,
-    scope: { agentId?: string; principalId?: string; fromSequence?: number; toSequence?: number } = {},
+    scope: {
+      agentId?: string;
+      principalId?: string;
+      fromSequence?: number;
+      toSequence?: number;
+      includePrompts?: boolean;
+    } = {},
   ): Promise<Json> {
     return this.post("/api/v1/reports/" + encodeURIComponent(id), compact(scope));
   }
 
   async createReportHtml(
     id: string,
-    scope: { agentId?: string; principalId?: string; fromSequence?: number; toSequence?: number } = {},
+    scope: {
+      agentId?: string;
+      principalId?: string;
+      fromSequence?: number;
+      toSequence?: number;
+      includePrompts?: boolean;
+    } = {},
   ): Promise<string> {
     return new TextDecoder().decode(await (this.request("POST", "/api/v1/reports/" + encodeURIComponent(id),
       { format: "html" }, compact(scope), true) as Promise<Uint8Array>));
@@ -211,6 +240,7 @@ export class LedgerClient {
     principalId?: string;
     fromSequence?: number;
     toSequence?: number;
+    includePrompts?: boolean;
   }): Promise<Uint8Array> {
     return this.request("POST", "/api/v1/disputes", undefined, compact(dispute), true) as Promise<Uint8Array>;
   }
@@ -225,6 +255,7 @@ export class LedgerClient {
       inputHash,
       correlationId: input.correlationId,
       attributes: input.attributes,
+      model: input.model === undefined ? undefined : compact({ ...input.model }),
     }));
   }
 
@@ -410,6 +441,7 @@ async function evidence(input: EvidenceInput): Promise<Json> {
     occurredAt: occurredAt === undefined ? undefined : formatInstant(occurredAt),
     inputHash: rest.inputHash ?? (given === undefined ? undefined : await hashOf(given)),
     outputHash: rest.outputHash ?? (output === undefined ? undefined : await hashOf(output)),
+    model: rest.model === undefined ? undefined : compact({ ...rest.model }),
   });
 }
 

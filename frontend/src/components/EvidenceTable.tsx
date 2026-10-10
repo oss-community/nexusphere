@@ -45,6 +45,13 @@ export function EvidenceTable({ items }: { items: Evidence[] }) {
                     <dt>Reason</dt><dd>{e.reason ?? '-'}</dd>
                     <dt>Delegation</dt><dd><code>{e.delegationId ?? '-'}</code></dd>
                     <dt>Correlation</dt><dd><code>{e.correlationId ?? '-'}</code></dd>
+                    {e.model && (
+                      <>
+                        <dt>Model</dt><dd>{e.model.name ?? '-'}{e.model.version ? ` (${e.model.version})` : ''}</dd>
+                        {e.model.promptHash && <><dt>Prompt hash</dt><dd><code>{e.model.promptHash}</code></dd></>}
+                        {e.model.configHash && <><dt>Config hash</dt><dd><code>{e.model.configHash}</code></dd></>}
+                      </>
+                    )}
                     <dt>Input hash</dt><dd><code>{e.inputHash ?? '-'}</code></dd>
                     <dt>Output hash</dt><dd><code>{e.outputHash ?? '-'}</code></dd>
                     <dt>Previous hash</dt><dd><code>{e.previousHash}</code></dd>

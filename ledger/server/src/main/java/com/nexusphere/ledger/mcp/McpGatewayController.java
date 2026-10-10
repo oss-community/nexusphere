@@ -36,9 +36,9 @@ class McpGatewayController {
             @RequestHeader(name = McpUpstream.SESSION_HEADER, required = false) String sessionId,
             @RequestHeader(name = McpUpstream.PROTOCOL_HEADER, required = false) String protocolVersion,
             @RequestHeader(name = HttpHeaders.ACCEPT, required = false) String accept,
-            @RequestBody byte[] body) {
+            @RequestHeader HttpHeaders headers, @RequestBody byte[] body) {
         boolean acceptsStream = accept != null && accept.contains(EventStream.CONTENT_TYPE);
-        return respond(gateway.post(caller, server, principalId, sessionId, protocolVersion, acceptsStream, body));
+        return respond(gateway.post(caller, server, principalId, sessionId, protocolVersion, acceptsStream, headers, body));
     }
 
     @GetMapping

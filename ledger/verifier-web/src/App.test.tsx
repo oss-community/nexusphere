@@ -1,7 +1,7 @@
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { App } from './App'
-import { KeyRevocation, KeyRotation, PrivateKey } from '@nexusphere/ledger'
+import { KeyRevocation, KeyRotation, PrivateKey, sha256Hex } from '@nexusphere/ledger'
 import {
   LEDGER_KEY,
   buildPackage,
@@ -131,6 +131,30 @@ describe('App', async () => {
     await user.click(screen.getByRole('button', { name: 'Verify' }))
     expect(await screen.findByTestId('verdict')).toHaveTextContent('VALID')
     expect(screen.getByText(`entry ${rekor.entry.logIndex} in rekor.local (pinned)`)).toBeInTheDocument()
+  })
+
+  it('shows the prompt texts and the models of the disclosed entries', async () => {
+    const prompt = 'Pay approved invoices only.'
+    const promptHash = await sha256Hex(prompt)
+    const modelled = await entries(4, undefined, undefined, { 2: { name: 'model-a', version: '2026-09-01', promptHash } })
+    const pkg = (await buildPackage(modelled, [2, 3])) as any
+    pkg.prompts = [{ hash: promptHash, text: prompt }]
+    const user = await upload(pkg)
+    await user.type(screen.getByLabelText('Ledger public key'), PINNED)
+    await user.click(screen.getByRole('button', { name: 'Verify' }))
+    expect(await screen.findByTestId('verdict')).toHaveTextContent('VALID')
+    expect(screen.getByText('Prompts')).toBeInTheDocument()
+    expect(screen.getByText('1 prompt texts match the hashes their entries name')).toBeInTheDocument()
+    expect(screen.getByRole('columnheader', { name: 'Model' })).toBeInTheDocument()
+    expect(screen.getByText('model-a 2026-09-01')).toBeInTheDocument()
+  })
+
+  it('shows no prompts line and no model column without them', async () => {
+    const user = await upload(await buildPackage(chain, [2]))
+    await user.click(screen.getByRole('button', { name: 'Verify' }))
+    expect(await screen.findByTestId('verdict')).toHaveTextContent('VALID')
+    expect(screen.queryByText('Prompts')).not.toBeInTheDocument()
+    expect(screen.queryByRole('columnheader', { name: 'Model' })).not.toBeInTheDocument()
   })
 
   it('reports files that are not packages', async () => {

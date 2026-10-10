@@ -29,7 +29,8 @@ def witness_note_key() -> NoteKey:
     return NoteKey(WITNESS, COSIGNATURE, WITNESS_KEY.public_key)
 
 
-def entries(count: int, agents=("invoice-agent", "sales-agent"), principals=("acme", "globex")) -> list:
+def entries(count: int, agents=("invoice-agent", "sales-agent"), principals=("acme", "globex"),
+            models=None) -> list:
     chain = []
     previous = GENESIS
     for index in range(count):
@@ -53,6 +54,8 @@ def entries(count: int, agents=("invoice-agent", "sales-agent"), principals=("ac
             "attributes": {"tool": "read_invoice"},
             "previousHash": previous,
         }
+        if sequence in (models or {}):
+            entry["model"] = dict(models[sequence])
         entry["salts"] = salts(sequence, ("principalId", "target", "reason", "correlationId", "attributes.tool"))
         entry["hash"] = link_hash(sequence, previous, content_hash(entry))
         previous = entry["hash"]

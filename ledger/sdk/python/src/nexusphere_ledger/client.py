@@ -116,18 +116,20 @@ class LedgerClient:
         return next(key["publicKey"] for key in self.keys() if key.get("status") == "ACTIVE")
 
     def export_package(self, agent_id: Optional[str] = None, principal_id: Optional[str] = None,
-                       from_sequence: Optional[int] = None, to_sequence: Optional[int] = None) -> dict:
+                       from_sequence: Optional[int] = None, to_sequence: Optional[int] = None,
+                       include_prompts: bool = False) -> dict:
         return self._post("/api/v1/packages", _compact({"agentId": agent_id, "principalId": principal_id,
-                                                        "fromSequence": from_sequence, "toSequence": to_sequence}))
+                                                        "fromSequence": from_sequence, "toSequence": to_sequence,
+                                                        "includePrompts": include_prompts or None}))
 
     def reports(self) -> List[dict]:
         return self._get("/api/v1/reports")
 
     def create_report(self, report_id: str, agent_id: Optional[str] = None, principal_id: Optional[str] = None,
                       from_sequence: Optional[int] = None, to_sequence: Optional[int] = None,
-                      html: bool = False) -> Union[dict, str]:
+                      html: bool = False, include_prompts: bool = False) -> Union[dict, str]:
         body = _compact({"agentId": agent_id, "principalId": principal_id, "fromSequence": from_sequence,
-                         "toSequence": to_sequence})
+                         "toSequence": to_sequence, "includePrompts": include_prompts or None})
         if html:
             return self._request("POST", "/api/v1/reports/" + _segment(report_id), query={"format": "html"},
                                  body=body, raw=True).decode("utf-8")
@@ -135,17 +137,19 @@ class LedgerClient:
 
     def create_dispute(self, title: str, description: Optional[str] = None, agent_id: Optional[str] = None,
                        principal_id: Optional[str] = None, from_sequence: Optional[int] = None,
-                       to_sequence: Optional[int] = None) -> bytes:
+                       to_sequence: Optional[int] = None, include_prompts: bool = False) -> bytes:
         return self._request("POST", "/api/v1/disputes", body=_compact({
             "agentId": agent_id, "principalId": principal_id, "fromSequence": from_sequence,
-            "toSequence": to_sequence, "title": title, "description": description}), raw=True)
+            "toSequence": to_sequence, "title": title, "description": description,
+            "includePrompts": include_prompts or None}), raw=True)
 
     def decide(self, principal_id: str, action: str, target: Optional[str] = None, input_hash: Optional[str] = None,
                correlation_id: Optional[str] = None, attributes: Optional[dict] = None,
-               agent_id: Optional[str] = None) -> dict:
+               agent_id: Optional[str] = None, model: Optional[dict] = None) -> dict:
         return self._post("/api/v1/decisions", _compact({
             "agentId": agent_id, "principalId": principal_id, "action": action, "target": target,
-            "inputHash": input_hash, "correlationId": correlation_id, "attributes": attributes}))
+            "inputHash": input_hash, "correlationId": correlation_id, "attributes": attributes,
+            "model": model}))
 
     def report_outcome(self, decision_id: str, outcome: str, output_hash: Optional[str] = None,
                        reason: Optional[str] = None, attributes: Optional[dict] = None) -> dict:
@@ -158,9 +162,9 @@ class LedgerClient:
     @contextmanager
     def act(self, principal_id: str, action: str, target: Optional[str] = None, input=None,
             correlation_id: Optional[str] = None, attributes: Optional[dict] = None,
-            agent_id: Optional[str] = None):
+            agent_id: Optional[str] = None, model: Optional[dict] = None):
         decision = self.decide(principal_id, action, target, None if input is None else hash_of(input),
-                               correlation_id, attributes, agent_id)
+                               correlation_id, attributes, agent_id, model)
         if decision.get("decision") != "ALLOW":
             raise Denied(decision)
         handle = Action(self, decision)
@@ -172,6 +176,12 @@ class LedgerClient:
             raise
         handle.reported = self.report_outcome(handle.decision_id, "SUCCEEDED", handle.output_hash, None,
                                               handle.attributes)
+
+    def store_prompt(self, text: str) -> str:
+        return self._request("PUT", "/api/v1/prompts", body={"text": text})["hash"]
+
+    def prompt(self, prompt_hash: str) -> dict:
+        return self._get("/api/v1/prompts/" + _segment(prompt_hash))
 
     def register_agent(self, agent_id: str, name: Optional[str] = None, owner_id: Optional[str] = None) -> dict:
         return self._post("/api/v1/agents", _compact({"agentId": agent_id, "name": name, "ownerId": owner_id}))
@@ -237,7 +247,7 @@ class LedgerClient:
 
     def _evidence(self, agent_id=None, principal_id=None, action=None, outcome=None, occurred_at=None,
                   target=None, decision=None, reason=None, delegation_id=None, input_hash=None, output_hash=None,
-                  correlation_id=None, attributes=None, input=None, output=None) -> dict:
+                  correlation_id=None, attributes=None, input=None, output=None, model=None) -> dict:
         if input is not None and input_hash is None:
             input_hash = hash_of(input)
         if output is not None and output_hash is None:
@@ -247,7 +257,7 @@ class LedgerClient:
             "agentId": agent_id, "principalId": principal_id, "action": action, "target": target,
             "decision": decision, "reason": reason, "delegationId": delegation_id, "inputHash": input_hash,
             "outputHash": output_hash, "outcome": outcome, "correlationId": correlation_id,
-            "attributes": attributes})
+            "attributes": attributes, "model": model})
 
     def _get(self, path: str, **query):
         return self._request("GET", path, query=query)

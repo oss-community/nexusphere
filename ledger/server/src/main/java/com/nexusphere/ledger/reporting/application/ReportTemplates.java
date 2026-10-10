@@ -13,10 +13,12 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.TreeSet;
 import java.util.function.Function;
+import java.util.function.Predicate;
 
 import static com.nexusphere.ledger.reporting.application.ReportFacts.erased;
 import static com.nexusphere.ledger.reporting.application.ReportFacts.has;
 import static com.nexusphere.ledger.reporting.application.ReportFacts.is;
+import static com.nexusphere.ledger.reporting.application.ReportFacts.model;
 
 public final class ReportTemplates {
 
@@ -83,6 +85,16 @@ public final class ReportTemplates {
                 Status.share(facts.count(has("delegationId").or(is("outcome", "DENIED"))), facts.total()), authority,
                 facts.sequences(has("delegationId"))));
         sections.add(outcomes(facts, "outcomes", "Outcomes", "What happened after each action that was not denied"));
+        long named = facts.count(model("name"));
+        List<String> model = new ArrayList<>();
+        model.add(named + " of " + facts.total() + " entries name the model the agent ran"
+                + (facts.models().isEmpty() ? "" : ": " + String.join(", ", facts.models())));
+        model.add(facts.count(model("promptHash")) + " entries name the hash of their prompt"
+                + (facts.modelValues("promptHash").isEmpty() ? ""
+                : ", " + facts.modelValues("promptHash").size() + " distinct"));
+        model.add(facts.count(model("configHash")) + " entries name the hash of their configuration");
+        sections.add(new ReportSection("model", "Model", "Which model, version and prompt each agent ran",
+                Status.share(named, facts.total()), model, facts.sequences(model("name"))));
         sections.add(integrity(facts, "integrity", "Integrity",
                 "The evidence has not been changed since it was recorded"));
         List<String> disclosure = List.of(
@@ -117,6 +129,17 @@ public final class ReportTemplates {
                 "The input of each use can be traced", Status.share(inputs, facts.total()),
                 List.of(inputs + " of " + facts.total() + " events record the hash of their input"),
                 facts.sequences(has("inputHash").negate())));
+        Predicate<JsonNode> traced = model("name").and(model("version")).and(model("promptHash"));
+        long models = facts.count(traced);
+        sections.add(new ReportSection("art-12-2-a", "EU AI Act Article 12(2)(a)",
+                "The records show which model, version and prompt produced each event, so a substantial"
+                        + " modification can be identified",
+                Status.share(models, facts.total()),
+                List.of(models + " of " + facts.total() + " events name the model, its version and the hash of"
+                                + " the prompt",
+                        facts.models().isEmpty() ? "No event names a model"
+                                : "Models: " + String.join(", ", facts.models())),
+                facts.sequences(traced.negate())));
         sections.add(retention(facts, "art-19-1", "EU AI Act Articles 19(1) and 26(6)",
                 "Logs are kept for at least six months", Period.ofMonths(6)));
         sections.add(integrity(facts, "integrity", "EU AI Act Article 12",

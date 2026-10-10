@@ -1,3 +1,4 @@
+import hashlib
 import io
 import json
 import os
@@ -38,6 +39,23 @@ class Cli(unittest.TestCase):
             self.assertFalse(json.loads(out)["valid"])
             self.assertEqual(USAGE, self.run_cli()[0])
             self.assertEqual(USAGE, self.run_cli(os.path.join(directory, "missing.json"))[0])
+
+    def test_package_with_prompts(self):
+        prompt = "Pay approved invoices only."
+        prompt_hash = hashlib.sha256(prompt.encode("utf-8")).hexdigest()
+        pkg = package(entries(3, models={2: {"name": "model-a", "promptHash": prompt_hash}}), {2})
+        with tempfile.TemporaryDirectory() as directory:
+            path = self.write(directory, "package.json", json.dumps(pkg))
+            code, out, _ = self.run_cli(path)
+            self.assertEqual(VALID, code, out)
+            self.assertNotIn("Prompts", out)
+            pkg["prompts"] = [{"hash": prompt_hash, "text": prompt}]
+            path = self.write(directory, "package.json", json.dumps(pkg))
+            code, out, _ = self.run_cli(path)
+            self.assertEqual(VALID, code, out)
+            self.assertIn("  Disclosed   : 1 entries\n"
+                          "  Prompts     : 1 prompt texts match the hashes their entries name\n"
+                          "  Log         : ", out)
 
     def test_timestamped_package(self):
         v = vector("timestamp.json")
