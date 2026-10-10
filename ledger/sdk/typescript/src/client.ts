@@ -345,6 +345,10 @@ export class LedgerClient {
     return this.post(`/api/v1/mandates/${encodeURIComponent(id)}/revoke`, compact({ reason }));
   }
 
+  issueTrackRecord(agentId: string, audience?: string, validFor?: string): Promise<Json> {
+    return this.post(`/api/v1/agents/${encodeURIComponent(agentId)}/track-record`, compact({ audience, validFor }));
+  }
+
   jwks(): Promise<Json> {
     return this.get("/public/v1/keys");
   }

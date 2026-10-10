@@ -23,6 +23,9 @@ function fakeLedger() {
     if (path === "/api/v1/index/proofs") {
       return Response.json({ format: "nexusphere-ledger/index-proof/v1", term: (body as { term: unknown }).term });
     }
+    if (path === "/api/v1/agents/invoice-agent/track-record") {
+      return Response.json({ credential: "token~", id: "00000000-0000-4000-8000-0000000000dd", checkpoint: 3 });
+    }
     if (path === "/api/v1/reports") {
       return Response.json([{ id: "dispute", title: "Dispute package", profiles: ["baseline"] }]);
     }
@@ -136,5 +139,17 @@ describe("LedgerClient index proofs", () => {
     expect(ledger.calls[0]).toMatchObject({ method: "POST", url: URL + "/api/v1/index/proofs", body: { term } });
     await client.indexProof({ type: "agent", agentId: "invoice-agent" }, 7);
     expect(ledger.calls[1].body).toEqual({ term: { type: "agent", agentId: "invoice-agent" }, sequence: 7 });
+  });
+});
+
+describe("LedgerClient track records", () => {
+  it("asks for the track record of an agent, for any or one audience", async () => {
+    const ledger = fakeLedger();
+    const client = new LedgerClient(URL, { apiKey: "invoice-agent-key", fetch: ledger.fetcher });
+    expect(await client.issueTrackRecord("invoice-agent")).toMatchObject({ credential: "token~", checkpoint: 3 });
+    expect(ledger.calls[0]).toMatchObject({ method: "POST", url: URL + "/api/v1/agents/invoice-agent/track-record",
+      body: {} });
+    await client.issueTrackRecord("invoice-agent", "https://supplier.example", "P7D");
+    expect(ledger.calls[1].body).toEqual({ audience: "https://supplier.example", validFor: "P7D" });
   });
 });

@@ -62,3 +62,24 @@ test('verifies an index proof from the built file without any network request', 
   await expect(browser.getByText('no entry up to sequence 3')).toBeVisible()
   expect(requests).toEqual([page])
 })
+
+test('verifies a track record against its index proof from the built file', async ({ page: browser }) => {
+  const record = vector('agent-track-record.json')
+  const requests: string[] = []
+  browser.on('request', (request) => requests.push(request.url()))
+  await browser.clock.setFixedTime(new Date('2026-10-10T00:00:00Z'))
+  await browser.goto(page)
+  await browser.getByLabel('Or paste a track record').fill(record.presentedWithOutcomesOnly)
+  await browser.getByLabel('Ledger public key').fill(LEDGER_KEY.publicKey.encoded)
+  await browser.getByLabel('Index proof file').setInputFiles({
+    name: 'proof.json',
+    mimeType: 'application/json',
+    buffer: Buffer.from(JSON.stringify(record.indexProof)),
+  })
+  await browser.getByRole('button', { name: 'Verify' }).click()
+  await expect(browser.getByTestId('verdict')).toHaveText('VALID')
+  await expect(browser.getByText('DENIED 1, SUCCEEDED 1')).toBeVisible()
+  await expect(browser.getByText('withheld')).toHaveCount(2)
+  await expect(browser.getByText('2 entries at checkpoint 3, matches the track record')).toBeVisible()
+  expect(requests).toEqual([page])
+})

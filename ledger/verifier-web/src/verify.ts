@@ -1,5 +1,7 @@
 import { INDEX_PROOF_FORMAT, readCertificates, verifyIndexProof, verifyPackage } from '@nexusphere/ledger'
 import type { IndexCheck, PackageReport } from '@nexusphere/ledger'
+import { isTrackRecord, matchTrackRecord, verifyTrackRecord } from './trackrecord'
+import type { TrackRecordCheck } from './trackrecord'
 
 export interface Entry {
   sequence: number
@@ -27,6 +29,14 @@ export interface IndexVerification {
   pinned: boolean
 }
 
+export interface TrackRecordVerification {
+  trackRecord: TrackRecordCheck
+  pinned: boolean
+  index: IndexCheck | null
+  mismatches: string[]
+  valid: boolean
+}
+
 export interface Input {
   packageText: string
   publicKey: string
@@ -37,9 +47,14 @@ export interface Input {
   requireTimestamp?: boolean
   rekorKeys?: string
   requireRekor?: boolean
+  indexProofText?: string
+  now?: number
 }
 
-export async function verify(input: Input): Promise<Verification | IndexVerification> {
+export async function verify(input: Input): Promise<Verification | IndexVerification | TrackRecordVerification> {
+  if (isTrackRecord(input.packageText.trim())) {
+    return verifyTrackRecordInput(input)
+  }
   let pkg: unknown
   try {
     pkg = JSON.parse(input.packageText)
@@ -59,19 +74,7 @@ export async function verify(input: Input): Promise<Verification | IndexVerifica
   if (!Number.isInteger(requiredWitnesses) || requiredWitnesses < 0) {
     throw new Error('Required witnesses must be a whole number.')
   }
-  let keys: Record<string, unknown>[] | undefined
-  if (input.keyListText && input.keyListText.trim() !== '') {
-    let parsed: unknown
-    try {
-      parsed = JSON.parse(input.keyListText)
-    } catch {
-      throw new Error('The key list is not JSON.')
-    }
-    if (!Array.isArray(parsed)) {
-      throw new Error('The key list must be the array that GET /api/v1/keys returns.')
-    }
-    keys = parsed as Record<string, unknown>[]
-  }
+  const keys = keyListOf(input)
   if ((pkg as Record<string, unknown>).format === INDEX_PROOF_FORMAT) {
     return {
       index: await verifyIndexProof(pkg, { pinnedPublicKey: publicKey, keyList: keys }),
@@ -111,6 +114,50 @@ export async function verify(input: Input): Promise<Verification | IndexVerifica
     rekorPinned: rekorKeys.length > 0,
     entries: entriesOf(pkg as Record<string, unknown>),
   }
+}
+
+async function verifyTrackRecordInput(input: Input): Promise<TrackRecordVerification> {
+  const publicKey = input.publicKey.trim() || null
+  const keyList = keyListOf(input) ?? []
+  let proof: unknown = null
+  if (input.indexProofText && input.indexProofText.trim() !== '') {
+    try {
+      proof = JSON.parse(input.indexProofText)
+    } catch {
+      throw new Error('The index proof is not JSON.')
+    }
+  }
+  const trackRecord = await verifyTrackRecord(input.packageText.trim(), {
+    pinnedPublicKey: publicKey,
+    keyList,
+    now: input.now ?? Math.floor(Date.now() / 1000),
+  })
+  const index = proof === null ? null : await verifyIndexProof(proof, { pinnedPublicKey: publicKey, keyList })
+  const mismatches = index && trackRecord.claims ? matchTrackRecord(trackRecord.claims, proof, index) : []
+  return {
+    trackRecord,
+    pinned: publicKey !== null,
+    index,
+    mismatches,
+    valid: trackRecord.claims !== null && trackRecord.problems.length === 0 &&
+      (index === null || (index.valid && mismatches.length === 0)),
+  }
+}
+
+function keyListOf(input: Input): Record<string, unknown>[] | undefined {
+  if (!input.keyListText || input.keyListText.trim() === '') {
+    return undefined
+  }
+  let parsed: unknown
+  try {
+    parsed = JSON.parse(input.keyListText)
+  } catch {
+    throw new Error('The key list is not JSON.')
+  }
+  if (!Array.isArray(parsed)) {
+    throw new Error('The key list must be the array that GET /api/v1/keys returns.')
+  }
+  return parsed as Record<string, unknown>[]
 }
 
 function entriesOf(pkg: Record<string, unknown>): Entry[] {

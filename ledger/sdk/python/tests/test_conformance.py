@@ -19,6 +19,7 @@ from nexusphere_ledger.package import verify_package
 from nexusphere_ledger.rekor import rekor_request, verify_rekor_entry
 from nexusphere_ledger.report import entries_digest, report_signed_bytes
 from nexusphere_ledger.timestamp import TimestampToken, read_certificates
+from nexusphere_ledger.trackrecord import TrackRecordClaims, TrackRecordVerifier, match_track_record
 
 from .support import ISSUER, LEDGER_KEY, ORIGIN, WITNESS, WITNESS_KEY, package, vector
 
@@ -419,6 +420,28 @@ class KeyBoundMandateVector(unittest.TestCase):
         agent = PrivateKey.from_seed(bytes.fromhex(v["agentSeed"]))
         presented = present_bound(v["token"], agent, v["audience"], v["nonce"], v["presentedAt"])
         self.assertEqual(v["presentation"], presented)
+
+
+class TrackRecordVector(unittest.TestCase):
+
+    def verifier(self):
+        return TrackRecordVerifier(ISSUER, keys=StaticKeys.fixed(ISSUER, LEDGER_KEY.public_key),
+                                   clock=lambda: 1790841600 + 3600)
+
+    def test_agent_track_record(self):
+        v = vector("agent-track-record.json")
+        full = self.verifier().verify(v["token"])
+        presented = self.verifier().verify(v["presentedWithOutcomesOnly"])
+        index = verify_index_proof(v["indexProof"], LEDGER_KEY.public_key.encoded)
+        self.assertEqual([], full.problems)
+        self.assertEqual(TrackRecordClaims.from_payload(v["claims"]), full.claims)
+        self.assertEqual(v["claims"], full.claims.to_payload())
+        self.assertEqual([], presented.problems)
+        self.assertIsNone(presented.claims.actions)
+        self.assertIsNone(presented.claims.principals)
+        self.assertEqual(full.claims.outcomes, presented.claims.outcomes)
+        self.assertEqual([], index.problems)
+        self.assertEqual([], match_track_record(full.claims, v["indexProof"], index))
 
 
 class KeyHistoryVector(unittest.TestCase):

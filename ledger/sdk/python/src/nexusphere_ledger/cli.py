@@ -15,6 +15,7 @@ from .package import verify_package
 from .report import verify_report
 from .timestamp import read_certificates
 from .timestamps import epoch_text
+from .trackrecord import TrackRecordVerifier, match_track_record
 
 VALID = 0
 INVALID = 1
@@ -35,6 +36,8 @@ def run(args, out, err, stdin=None) -> int:
         return _report(args[1:], out, err)
     if args and args[0] == "index":
         return _index(args[1:], out, err)
+    if args and args[0] == "track-record":
+        return _track_record(args[1:], out, err, stdin or sys.stdin)
     if args and args[0] == "dispute":
         return _dispute(args[1:], out, err)
     return _package(args[1:] if args and args[0] == "package" else args, out, err)
@@ -462,6 +465,96 @@ def _print_mandate(check, options, out):
         out.write("Result: INVALID\n")
         for problem in check.problems:
             out.write("  - %s: %s\n" % (problem.code, problem.message))
+
+
+def _track_record(args, out, err, stdin) -> int:
+    parser = _Parser(prog="nexusphere-ledger-verify track-record", add_help=False)
+    parser.add_argument("--issuer", action="append", default=[])
+    parser.add_argument("--audience")
+    parser.add_argument("--public-key")
+    parser.add_argument("--public-key-file")
+    parser.add_argument("--nonce")
+    parser.add_argument("--require-key-binding", action="store_true")
+    parser.add_argument("--index-proof")
+    parser.add_argument("--json", action="store_true")
+    parser.add_argument("token")
+    options = _parse(parser, args, err)
+    if options is None:
+        return USAGE
+    if not options.issuer:
+        err.write(parser.format_usage() + "--issuer is required\n")
+        return USAGE
+    reading = options.token
+    try:
+        token = _read_token(options.token, stdin)
+        public_key = _public_key(options)
+        proof = None
+        if options.index_proof:
+            reading = options.index_proof
+            with open(options.index_proof, encoding="utf-8") as file:
+                proof = json.load(file)
+    except (OSError, ValueError) as e:
+        err.write("Cannot read %s: %s\n" % (reading, e))
+        return USAGE
+    keys = None
+    if public_key is not None:
+        try:
+            key = PublicKey.from_base64(public_key)
+        except ValueError:
+            err.write("The public key is not a base64 X.509 Ed25519 key\n")
+            return USAGE
+        keys = StaticKeys({issuer.rstrip("/"): {key.key_id: key} for issuer in options.issuer})
+    verifier = TrackRecordVerifier(options.issuer, keys=keys, audience=options.audience,
+                                   require_key_binding=options.require_key_binding)
+    check = verifier.verify_bound(token, options.nonce)
+    problems = ["%s: %s" % (p.code, p.message) for p in check.problems]
+    index = None
+    if proof is not None:
+        index = verify_index_proof(proof, public_key, None)
+        problems.extend("INDEX_PROOF: " + p for p in index.problems)
+        if check.claims is not None:
+            problems.extend("INDEX_MISMATCH: " + p for p in match_track_record(check.claims, proof, index))
+    valid = not problems
+    if options.json:
+        out.write(json.dumps({"valid": valid, "problems": problems,
+                              "claims": None if check.claims is None else check.claims.to_payload(),
+                              "indexProof": None if index is None else index.to_dict()}, indent=2) + "\n")
+    else:
+        _print_track_record(check.claims, index, valid, problems, out)
+    return VALID if valid else INVALID
+
+
+def _counts(counts) -> str:
+    if counts is None:
+        return "withheld"
+    return ", ".join("%s %d" % item for item in sorted(counts.items())) or "none"
+
+
+def _print_track_record(c, index, valid, problems, out):
+    out.write("Nexusphere Ledger agent track record\n")
+    if c is not None:
+        out.write("  Credential  : %s\n" % c.record_id)
+        out.write("  Issuer      : %s\n" % c.issuer)
+        out.write("  Agent       : %s\n" % c.agent_id)
+        out.write("  Audience    : %s\n" % ("any" if c.audience is None else c.audience))
+        out.write("  Valid       : %s to %s\n" % (epoch_text(c.issued_at), epoch_text(c.expires_at)))
+        out.write("  Checkpoint  : %d, index root %s\n" % (c.checkpoint_sequence, c.index_root))
+        span = "" if c.first_sequence is None else ", sequences %d to %d, %s to %s" % (
+            c.first_sequence, c.last_sequence, c.first_at, c.last_at)
+        out.write("  Entries     : %d%s\n" % (c.total, span))
+        out.write("  Outcomes    : %s\n" % _counts(c.outcomes))
+        out.write("  Principals  : %s\n" % ("withheld" if c.principals is None else c.principals))
+        out.write("  Actions     : %s\n" % _counts(c.actions))
+        out.write("  Agent key   : %s\n" % ("none" if c.holder_key is None else c.holder_key.key_id))
+    if index is not None:
+        out.write("  Index proof : %s entries at checkpoint %s\n"
+                  % (_show(index.count) if index.present else 0, _show(index.sequence)))
+    if valid:
+        out.write("Result: VALID\n")
+    else:
+        out.write("Result: INVALID\n")
+        for problem in problems:
+            out.write("  - %s\n" % problem)
 
 
 if __name__ == "__main__":

@@ -1,11 +1,13 @@
 import { useState } from 'react'
 import type { ChangeEvent, DragEvent, FormEvent } from 'react'
 import { verify } from './verify'
-import type { IndexVerification, Verification } from './verify'
+import type { IndexVerification, TrackRecordVerification, Verification } from './verify'
+import { instantText } from './trackrecord'
 
 export function App() {
   const [fileName, setFileName] = useState<string | null>(null)
   const [packageText, setPackageText] = useState('')
+  const [pasted, setPasted] = useState('')
   const [publicKey, setPublicKey] = useState('')
   const [keyListName, setKeyListName] = useState<string | null>(null)
   const [keyListText, setKeyListText] = useState('')
@@ -16,7 +18,9 @@ export function App() {
   const [requireTimestamp, setRequireTimestamp] = useState(false)
   const [rekorKeys, setRekorKeys] = useState('')
   const [requireRekor, setRequireRekor] = useState(false)
-  const [result, setResult] = useState<Verification | IndexVerification | null>(null)
+  const [indexProofName, setIndexProofName] = useState<string | null>(null)
+  const [indexProofText, setIndexProofText] = useState('')
+  const [result, setResult] = useState<Verification | IndexVerification | TrackRecordVerification | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
 
@@ -26,6 +30,7 @@ export function App() {
     }
     setFileName(file.name)
     setPackageText(await file.text())
+    setPasted('')
     setResult(null)
     setError(null)
   }
@@ -50,6 +55,24 @@ export function App() {
     setResult(null)
   }
 
+  async function loadIndexProof(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0]
+    if (!file) {
+      return
+    }
+    setIndexProofName(file.name)
+    setIndexProofText(await file.text())
+    setResult(null)
+  }
+
+  function paste(text: string) {
+    setPasted(text)
+    setResult(null)
+    setError(null)
+  }
+
+  const input = pasted.trim() !== '' ? pasted : packageText
+
   function chosen(event: ChangeEvent<HTMLInputElement>) {
     void load(event.target.files?.[0])
   }
@@ -66,7 +89,7 @@ export function App() {
     setResult(null)
     try {
       setResult(await verify({
-        packageText,
+        packageText: input,
         publicKey,
         keyListText,
         witnesses,
@@ -75,6 +98,7 @@ export function App() {
         requireTimestamp,
         rekorKeys,
         requireRekor,
+        indexProofText,
       }))
     } catch (e) {
       setError((e as Error).message)
@@ -88,8 +112,8 @@ export function App() {
       <header>
         <h1>Package Verifier</h1>
         <p className="muted">
-          Checks a Nexusphere Ledger evidence package or index proof in this browser. The file and the keys never leave
-          this page.
+          Checks a Nexusphere Ledger evidence package, index proof or agent track record in this browser. The file and
+          the keys never leave this page.
         </p>
       </header>
       <form onSubmit={submit} className="panel">
@@ -98,8 +122,22 @@ export function App() {
           onDragOver={(event) => event.preventDefault()}
           onDrop={dropped}
         >
-          <span>{fileName ?? 'Choose or drop the package or index proof file (JSON)'}</span>
-          <input type="file" accept="application/json,.json" aria-label="Package file" onChange={chosen} />
+          <span>{fileName ?? 'Choose or drop the package or index proof file (JSON), or a track record'}</span>
+          <input
+            type="file"
+            accept="application/json,.json,text/plain,.txt,.jwt,.sd-jwt"
+            aria-label="Package file"
+            onChange={chosen}
+          />
+        </label>
+        <label>
+          Or paste a track record
+          <textarea
+            rows={2}
+            value={pasted}
+            onChange={(event) => paste(event.target.value)}
+            placeholder="eyJhbGciOiJFZERTQSIsInR5cCI6ImRjK3NkLWp3dCIs...~, the SD-JWT VC of an agent track record"
+          />
         </label>
         <label>
           Ledger public key
@@ -167,7 +205,16 @@ export function App() {
           <input type="checkbox" checked={requireRekor} onChange={(event) => setRequireRekor(event.target.checked)} />
           Require a Rekor entry
         </label>
-        <button type="submit" disabled={busy || packageText === ''}>
+        <label className="drop small">
+          <span>{indexProofName ?? 'Optional: an index proof of the agent (JSON), to cross-check a track record'}</span>
+          <input
+            type="file"
+            accept="application/json,.json"
+            aria-label="Index proof file"
+            onChange={(event) => void loadIndexProof(event)}
+          />
+        </label>
+        <button type="submit" disabled={busy || input.trim() === ''}>
           {busy ? 'Verifying…' : 'Verify'}
         </button>
       </form>
@@ -176,7 +223,11 @@ export function App() {
           {error}
         </p>
       )}
-      {result && ('index' in result ? <IndexResult verification={result} /> : <Result verification={result} />)}
+      {result && ('trackRecord' in result
+        ? <TrackRecordResult verification={result} />
+        : 'index' in result
+          ? <IndexResult verification={result} />
+          : <Result verification={result} />)}
     </main>
   )
 }
@@ -205,6 +256,78 @@ function IndexResult({ verification }: { verification: IndexVerification }) {
       {index.problems.length > 0 && (
         <ul className="problems">
           {index.problems.map((problem) => (
+            <li key={problem}>{problem}</li>
+          ))}
+        </ul>
+      )}
+      <dl>
+        {rows.map(([name, value]) => (
+          <div key={name}>
+            <dt>{name}</dt>
+            <dd>{value}</dd>
+          </div>
+        ))}
+      </dl>
+    </section>
+  )
+}
+
+function counts(values: Record<string, number> | null): string {
+  if (values === null) {
+    return 'withheld'
+  }
+  const entries = Object.entries(values)
+  return entries.length ? entries.map(([name, count]) => `${name} ${count}`).join(', ') : 'none'
+}
+
+function TrackRecordResult({ verification }: { verification: TrackRecordVerification }) {
+  const { trackRecord, pinned, index, mismatches, valid } = verification
+  const claims = trackRecord.claims
+  const problems = [
+    ...trackRecord.problems,
+    ...(index ? index.problems.map((problem) => `Index proof: ${problem}`) : []),
+    ...mismatches,
+  ]
+  const rows: [string, string][] = claims
+    ? [
+        ['Credential', claims.id],
+        ['Issuer', claims.issuer],
+        ['Agent', claims.agentId],
+        ['Audience', claims.audience ?? 'any'],
+        ['Valid', `${instantText(claims.issuedAt)} to ${instantText(claims.expiresAt)}`],
+        ['Checkpoint', `${claims.checkpointSequence}, head ${claims.headHash}`],
+        ['Index root', claims.indexRoot],
+        ['Entries', String(claims.total) + (claims.firstSequence === null
+          ? ''
+          : `, sequences ${claims.firstSequence} to ${claims.lastSequence}, ${claims.firstAt} to ${claims.lastAt}`)],
+        ['Outcomes', counts(claims.outcomes)],
+        ['Principals', claims.principals === null ? 'withheld' : String(claims.principals)],
+        ['Actions', counts(claims.actions)],
+        ['Agent key', claims.holderKey ? claims.holderKey.keyId : 'none'],
+        ['Signed by', `${trackRecord.keyId ?? 'unknown'}${pinned ? '' : ', not pinned'}`],
+      ]
+    : []
+  if (index) {
+    rows.push([
+      'Index proof',
+      `${index.present ? index.count : 0} entries at checkpoint ${index.sequence ?? 'unknown'}, ` +
+        (index.valid && mismatches.length === 0 ? 'matches the track record' : 'does not match the track record'),
+    ])
+  }
+  return (
+    <section className="panel" aria-label="Result">
+      <p className={`badge ${valid ? 'good' : 'bad'}`} data-testid="verdict">
+        {valid ? 'VALID' : 'INVALID'}
+      </p>
+      {valid && !pinned && (
+        <p className="badge wait" role="note">
+          Not pinned: the track record was checked only against the key list. Paste the ledger's public key to know who
+          signed it.
+        </p>
+      )}
+      {problems.length > 0 && (
+        <ul className="problems">
+          {problems.map((problem) => (
             <li key={problem}>{problem}</li>
           ))}
         </ul>

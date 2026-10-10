@@ -12,6 +12,7 @@ import { PackageReport, verifyPackage } from "./package.js";
 import { ReportCheck, verifyReport } from "./report.js";
 import { X509Certificate, readCertificates } from "./timestamp.js";
 import { epochText } from "./timestamps.js";
+import { TrackRecordClaims, TrackRecordVerifier, matchTrackRecord, trackRecordPayload } from "./trackrecord.js";
 
 export const VALID = 0;
 export const INVALID = 1;
@@ -22,7 +23,8 @@ export const USAGE_TEXT = `Usage: nexusphere-ledger-verify [--public-key <base64
        nexusphere-ledger-verify statement [--public-key <key> | --public-key-file <file>] [--receipt <receipt.cose>] <statement.cose>
        nexusphere-ledger-verify report [package options] --package <package.json> <report.json>
        nexusphere-ledger-verify dispute [package options] <dispute.zip>
-       nexusphere-ledger-verify index [--public-key <key> | --public-key-file <file>] [--keys <keys.json>] [--package <package.json>] [--json] <proof.json>`;
+       nexusphere-ledger-verify index [--public-key <key> | --public-key-file <file>] [--keys <keys.json>] [--package <package.json>] [--json] <proof.json>
+       nexusphere-ledger-verify track-record --issuer <url> [--issuer <url>] [--audience <aud>] [--public-key <key> | --public-key-file <file>] [--nonce <nonce>] [--require-key-binding] [--index-proof <proof.json>] [--json] <token | token file | ->`;
 
 export interface Io {
   out: (text: string) => void;
@@ -85,6 +87,9 @@ export async function run(args: string[], io: Io): Promise<number> {
     }
     if (args[0] === "index") {
       return await index(args.slice(1), io);
+    }
+    if (args[0] === "track-record") {
+      return await trackRecord(args.slice(1), io);
     }
     if (args[0] === "dispute") {
       return await dispute(args.slice(1), io);
@@ -619,6 +624,105 @@ async function printMandate(check: MandateCheck, action: string | null, target: 
   lines.push(check.valid ? "Result: VALID" : "Result: INVALID");
   if (!check.valid) {
     check.problems.forEach((p) => lines.push(`  - ${p.code}: ${p.message}`));
+  }
+  io.out(lines.join("\n") + "\n");
+}
+
+async function trackRecord(args: string[], io: Io): Promise<number> {
+  const { options, positional } = parse(args, [
+    "--issuer", "--audience", "--public-key", "--public-key-file", "--nonce", "--require-key-binding",
+    "--index-proof", "--json",
+  ]);
+  const issuers = options["--issuer"] ?? [];
+  if (positional === null || issuers.length === 0) {
+    throw new UsageError();
+  }
+  let token: string;
+  let keyText: string | null;
+  let proof: unknown = null;
+  let reading = positional;
+  try {
+    token = readToken(positional, io);
+    keyText = publicKey(options);
+    if (options["--index-proof"]) {
+      reading = options["--index-proof"][0];
+      proof = JSON.parse(readFileSync(reading, "utf8"));
+    }
+  } catch (e) {
+    io.err(`Cannot read ${reading}: ${(e as Error).message}\n`);
+    return USAGE;
+  }
+  let keys: StaticKeys | undefined;
+  if (keyText !== null) {
+    let key: PublicKey;
+    try {
+      key = await PublicKey.fromBase64(keyText);
+    } catch {
+      io.err("The public key is not a base64 X.509 Ed25519 key\n");
+      return USAGE;
+    }
+    keys = new StaticKeys(Object.fromEntries(issuers.map((issuer) => [issuer.replace(/\/$/, ""), { [key.keyId]: key }])));
+  }
+  const verifier = new TrackRecordVerifier(issuers, {
+    keys,
+    audience: options["--audience"]?.[0] ?? null,
+    requireKeyBinding: !!options["--require-key-binding"],
+  });
+  const check = await verifier.verifyBound(token, options["--nonce"]?.[0] ?? null);
+  const problems = check.problems.map((p) => `${p.code}: ${p.message}`);
+  let indexCheck: IndexCheck | null = null;
+  if (proof !== null) {
+    indexCheck = await verifyIndexProof(proof, { pinnedPublicKey: keyText });
+    indexCheck.problems.forEach((p) => problems.push("INDEX_PROOF: " + p));
+    if (check.claims !== null) {
+      matchTrackRecord(check.claims, proof, indexCheck).forEach((p) => problems.push("INDEX_MISMATCH: " + p));
+    }
+  }
+  const valid = problems.length === 0;
+  if (options["--json"]) {
+    io.out(JSON.stringify({
+      valid,
+      problems,
+      claims: check.claims === null ? null : trackRecordPayload(check.claims),
+      indexProof: indexCheck,
+    }, null, 2) + "\n");
+  } else {
+    await printTrackRecord(check.claims, indexCheck, valid, problems, io);
+  }
+  return valid ? VALID : INVALID;
+}
+
+function counts(values: Record<string, number> | null): string {
+  if (values === null) {
+    return "withheld";
+  }
+  const entries = Object.entries(values).sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0));
+  return entries.length === 0 ? "none" : entries.map(([name, count]) => `${name} ${count}`).join(", ");
+}
+
+async function printTrackRecord(c: TrackRecordClaims | null, index: IndexCheck | null, valid: boolean,
+  problems: string[], io: Io) {
+  const lines = ["Nexusphere Ledger agent track record"];
+  if (c) {
+    lines.push(`  Credential  : ${c.recordId}`);
+    lines.push(`  Issuer      : ${c.issuer}`);
+    lines.push(`  Agent       : ${c.agentId}`);
+    lines.push(`  Audience    : ${c.audience ?? "any"}`);
+    lines.push(`  Valid       : ${epochText(c.issuedAt)} to ${epochText(c.expiresAt)}`);
+    lines.push(`  Checkpoint  : ${c.checkpointSequence}, index root ${c.indexRoot}`);
+    lines.push(`  Entries     : ${c.total}${c.firstSequence === null ? ""
+      : `, sequences ${c.firstSequence} to ${c.lastSequence}, ${c.firstAt} to ${c.lastAt}`}`);
+    lines.push(`  Outcomes    : ${counts(c.outcomes)}`);
+    lines.push(`  Principals  : ${c.principals ?? "withheld"}`);
+    lines.push(`  Actions     : ${counts(c.actions)}`);
+    lines.push(`  Agent key   : ${c.holderKey ? await keyIdOf(c.holderKey) : "none"}`);
+  }
+  if (index !== null) {
+    lines.push(`  Index proof : ${index.present ? index.count : 0} entries at checkpoint ${index.sequence}`);
+  }
+  lines.push(valid ? "Result: VALID" : "Result: INVALID");
+  if (!valid) {
+    problems.forEach((p) => lines.push("  - " + p));
   }
   io.out(lines.join("\n") + "\n");
 }

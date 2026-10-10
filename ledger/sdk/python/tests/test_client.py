@@ -2,6 +2,7 @@ import io
 import json
 import unittest
 import urllib.error
+from datetime import timedelta
 
 from nexusphere_ledger import LedgerClient, LedgerError
 
@@ -92,6 +93,19 @@ class Client(unittest.TestCase):
         with self.assertRaises(LedgerError) as error:
             client.index_proof(term)
         self.assertEqual(403, error.exception.status)
+
+
+    def test_issue_track_record(self):
+        issued = {"credential": "token~", "id": "00000000-0000-4000-8000-0000000000dd",
+                  "expiresAt": "2026-11-01T08:00:00Z", "checkpoint": 3}
+        client, opener = self.client((200, issued), (200, issued))
+        self.assertEqual(issued, client.issue_track_record("invoice-agent"))
+        self.assertEqual("POST", opener.requests[0].get_method())
+        self.assertEqual("https://ledger.example/api/v1/agents/invoice-agent/track-record",
+                         opener.requests[0].full_url)
+        self.assertEqual({}, opener.body())
+        client.issue_track_record("invoice-agent", "https://buyer.example", timedelta(days=7))
+        self.assertEqual({"audience": "https://buyer.example", "validFor": "PT604800S"}, opener.body())
 
 
 if __name__ == "__main__":
