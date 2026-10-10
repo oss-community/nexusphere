@@ -4,7 +4,8 @@ import uuid
 from datetime import datetime, timedelta, timezone
 
 from nexusphere_ledger import (Denied, EvidenceLink, EvidenceStatement, LedgerClient, LedgerError, LogReceipt,
-                               MandateVerifier, Note, NoteKey, PublicKey, SdJwt, verify_package)
+                               MandateVerifier, Note, NoteKey, PrivateKey, PublicKey, SdJwt, present_bound,
+                               verify_package)
 
 URL = os.environ.get("NEXUSPHERE_LEDGER_URL")
 OPERATOR_KEY = os.environ.get("NEXUSPHERE_LEDGER_API_KEY", "nexusphere-ledger-development-key-change-me")
@@ -75,6 +76,25 @@ class LiveLedger(unittest.TestCase):
         self.operator.revoke_mandate(issued["id"], "test")
         revoked = MandateVerifier(issuer).verify(token)
         self.assertTrue(revoked.has("REVOKED"), revoked.problems)
+
+    def test_key_bound_mandate_from_live_ledger(self):
+        agent_id = "sdk-keyed-" + uuid.uuid4().hex[:8]
+        registered = self.operator.register_agent(agent_id, "Python SDK keyed agent", "acme")
+        agent = LedgerClient(URL, registered["apiKey"])
+        key = PrivateKey.generate()
+        updated = agent.set_signing_key(agent_id, key.public_key)
+        self.assertEqual(key.key_id, updated["signingKeyId"])
+        grant = self.operator.create_grant("alice", agent_id, ["a2a/send"], ["supplier/*"],
+                                           datetime.now(timezone.utc) + timedelta(days=1))
+        token = agent.issue_mandate(grant["id"], "https://supplier.example")["token"]
+        issuer = SdJwt.parse(token).jwt.payload["iss"]
+        presented = present_bound(token, key, "https://supplier.example", "ab" * 32)
+        check = MandateVerifier(issuer, audience="https://supplier.example").verify_bound(presented, "ab" * 32)
+        self.assertTrue(check.valid, check.problems)
+        self.assertEqual(key.public_key, check.claims.holder_key)
+        with self.assertRaises(LedgerError) as error:
+            agent.set_signing_key(agent_id, PrivateKey.generate().public_key)
+        self.assertEqual(403, error.exception.status)
 
     def test_errors(self):
         with self.assertRaises(LedgerError) as error:

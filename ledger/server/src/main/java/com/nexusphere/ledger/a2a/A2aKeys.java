@@ -26,12 +26,15 @@ class A2aKeys implements KeyResolver {
     private final HttpFetcher http;
     private final JwksKeyResolver jwks;
     private final MandateVerifier verifier;
+    private final Clock clock;
+    private volatile MandateVerifier own;
 
     A2aKeys(LedgerSigner signer, MandateService mandates, LedgerProperties properties, Clock clock) {
         this.signer = signer;
         this.mandates = mandates;
         this.http = HttpFetcher.create(Duration.ofSeconds(10));
         this.jwks = new JwksKeyResolver(http, clock, CACHE);
+        this.clock = clock;
         List<String> trusted = properties.a2a() == null || properties.a2a().trustedIssuers() == null ? List.of()
                 : properties.a2a().trustedIssuers().stream().filter(i -> !i.isBlank()).toList();
         if (trusted.isEmpty()) {
@@ -51,6 +54,16 @@ class A2aKeys implements KeyResolver {
             return signer.findTrusted(keyId).map(SigningKeys.PublicKeyInfo::publicKey);
         }
         return jwks.resolve(issuer, keyId);
+    }
+
+    MandateVerifier own() {
+        MandateVerifier verifier = own;
+        if (verifier == null) {
+            verifier = MandateVerifier.builder().keys(this).clock(clock).trustIssuer(mandates.issuer())
+                    .statusLists((issuer, uri) -> mandates.currentStatusList()).requireKeyBinding().build();
+            own = verifier;
+        }
+        return verifier;
     }
 
     Optional<MandateVerifier> verifier() {

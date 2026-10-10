@@ -48,8 +48,9 @@ class A2aController {
     ResponseEntity<StreamingResponseBody> send(
             Caller caller, @PathVariable String peer,
             @RequestHeader(name = PRINCIPAL_HEADER, required = false) String principalId,
+            @RequestHeader(name = A2aOutbound.MANDATE_HEADER, required = false) String mandate,
             @RequestBody byte[] body) {
-        return respond(outbound.send(caller, peer, principalId, body));
+        return respond(outbound.send(caller, peer, principalId, mandate, body));
     }
 
     @PostMapping("/a2a/in/{agent}")

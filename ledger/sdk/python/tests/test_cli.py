@@ -5,6 +5,8 @@ import tempfile
 import unittest
 
 from nexusphere_ledger.cli import INVALID, USAGE, VALID, run
+from nexusphere_ledger.keys import PrivateKey
+from nexusphere_ledger.mandate import present_bound
 
 from .support import ISSUER, LEDGER_KEY, entries, package, vector, witness_note_key
 
@@ -56,6 +58,21 @@ class Cli(unittest.TestCase):
                                     LEDGER_KEY.public_key.encoded, "--skip-status", "--json", token)
         self.assertEqual(INVALID, code)
         self.assertEqual("UNTRUSTED_ISSUER", json.loads(out)["problems"][0]["code"])
+
+    def test_key_bound_mandate(self):
+        v = vector("mandate-key-binding.json")
+        agent = PrivateKey.from_seed(bytes.fromhex(v["agentSeed"]))
+        presented = present_bound(v["token"], agent, v["audience"], v["nonce"])
+        common = ("mandate", "--issuer", ISSUER, "--public-key", LEDGER_KEY.public_key.encoded, "--skip-status")
+        code, out, _ = self.run_cli(*common, "--nonce", v["nonce"], presented)
+        self.assertEqual(VALID, code, out)
+        self.assertIn("Agent key   : " + agent.key_id, out)
+        code, out, _ = self.run_cli(*common, "--nonce", "00" * 32, presented)
+        self.assertEqual(INVALID, code)
+        self.assertIn("KEY_BINDING_INVALID", out)
+        code, out, _ = self.run_cli(*common, "--require-key-binding", vector("mandate.json")["token"])
+        self.assertEqual(INVALID, code)
+        self.assertIn("KEY_NOT_BOUND", out)
 
 
 if __name__ == "__main__":

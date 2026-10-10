@@ -11,6 +11,7 @@
 * [Verify a Package](#verify-a-package)
 * [Verify a Statement and Receipt](#verify-a-statement-and-receipt)
 * [Verify a Mandate](#verify-a-mandate)
+* [Present a Key-Bound Mandate](#present-a-key-bound-mandate)
 * [Command Line](#command-line)
 * [Reference](#reference)
 * [Test](#test)
@@ -165,8 +166,8 @@ print(statement.verify(key), receipt.verify(statement.leaf_hash, key))
 
 `MandateVerifier` reads the issuer's keys from `/public/v1/keys` and its revocation status list, and caches both for
 five minutes. Problems carry the same codes as the Java SDK: `MALFORMED`, `WRONG_TYPE`, `UNTRUSTED_ISSUER`,
-`UNKNOWN_KEY`, `BAD_SIGNATURE`, `NOT_YET_VALID`, `EXPIRED`, `WRONG_AUDIENCE`, `NOT_COVERED`, `REVOKED` and
-`STATUS_UNAVAILABLE`.
+`UNKNOWN_KEY`, `BAD_SIGNATURE`, `NOT_YET_VALID`, `EXPIRED`, `WRONG_AUDIENCE`, `NOT_COVERED`, `REVOKED`,
+`STATUS_UNAVAILABLE`, `KEY_BINDING_MISSING`, `KEY_BINDING_INVALID` and `KEY_NOT_BOUND`.
 
 </p>
 
@@ -176,6 +177,27 @@ from nexusphere_ledger import MandateVerifier
 verifier = MandateVerifier("http://localhost:8090", audience="https://supplier.example")
 check = verifier.verify_action(token, "a2a/send", "supplier/sales")
 print(check.valid, check.claims.agent_id, [p.code for p in check.problems])
+```
+
+## Present a Key-Bound Mandate
+
+<p style="text-align: justify;">
+
+An agent with its own key registers the public half with `set_signing_key`; mandates issued afterwards name it in
+`cnf`. `present_bound` adds a KB-JWT signed by the agent for an audience and a nonce, and `verify_bound` checks it.
+For the A2A gateway the nonce is the hex SHA-256 of the request body.
+
+</p>
+
+```python
+from nexusphere_ledger import MandateVerifier, PrivateKey, hash_of, present_bound
+
+key = PrivateKey.generate()
+agent.set_signing_key("invoice-agent", key.public_key)
+token = agent.issue_mandate(grant_id, "https://supplier.example")["token"]
+presented = present_bound(token, key, "https://supplier.example", hash_of(body))
+check = MandateVerifier("http://localhost:8090", audience="https://supplier.example").verify_bound(presented, hash_of(body))
+print(check.valid, check.claims.holder_key.key_id)
 ```
 
 ## Command Line
@@ -205,20 +227,27 @@ Step 3. Verify a mandate for an action:
 nexusphere-ledger-verify mandate --issuer http://localhost:8090 --action a2a/send --target supplier/sales "{token}"
 ```
 
+Step 4. Verify a key-bound presentation against its nonce; the output must show `Agent key` and end with
+`Result: VALID`:
+
+```shell
+nexusphere-ledger-verify mandate --issuer http://localhost:8090 --audience https://supplier.example --nonce "{nonce}" "{presentation}"
+```
+
 ## Reference
 
-| Module      | Contents                                                                                        |
-|-------------|-------------------------------------------------------------------------------------------------|
+| Module      | Contents                                                                                         |
+|-------------|--------------------------------------------------------------------------------------------------|
 | `client`    | `LedgerClient` for evidence, batches, decisions, `act`, grants, mandates, packages, keys, proofs |
-| `package`   | `verify_package` and `PackageReport`                                                            |
-| `evidence`  | Content and link hashes, `ChainVerifier`, `Checkpoint`                                          |
-| `merkle`    | RFC 9162 roots, inclusion and consistency proofs                                                |
-| `note`      | C2SP signed notes, note keys and `tlog-cosignature/v1` cosignatures                             |
-| `cose`      | `CoseSign1`, SCITT `EvidenceStatement` and RFC 9942 `LogReceipt`                                |
-| `mandate`   | SD-JWT VC mandates, `MandateVerifier`, status lists and JWKs                                    |
-| `keys`      | Ed25519 keys, key IDs, key rotations and trusted keys from a pinned key                         |
-| `canonical` | Canonical JSON                                                                                  |
-| `cbor`      | Deterministic CBOR                                                                              |
+| `package`   | `verify_package` and `PackageReport`                                                             |
+| `evidence`  | Content and link hashes, `ChainVerifier`, `Checkpoint`                                           |
+| `merkle`    | RFC 9162 roots, inclusion and consistency proofs                                                 |
+| `note`      | C2SP signed notes, note keys and `tlog-cosignature/v1` cosignatures                              |
+| `cose`      | `CoseSign1`, SCITT `EvidenceStatement` and RFC 9942 `LogReceipt`                                 |
+| `mandate`   | SD-JWT VC mandates, `MandateVerifier`, status lists and JWKs                                     |
+| `keys`      | Ed25519 keys, key IDs, key rotations and trusted keys from a pinned key                          |
+| `canonical` | Canonical JSON                                                                                   |
+| `cbor`      | Deterministic CBOR                                                                               |
 
 ## Test
 

@@ -1,5 +1,7 @@
 package com.nexusphere.ledger.authorization.application;
 
+import com.nexusphere.ledger.agent.domain.model.Agent;
+import com.nexusphere.ledger.agent.domain.repository.AgentRepository;
 import com.nexusphere.ledger.authorization.domain.model.Grant;
 import com.nexusphere.ledger.authorization.domain.model.GrantStatus;
 import com.nexusphere.ledger.authorization.domain.model.Mandate;
@@ -40,15 +42,17 @@ public class MandateService {
 
     private final MandateRepository mandates;
     private final GrantRepository grants;
+    private final AgentRepository agents;
     private final EvidenceService evidence;
     private final LedgerSigner signer;
     private final LedgerProperties properties;
     private final Clock clock;
 
-    MandateService(MandateRepository mandates, GrantRepository grants, EvidenceService evidence, LedgerSigner signer,
-                   LedgerProperties properties, Clock clock) {
+    MandateService(MandateRepository mandates, GrantRepository grants, AgentRepository agents,
+                   EvidenceService evidence, LedgerSigner signer, LedgerProperties properties, Clock clock) {
         this.mandates = mandates;
         this.grants = grants;
+        this.agents = agents;
         this.evidence = evidence;
         this.signer = signer;
         this.properties = properties;
@@ -87,6 +91,7 @@ public class MandateService {
         }
         Instant notBefore = terms.notBefore() != null && terms.notBefore().isAfter(now)
                 ? terms.notBefore().truncatedTo(ChronoUnit.SECONDS) : now;
+        Agent agent = agents.find(terms.agentId()).orElseThrow();
         UUID id = UUID.randomUUID();
         long index = mandates.reserve(id, terms.id(), terms.agentId(), terms.principalId(), request.audience(), now,
                 expiresAt);
@@ -95,7 +100,7 @@ public class MandateService {
         }
         MandateClaims claims = new MandateClaims(issuer(), id, terms.agentId(), terms.principalId(),
                 request.audience(), terms.actions(), terms.targets(), terms.maxUses(), terms.id(), terms.hash(), now,
-                notBefore, expiresAt, issuer() + STATUS_LIST_PATH, index);
+                notBefore, expiresAt, issuer() + STATUS_LIST_PATH, index, agent.publicSigningKey());
         String token = signer.signMandate(claims);
         mandates.attachToken(id, token);
         Map<String, String> attributes = new LinkedHashMap<>();
@@ -103,6 +108,9 @@ public class MandateService {
         attributes.put("expiresAt", expiresAt.toString());
         if (request.audience() != null) {
             attributes.put("audience", request.audience());
+        }
+        if (agent.signingKeyId() != null) {
+            attributes.put("signingKeyId", agent.signingKeyId());
         }
         record(terms, id, "mandate/issue", null, Hashes.sha256(token.getBytes(StandardCharsets.US_ASCII)),
                 attributes);
@@ -145,11 +153,16 @@ public class MandateService {
 
     @Transactional(readOnly = true)
     public String statusList() {
+        return signer.signStatusList(currentStatusList());
+    }
+
+    @Transactional(readOnly = true)
+    public StatusList currentStatusList() {
         Instant now = clock.instant().truncatedTo(ChronoUnit.SECONDS);
         Duration ttl = properties.mandate() == null || properties.mandate().statusListTtl() == null
                 ? Duration.ofMinutes(5) : properties.mandate().statusListTtl();
-        return signer.signStatusList(new StatusList(issuer(), issuer() + STATUS_LIST_PATH, now, now.plus(ttl),
-                StatusList.DEFAULT_SIZE, mandates.revokedIndexes()));
+        return new StatusList(issuer(), issuer() + STATUS_LIST_PATH, now, now.plus(ttl), StatusList.DEFAULT_SIZE,
+                mandates.revokedIndexes());
     }
 
     private void revoke(Mandate mandate, String reason) {

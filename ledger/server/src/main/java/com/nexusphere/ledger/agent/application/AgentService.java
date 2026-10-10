@@ -5,6 +5,7 @@ import com.nexusphere.ledger.agent.domain.model.AgentRegistration;
 import com.nexusphere.ledger.agent.domain.model.AgentStatus;
 import com.nexusphere.ledger.agent.domain.model.IssuedAgent;
 import com.nexusphere.ledger.agent.domain.repository.AgentRepository;
+import com.nexusphere.ledger.chain.SigningKeys;
 import com.nexusphere.ledger.evidence.application.EvidenceService;
 import com.nexusphere.ledger.evidence.domain.model.EvidenceSubmission;
 import com.nexusphere.ledger.evidence.domain.model.Outcome;
@@ -13,8 +14,10 @@ import com.nexusphere.ledger.server.web.LedgerException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.security.PublicKey;
 import java.time.Clock;
 import java.time.Instant;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.regex.Pattern;
@@ -74,6 +77,38 @@ public class AgentService {
         agents.updateKey(agentId, AgentKeys.hash(key), AgentKeys.prefix(key));
         record(agent, "agent/rotate-key", Map.of("keyPrefix", AgentKeys.prefix(key)));
         return new IssuedAgent(get(agentId), key);
+    }
+
+    @Transactional
+    public Agent setSigningKey(String agentId, String publicKey, boolean operator) {
+        new FieldErrors().text("publicKey", publicKey, true, 200).throwIfAny("The signing key has invalid fields.");
+        PublicKey key;
+        try {
+            key = SigningKeys.decodePublic(publicKey);
+        } catch (IllegalArgumentException e) {
+            throw LedgerException.invalid("The signing key has invalid fields.",
+                    Map.of("publicKey", "must be a base64 X.509 Ed25519 public key"));
+        }
+        Agent agent = agents.lock(agentId).orElseThrow(() -> LedgerException.notFound("Agent " + agentId));
+        if (!agent.active()) {
+            throw LedgerException.conflict("AGENT_NOT_ACTIVE", "Agent " + agentId + " is disabled.");
+        }
+        String encoded = SigningKeys.encode(key);
+        if (encoded.equals(agent.signingKey())) {
+            return agent;
+        }
+        if (agent.signingKey() != null && !operator) {
+            throw LedgerException.forbidden("Only an operator can replace the signing key of agent " + agentId + ".");
+        }
+        String keyId = SigningKeys.keyIdOf(key);
+        agents.updateSigningKey(agentId, encoded, keyId, clock.instant());
+        Map<String, String> attributes = new LinkedHashMap<>();
+        attributes.put("signingKeyId", keyId);
+        if (agent.signingKeyId() != null) {
+            attributes.put("previousSigningKeyId", agent.signingKeyId());
+        }
+        record(agent, "agent/signing-key", attributes);
+        return get(agentId);
     }
 
     @Transactional(readOnly = true)

@@ -35,8 +35,8 @@ and `dev` profiles against a PostgreSQL 18 container. `LedgerClient` talks to it
 outside caller, and rebuilds evidence entries from the JSON so they can be checked with `ledger/chain` without trusting
 the server. `FakeMcpServer` is a small MCP server on a random port, configured as the `files` server of the gateway; it
 answers `initialize`, `tools/list` and `tools/call`, and streams the answer of tools ending in `_sse`.
-`A2aE2ETest` starts a second ledger, `SupplierLedger`, with its own PostgreSQL container and signing key, which trusts
-the first one and forwards to `FakeA2aAgent`, which streams `message/stream` and `tasks/resubscribe`, so mandates,
+`A2aE2ETest` and `AgentKeyBindingE2ETest` start a second ledger, `SupplierLedger`, with its own PostgreSQL container
+and signing key, which trusts the first one and forwards to `FakeA2aAgent`, which streams `message/stream` and `tasks/resubscribe`, so mandates,
 request proofs and receipts cross between two ledgers over HTTP.
 `PrincipalConsentE2ETest` starts a `StandaloneLedger` that trusts `FakeOidcProvider`, a small OpenID Connect provider
 on a random port that signs RS256 tokens for any principal.
@@ -114,6 +114,12 @@ other, which watches it, to cosign its log checkpoints over the C2SP witness pro
 |                           | An unreachable peer is answered without delivery                              |
 |                           | A streamed task is relayed live and the receipt covers every event            |
 |                           | A stream that ends in a failed task is recorded as failed on both sides       |
+| `AgentKeyBindingE2ETest`  | The agent registers its key and only an operator can replace it               |
+|                           | A mandate names the agent key in its confirmation claim                       |
+|                           | A key-bound presentation is accepted on both ledgers                          |
+|                           | An API key alone is not enough once the agent has a key                       |
+|                           | A mandate bound to a replaced key is refused                                  |
+|                           | The receiving ledger rejects a bound mandate without key binding              |
 | `PrincipalConsentE2ETest` | A principal signs in with an OIDC token that only opens the principal API     |
 |                           | An operator grant waits for the principal's consent                           |
 |                           | An agent asks for a grant and the principal denies it                         |

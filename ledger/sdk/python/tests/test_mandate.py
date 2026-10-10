@@ -3,7 +3,9 @@ import unittest
 from nexusphere_ledger.keys import PrivateKey
 from nexusphere_ledger.mandate import (BAD_SIGNATURE, EXPIRED, MALFORMED, NOT_COVERED, NOT_YET_VALID, REVOKED,
                                        STATUS_UNAVAILABLE, TYPE, UNKNOWN_KEY, UNTRUSTED_ISSUER, VCT, WRONG_AUDIENCE,
-                                       Disclosure, JwksKeys, MandateVerifier, SdJwt, StaticKeys, StatusList, jwk_of)
+                                       KEY_BINDING_INVALID, KEY_BINDING_MISSING, KEY_NOT_BOUND, Disclosure, JwksKeys,
+                                       MandateVerifier, SdJwt, StaticKeys, StatusList, confirmation_jwk, jwk_of,
+                                       present_bound)
 
 from .support import ISSUER, LEDGER_KEY, vector
 
@@ -11,7 +13,7 @@ NOW = 1790841600 + 3600
 STATUS = ISSUER + "/public/v1/mandates/status"
 
 
-def issue(key=LEDGER_KEY, issuer=ISSUER, index=3, exp=1822377600, nbf=1790841600, status=STATUS):
+def issue(key=LEDGER_KEY, issuer=ISSUER, index=3, exp=1822377600, nbf=1790841600, status=STATUS, holder=None):
     disclosures = [Disclosure.of("principal", "globex"),
                    Disclosure.of("grant", "00000000-0000-4000-8000-0000000000bb")]
     payload = {"iss": issuer, "vct": VCT, "sub": "sales-agent", "aud": "https://supplier.example",
@@ -19,6 +21,8 @@ def issue(key=LEDGER_KEY, issuer=ISSUER, index=3, exp=1822377600, nbf=1790841600
                "mandate": {"actions": ["a2a/send"], "targets": ["supplier/*"], "maxUses": 5,
                            "_sd": sorted(d.digest for d in disclosures)},
                "status": {"status_list": {"idx": index, "uri": status}}, "_sd_alg": "sha-256"}
+    if holder is not None:
+        payload["cnf"] = {"jwk": confirmation_jwk(holder.public_key)}
     return SdJwt.issue({"alg": "EdDSA", "typ": TYPE, "kid": key.key_id}, payload, disclosures, key)
 
 
@@ -103,6 +107,51 @@ class MandateVerification(unittest.TestCase):
         keys = JwksKeys(FakeIssuer(), clock=lambda: NOW)
         check = MandateVerifier(ISSUER, keys=keys, skip_status=True, clock=lambda: NOW).verify(token)
         self.assertTrue(check.valid, check.problems)
+
+
+AGENT = PrivateKey.generate()
+AUDIENCE = "https://supplier.example"
+NONCE = "ab" * 32
+
+
+class KeyBindingTest(unittest.TestCase):
+
+    def verifier(self, **options):
+        return MandateVerifier(ISSUER, fetch=FakeIssuer(), clock=lambda: NOW, audience=AUDIENCE, **options)
+
+    def test_bound_presentation_is_valid(self):
+        token = present_bound(issue(holder=AGENT), AGENT, AUDIENCE, NONCE, NOW - 5)
+        check = self.verifier().verify_bound(token, NONCE, "a2a/send", "supplier/orders")
+        self.assertTrue(check.valid, check.problems)
+        self.assertEqual(AGENT.public_key, check.claims.holder_key)
+        self.assertIsNotNone(SdJwt.parse(token).key_binding)
+
+    def test_bound_mandate_needs_key_binding(self):
+        self.assertTrue(self.verifier().verify_bound(issue(holder=AGENT), NONCE).has(KEY_BINDING_MISSING))
+
+    def test_wrong_key_nonce_audience_or_age(self):
+        cases = [present_bound(issue(holder=AGENT), PrivateKey.generate(), AUDIENCE, NONCE, NOW),
+                 present_bound(issue(holder=AGENT), AGENT, AUDIENCE, "cd" * 32, NOW),
+                 present_bound(issue(holder=AGENT), AGENT, "https://evil.example", NONCE, NOW),
+                 present_bound(issue(holder=AGENT), AGENT, AUDIENCE, NONCE, NOW - 600)]
+        for token in cases:
+            self.assertTrue(self.verifier().verify_bound(token, NONCE).has(KEY_BINDING_INVALID), token)
+
+    def test_key_binding_moved_to_another_presentation(self):
+        bound = present_bound(issue(holder=AGENT), AGENT, AUDIENCE, NONCE, NOW)
+        moved = issue(holder=AGENT) + bound[bound.rindex("~") + 1:]
+        self.assertTrue(self.verifier().verify_bound(moved, NONCE).has(KEY_BINDING_INVALID))
+
+    def test_unbound_mandate(self):
+        self.assertTrue(self.verifier().verify_bound(present_bound(issue(), AGENT, AUDIENCE, NONCE, NOW), NONCE)
+                        .has(KEY_BINDING_INVALID))
+        self.assertTrue(self.verifier().verify_bound(issue(), NONCE).valid)
+        self.assertTrue(self.verifier(require_key_binding=True).verify_bound(issue(), NONCE).has(KEY_NOT_BOUND))
+
+    def test_presentation_is_bound_once(self):
+        bound = present_bound(issue(holder=AGENT), AGENT, AUDIENCE, NONCE, NOW)
+        with self.assertRaises(ValueError):
+            present_bound(bound, AGENT, AUDIENCE, NONCE, NOW)
 
 
 if __name__ == "__main__":

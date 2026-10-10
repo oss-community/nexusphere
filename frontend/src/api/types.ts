@@ -68,6 +68,9 @@ export interface Agent {
   status: string
   keyPrefix: string
   createdAt: string
+  signingKey: string | null
+  signingKeyId: string | null
+  signingKeySetAt: string | null
 }
 
 export interface IssuedAgent extends Agent {

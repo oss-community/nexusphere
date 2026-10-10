@@ -11,6 +11,7 @@ import org.springframework.stereotype.Repository;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Timestamp;
+import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -19,7 +20,8 @@ import java.util.Optional;
 class JdbcAgentRepository implements AgentRepository, AgentCredentials {
 
     private static final String SELECT =
-            "select agent_id, name, owner_id, status, key_prefix, created_at from ledger.agent";
+            "select agent_id, name, owner_id, status, key_prefix, created_at, signing_key, signing_key_id, "
+                    + "signing_key_set_at from ledger.agent";
 
     private final NamedParameterJdbcTemplate jdbc;
 
@@ -74,6 +76,17 @@ class JdbcAgentRepository implements AgentRepository, AgentCredentials {
     }
 
     @Override
+    public void updateSigningKey(String agentId, String signingKey, String signingKeyId, Instant setAt) {
+        jdbc.update("""
+                update ledger.agent set signing_key = :signingKey, signing_key_id = :signingKeyId,
+                       signing_key_set_at = :setAt
+                 where agent_id = :agentId
+                """, new MapSqlParameterSource().addValue("signingKey", signingKey)
+                .addValue("signingKeyId", signingKeyId).addValue("setAt", Timestamp.from(setAt))
+                .addValue("agentId", agentId));
+    }
+
+    @Override
     public Optional<String> activeAgentByKeyHash(String keyHash) {
         return jdbc.queryForList("select agent_id from ledger.agent where key_hash = :keyHash and status = 'ACTIVE'",
                 Map.of("keyHash", keyHash), String.class).stream().findFirst();
@@ -82,6 +95,7 @@ class JdbcAgentRepository implements AgentRepository, AgentCredentials {
     private static Agent row(ResultSet rs, int row) throws SQLException {
         return new Agent(rs.getString("agent_id"), rs.getString("name"), rs.getString("owner_id"),
                 AgentStatus.valueOf(rs.getString("status")), rs.getString("key_prefix"),
-                rs.getTimestamp("created_at").toInstant());
+                rs.getTimestamp("created_at").toInstant(), rs.getString("signing_key"), rs.getString("signing_key_id"),
+                rs.getTimestamp("signing_key_set_at") == null ? null : rs.getTimestamp("signing_key_set_at").toInstant());
     }
 }

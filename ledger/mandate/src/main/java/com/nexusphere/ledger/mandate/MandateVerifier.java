@@ -18,11 +18,15 @@ public final class MandateVerifier {
     private final String audience;
     private final Clock clock;
     private final Duration clockSkew;
+    private final Duration keyBindingMaxAge;
+    private final boolean requireKeyBinding;
 
     private MandateVerifier(Builder builder) {
         this.issuers = Set.copyOf(builder.issuers);
         this.clock = builder.clock;
         this.clockSkew = builder.clockSkew;
+        this.keyBindingMaxAge = builder.keyBindingMaxAge;
+        this.requireKeyBinding = builder.requireKeyBinding;
         this.audience = builder.audience;
         HttpFetcher http = builder.http == null ? HttpFetcher.create(builder.timeout) : builder.http;
         this.keys = builder.keys == null ? new JwksKeyResolver(http, clock, builder.cacheTtl) : builder.keys;
@@ -36,19 +40,28 @@ public final class MandateVerifier {
     }
 
     public MandateCheck verify(String token) {
-        return check(token, null, null, false);
+        return check(token, null, null, false, null);
     }
 
     public MandateCheck verify(String token, String action, String target) {
-        return check(token, action, target, true);
+        return check(token, action, target, true, null);
     }
 
-    private MandateCheck check(String token, String action, String target, boolean coverage) {
+    public MandateCheck verifyBound(String token, String nonce) {
+        return check(token, null, null, false, nonce);
+    }
+
+    public MandateCheck verifyBound(String token, String nonce, String action, String target) {
+        return check(token, action, target, true, nonce);
+    }
+
+    private MandateCheck check(String token, String action, String target, boolean coverage, String nonce) {
         List<MandateCheck.Problem> problems = new ArrayList<>();
         Jws.Parsed parsed;
         MandateClaims claims;
+        SdJwt sdJwt;
         try {
-            SdJwt sdJwt = SdJwt.parse(token);
+            sdJwt = SdJwt.parse(token);
             parsed = sdJwt.jwt();
             claims = MandateClaims.fromPayload(sdJwt.claims());
         } catch (IllegalArgumentException e) {
@@ -88,6 +101,10 @@ public final class MandateVerifier {
             problems.add(new MandateCheck.Problem(MandateProblem.WRONG_AUDIENCE,
                     "The mandate is for " + claims.audience() + ", not " + audience));
         }
+        MandateCheck.Problem binding = keyBinding(sdJwt, claims, nonce, now);
+        if (binding != null) {
+            problems.add(binding);
+        }
         if (coverage && !claims.covers(action, target)) {
             problems.add(new MandateCheck.Problem(MandateProblem.NOT_COVERED,
                     "The mandate does not cover " + action + " on " + target));
@@ -96,6 +113,24 @@ public final class MandateVerifier {
             problems.addAll(status(claims));
         }
         return new MandateCheck(claims, problems);
+    }
+
+    private MandateCheck.Problem keyBinding(SdJwt sdJwt, MandateClaims claims, String nonce, Instant now) {
+        if (!claims.bound()) {
+            if (sdJwt.keyBinding() != null) {
+                return new MandateCheck.Problem(MandateProblem.KEY_BINDING_INVALID,
+                        "The mandate names no agent key, so it cannot carry a key binding");
+            }
+            return requireKeyBinding ? new MandateCheck.Problem(MandateProblem.KEY_NOT_BOUND,
+                    "The mandate is not bound to a key of the agent") : null;
+        }
+        if (sdJwt.keyBinding() == null) {
+            return new MandateCheck.Problem(MandateProblem.KEY_BINDING_MISSING,
+                    "The mandate is bound to a key of the agent and needs a key binding");
+        }
+        String problem = KeyBinding.problem(sdJwt, claims.holderKey(), audience != null ? audience
+                : claims.audience(), nonce, now, clockSkew, keyBindingMaxAge);
+        return problem == null ? null : new MandateCheck.Problem(MandateProblem.KEY_BINDING_INVALID, problem);
     }
 
     private List<MandateCheck.Problem> status(MandateClaims claims) {
@@ -130,6 +165,8 @@ public final class MandateVerifier {
         private Duration clockSkew = Duration.ofSeconds(60);
         private Duration cacheTtl = Duration.ofMinutes(5);
         private Duration timeout = Duration.ofSeconds(10);
+        private Duration keyBindingMaxAge = Duration.ofMinutes(5);
+        private boolean requireKeyBinding;
 
         private Builder() {
         }
@@ -176,6 +213,16 @@ public final class MandateVerifier {
 
         public Builder cacheTtl(Duration cacheTtl) {
             this.cacheTtl = cacheTtl;
+            return this;
+        }
+
+        public Builder requireKeyBinding() {
+            this.requireKeyBinding = true;
+            return this;
+        }
+
+        public Builder keyBindingMaxAge(Duration keyBindingMaxAge) {
+            this.keyBindingMaxAge = keyBindingMaxAge;
             return this;
         }
 

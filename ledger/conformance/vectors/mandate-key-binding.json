@@ -1,0 +1,41 @@
+{
+  "description" : "SD-JWT VC mandate bound to the agent key with cnf, presented with a KB-JWT",
+  "agentSeed" : "c5aa8df43f9f837bedb7442f31dcb7b166d38535076f094b85ce3a2e0b4458f7",
+  "agentPublicKey" : "MCowBQYDK2VwAyEA/FHNjmIYoaONpH7QAjDwWAgW7RO6MwOsXeuRFUiQgCU=",
+  "audience" : "https://supplier.example",
+  "nonce" : "049aba59a5035ce3ebb781e1f9176faa52302d2f5cb23b9a692673654f334fe6",
+  "presentedAt" : 1790845200,
+  "token" : "eyJhbGciOiJFZERTQSIsInR5cCI6ImRjK3NkLWp3dCIsImtpZCI6IjA2ZTNmZDhmZGEyOWJiNjAifQ.eyJpc3MiOiJodHRwczovL2xlZGdlci5leGFtcGxlIiwidmN0IjoidXJuOm5leHVzcGhlcmU6dmN0OmFnZW50LW1hbmRhdGU6MSIsInN1YiI6InNhbGVzLWFnZW50IiwiYXVkIjoiaHR0cHM6Ly9zdXBwbGllci5leGFtcGxlIiwianRpIjoiMDAwMDAwMDAtMDAwMC00MDAwLTgwMDAtMDAwMDAwMDAwMGNjIiwiaWF0IjoxNzkwODQxNjAwLCJuYmYiOjE3OTA4NDE2MDAsImV4cCI6MTgyMjM3NzYwMCwibWFuZGF0ZSI6eyJhY3Rpb25zIjpbImEyYS9zZW5kIl0sInRhcmdldHMiOlsic3VwcGxpZXIvKiJdLCJfc2QiOlsiVTJxUjJJakFOaVVtRHJmZUp4dWRQdkhOcFFsd0dwZDh2dmtGQkZrdU9XVSIsIm1xQWZJSEI3cUxnYlpNXzJBVG9vVnZWcWdSVUJkTlpqSXlFRXJ0NzlxbnMiLCJ5N3pFak5aQ2gtb0wta1NiVWFRdTVzekdCY1VfR0k1VUdDQmpGdFFaOGdvIl19LCJzdGF0dXMiOnsic3RhdHVzX2xpc3QiOnsiaWR4Ijo0LCJ1cmkiOiJodHRwczovL2xlZGdlci5leGFtcGxlL3B1YmxpYy92MS9tYW5kYXRlcy9zdGF0dXMifX0sImNuZiI6eyJqd2siOnsia3R5IjoiT0tQIiwiY3J2IjoiRWQyNTUxOSIsIngiOiJfRkhOam1JWW9hT05wSDdRQWpEd1dBZ1c3Uk82TXdPc1hldVJGVWlRZ0NVIn19LCJfc2RfYWxnIjoic2hhLTI1NiJ9.x9yD16VxqxvE9HsZAFu_cTtuEYUk_Wc_b266lt5QEaTsGUJuDdefwU4U1cCXsQW31NmoGZvqeCnqSmjkxlHKCw~WyItX05seXVQbWJzcFczVThKU3JnNkZ3IiwicHJpbmNpcGFsIiwiZ2xvYmV4Il0~WyJ3b29SUVZlNF9IUl9leUQyaWRHY21nIiwiZ3JhbnQiLCIwMDAwMDAwMC0wMDAwLTQwMDAtODAwMC0wMDAwMDAwMDAwYmIiXQ~WyJlb2RFdjRqdmxVZVJkTlM1WTJnOE9RIiwidGVybXNIYXNoIiwiNTFkMjM2MWY0ZmFlYTNiYzhmOWZhY2RiYzdkOTlhYmI1NTU1OTZhMmU1MWY3YjI1ZmQzYjQxYzkzNTg3ZTYxNiJd~",
+  "presentation" : "eyJhbGciOiJFZERTQSIsInR5cCI6ImRjK3NkLWp3dCIsImtpZCI6IjA2ZTNmZDhmZGEyOWJiNjAifQ.eyJpc3MiOiJodHRwczovL2xlZGdlci5leGFtcGxlIiwidmN0IjoidXJuOm5leHVzcGhlcmU6dmN0OmFnZW50LW1hbmRhdGU6MSIsInN1YiI6InNhbGVzLWFnZW50IiwiYXVkIjoiaHR0cHM6Ly9zdXBwbGllci5leGFtcGxlIiwianRpIjoiMDAwMDAwMDAtMDAwMC00MDAwLTgwMDAtMDAwMDAwMDAwMGNjIiwiaWF0IjoxNzkwODQxNjAwLCJuYmYiOjE3OTA4NDE2MDAsImV4cCI6MTgyMjM3NzYwMCwibWFuZGF0ZSI6eyJhY3Rpb25zIjpbImEyYS9zZW5kIl0sInRhcmdldHMiOlsic3VwcGxpZXIvKiJdLCJfc2QiOlsiVTJxUjJJakFOaVVtRHJmZUp4dWRQdkhOcFFsd0dwZDh2dmtGQkZrdU9XVSIsIm1xQWZJSEI3cUxnYlpNXzJBVG9vVnZWcWdSVUJkTlpqSXlFRXJ0NzlxbnMiLCJ5N3pFak5aQ2gtb0wta1NiVWFRdTVzekdCY1VfR0k1VUdDQmpGdFFaOGdvIl19LCJzdGF0dXMiOnsic3RhdHVzX2xpc3QiOnsiaWR4Ijo0LCJ1cmkiOiJodHRwczovL2xlZGdlci5leGFtcGxlL3B1YmxpYy92MS9tYW5kYXRlcy9zdGF0dXMifX0sImNuZiI6eyJqd2siOnsia3R5IjoiT0tQIiwiY3J2IjoiRWQyNTUxOSIsIngiOiJfRkhOam1JWW9hT05wSDdRQWpEd1dBZ1c3Uk82TXdPc1hldVJGVWlRZ0NVIn19LCJfc2RfYWxnIjoic2hhLTI1NiJ9.x9yD16VxqxvE9HsZAFu_cTtuEYUk_Wc_b266lt5QEaTsGUJuDdefwU4U1cCXsQW31NmoGZvqeCnqSmjkxlHKCw~WyItX05seXVQbWJzcFczVThKU3JnNkZ3IiwicHJpbmNpcGFsIiwiZ2xvYmV4Il0~WyJ3b29SUVZlNF9IUl9leUQyaWRHY21nIiwiZ3JhbnQiLCIwMDAwMDAwMC0wMDAwLTQwMDAtODAwMC0wMDAwMDAwMDAwYmIiXQ~WyJlb2RFdjRqdmxVZVJkTlM1WTJnOE9RIiwidGVybXNIYXNoIiwiNTFkMjM2MWY0ZmFlYTNiYzhmOWZhY2RiYzdkOTlhYmI1NTU1OTZhMmU1MWY3YjI1ZmQzYjQxYzkzNTg3ZTYxNiJd~eyJhbGciOiJFZERTQSIsInR5cCI6ImtiK2p3dCJ9.eyJpYXQiOjE3OTA4NDUyMDAsImF1ZCI6Imh0dHBzOi8vc3VwcGxpZXIuZXhhbXBsZSIsIm5vbmNlIjoiMDQ5YWJhNTlhNTAzNWNlM2ViYjc4MWUxZjkxNzZmYWE1MjMwMmQyZjVjYjIzYjlhNjkyNjczNjU0ZjMzNGZlNiIsInNkX2hhc2giOiJsOHd5VkFSaHdCMlZlZTBJQTZtSlpLUm5kMEExRFZ2MHlyQjM3a3ZXdVc0In0.c4Quuhu__THTKf00AhrVlijs2q-DP0dZd5p2YGPiBbDt-ra4aX_2fPBc8leXjAChnKfDMSezW23vP48L3JuIDg",
+  "sdHash" : "l8wyVARhwB2Vee0IA6mJZKRnd0A1DVv0yrB37kvWuW4",
+  "claims" : {
+    "iss" : "https://ledger.example",
+    "vct" : "urn:nexusphere:vct:agent-mandate:1",
+    "sub" : "sales-agent",
+    "aud" : "https://supplier.example",
+    "jti" : "00000000-0000-4000-8000-0000000000cc",
+    "iat" : 1790841600,
+    "nbf" : 1790841600,
+    "exp" : 1822377600,
+    "mandate" : {
+      "principal" : "globex",
+      "actions" : [ "a2a/send" ],
+      "targets" : [ "supplier/*" ],
+      "grant" : "00000000-0000-4000-8000-0000000000bb",
+      "termsHash" : "51d2361f4faea3bc8f9facdbc7d99abb555596a2e51f7b25fd3b41c93587e616"
+    },
+    "status" : {
+      "status_list" : {
+        "idx" : 4,
+        "uri" : "https://ledger.example/public/v1/mandates/status"
+      }
+    },
+    "cnf" : {
+      "jwk" : {
+        "kty" : "OKP",
+        "crv" : "Ed25519",
+        "x" : "_FHNjmIYoaONpH7QAjDwWAgW7RO6MwOsXeuRFUiQgCU"
+      }
+    }
+  }
+}

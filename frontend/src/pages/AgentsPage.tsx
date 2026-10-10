@@ -55,7 +55,7 @@ export function AgentsPage() {
         <ErrorMessage error={agents.error} />
         {agents.data && (
           <table>
-            <thead><tr><th>Agent ID</th><th>Name</th><th>Owner</th><th>Key</th><th>Status</th><th>Created</th><th /></tr></thead>
+            <thead><tr><th>Agent ID</th><th>Name</th><th>Owner</th><th>Key</th><th>Signing key</th><th>Status</th><th>Created</th><th /></tr></thead>
             <tbody>
               {agents.data.items.map((a) => (
                 <tr key={a.agentId}>
@@ -63,6 +63,7 @@ export function AgentsPage() {
                   <td>{a.name}</td>
                   <td>{a.ownerId}</td>
                   <td><code>{a.keyPrefix}…</code></td>
+                  <td>{a.signingKeyId ? <code>{a.signingKeyId}</code> : 'none'}</td>
                   <td><Badge value={a.status} /></td>
                   <td><Time value={a.createdAt} /></td>
                   <td className="row-actions">

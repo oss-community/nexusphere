@@ -123,7 +123,9 @@ curl -s -X POST http://localhost:8090/api/v1/agents -H "$OP" -H "Content-Type: a
 <p style="text-align: justify;">
 
 Each answer carries the agent's `apiKey` once. Keep it; a lost key is replaced with
-`POST /api/v1/agents/{agentId}/key`. The Agents page of the web UI does the same.
+`POST /api/v1/agents/{agentId}/key`. The Agents page of the web UI does the same. An agent that talks to other
+organizations should also register an Ed25519 key of its own, so a copied API key is not enough to act for it; see
+[Agent Keys and Key Binding](../ledger/README.md#agent-keys-and-key-binding).
 
 </p>
 
@@ -211,8 +213,8 @@ LEDGER_MCP_SERVERS_FILES_AUTHORIZATION: Bearer upstream-secret
 <p style="text-align: justify;">
 
 When an agent works with an agent of another organization, both sides run a ledger. The sending ledger decides the
-call and attaches a mandate, the receiving ledger checks it and answers with a signed receipt, and both keep matching
-evidence. The A2A gateway and its settings are in [Nexusphere Ledger](../ledger/README.md#a2a-gateway).
+call and attaches a mandate, or the agent's own key-bound presentation when it has a signing key, the receiving ledger
+checks it and answers with a signed receipt, and both keep matching evidence. The A2A gateway and its settings are in [Nexusphere Ledger](../ledger/README.md#a2a-gateway).
 
 </p>
 

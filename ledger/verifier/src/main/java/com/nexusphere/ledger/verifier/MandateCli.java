@@ -39,6 +39,8 @@ final class MandateCli {
         String target = null;
         String publicKey = null;
         boolean skipStatus = false;
+        boolean requireKeyBinding = false;
+        String nonce = null;
         boolean json = false;
         String source = null;
         try {
@@ -51,6 +53,8 @@ final class MandateCli {
                     case "--public-key" -> publicKey = args[++i].trim();
                     case "--public-key-file" -> publicKey = Files.readString(Path.of(args[++i])).trim();
                     case "--skip-status" -> skipStatus = true;
+                    case "--nonce" -> nonce = args[++i];
+                    case "--require-key-binding" -> requireKeyBinding = true;
                     case "--json" -> json = true;
                     default -> {
                         if (source != null || args[i].startsWith("--")) {
@@ -93,8 +97,12 @@ final class MandateCli {
         if (skipStatus) {
             builder.skipStatus();
         }
+        if (requireKeyBinding) {
+            builder.requireKeyBinding();
+        }
         MandateVerifier verifier = builder.build();
-        MandateCheck check = action == null ? verifier.verify(token) : verifier.verify(token, action, target);
+        MandateCheck check = action == null ? verifier.verifyBound(token, nonce)
+                : verifier.verifyBound(token, nonce, action, target);
         if (json) {
             Map<String, Object> report = new LinkedHashMap<>();
             report.put("valid", check.valid());
@@ -130,6 +138,7 @@ final class MandateCli {
             out.println("  Allows      : " + String.join(", ", c.actions()) + " on " + String.join(", ", c.targets())
                     + (c.maxUses() == null ? "" : ", at most " + c.maxUses() + " uses"));
             out.println("  Valid       : " + c.notBefore() + " to " + c.expiresAt());
+            out.println("  Agent key   : " + (c.bound() ? SigningKeys.keyIdOf(c.holderKey()) : "none"));
             out.println("  Status      : " + (skipStatus ? "not checked" : "index " + c.statusIndex() + " in "
                     + c.statusListUrl()));
         }

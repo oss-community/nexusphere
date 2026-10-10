@@ -1,5 +1,7 @@
 package com.nexusphere.ledger.a2a;
 
+import com.nexusphere.ledger.agent.application.AgentService;
+import com.nexusphere.ledger.agent.domain.model.Agent;
 import com.nexusphere.ledger.authorization.application.DecisionService;
 import com.nexusphere.ledger.authorization.application.MandateService;
 import com.nexusphere.ledger.authorization.domain.model.DecisionRequest;
@@ -7,11 +9,15 @@ import com.nexusphere.ledger.authorization.domain.model.DecisionResult;
 import com.nexusphere.ledger.authorization.domain.model.Mandate;
 import com.nexusphere.ledger.authorization.domain.model.OutcomeReport;
 import com.nexusphere.ledger.chain.Hashes;
+import com.nexusphere.ledger.chain.SigningKeys;
 import com.nexusphere.ledger.evidence.domain.model.Decision;
 import com.nexusphere.ledger.evidence.domain.model.Outcome;
 import com.nexusphere.ledger.mandate.ExchangeReceipt;
 import com.nexusphere.ledger.mandate.ExchangeRequest;
 import com.nexusphere.ledger.mandate.Jws;
+import com.nexusphere.ledger.mandate.MandateCheck;
+import com.nexusphere.ledger.mandate.MandateClaims;
+import com.nexusphere.ledger.mandate.MandateProblem;
 import com.nexusphere.ledger.server.config.LedgerProperties;
 import com.nexusphere.ledger.server.security.Caller;
 import com.nexusphere.ledger.server.signing.LedgerSigner;
@@ -29,8 +35,10 @@ import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
@@ -44,12 +52,18 @@ class A2aOutbound {
     static final String DECISION_HEADER = "X-Ledger-Decision";
     static final String EXCHANGE_HEADER = "X-Ledger-Exchange";
     static final String RECEIPT_STATUS_HEADER = "X-Ledger-Receipt";
+    static final String WRONG_AGENT = "WRONG_AGENT";
+    static final String WRONG_PRINCIPAL = "WRONG_PRINCIPAL";
+    static final String UNDISCLOSED = "UNDISCLOSED";
+    static final String STALE_KEY = "STALE_KEY";
+    static final String GRANT_MISMATCH = "GRANT_MISMATCH";
 
     private static final Logger log = LoggerFactory.getLogger(A2aOutbound.class);
 
     private final LedgerProperties properties;
     private final DecisionService decisions;
     private final MandateService mandates;
+    private final AgentService agents;
     private final LedgerSigner signer;
     private final A2aKeys keys;
     private final A2aHttp http;
@@ -57,11 +71,12 @@ class A2aOutbound {
     private final JsonRpc rpc;
     private final Clock clock;
 
-    A2aOutbound(LedgerProperties properties, DecisionService decisions, MandateService mandates, LedgerSigner signer,
-                A2aKeys keys, A2aHttp http, A2aExchanges exchanges, JsonRpc rpc, Clock clock) {
+    A2aOutbound(LedgerProperties properties, DecisionService decisions, MandateService mandates, AgentService agents,
+                LedgerSigner signer, A2aKeys keys, A2aHttp http, A2aExchanges exchanges, JsonRpc rpc, Clock clock) {
         this.properties = properties;
         this.decisions = decisions;
         this.mandates = mandates;
+        this.agents = agents;
         this.signer = signer;
         this.keys = keys;
         this.http = http;
@@ -70,7 +85,7 @@ class A2aOutbound {
         this.clock = clock;
     }
 
-    A2aResponse send(Caller caller, String peerName, String principalId, byte[] body) {
+    A2aResponse send(Caller caller, String peerName, String principalId, String presented, byte[] body) {
         LedgerProperties.A2a.Peer peer = peer(peerName);
         A2aResponse invalid = rpc.invalid(body);
         if (invalid != null) {
@@ -88,6 +103,25 @@ class A2aOutbound {
                     null, Map.of());
         }
         String requestHash = Hashes.sha256(body);
+        Agent agent = agents.get(caller.agentId());
+        MandateClaims bound = null;
+        if (agent.signingKey() != null) {
+            if (presented == null || presented.isBlank()) {
+                return rpc.error(400, id, JsonRpc.INVALID_PARAMS, "Agent " + agent.agentId()
+                        + " has a signing key, so it must send its key-bound mandate in the " + MANDATE_HEADER
+                        + " header.", null, Map.of());
+            }
+            MandateCheck check = keys.own().verifyBound(presented, requestHash);
+            List<String> problems = new ArrayList<>(check.problems().stream().map(p -> p.code().name()).toList());
+            bound = check.claims();
+            if (bound != null) {
+                problems.addAll(presentationProblems(bound, agent, principalId, peer));
+            }
+            if (bound == null || !problems.isEmpty()) {
+                return rpc.error(403, id, JsonRpc.DENIED, "The presented mandate does not allow this request.",
+                        Map.of("problems", problems), Map.of());
+            }
+        }
         DecisionResult decision;
         try {
             decision = decisions.decide(new DecisionRequest(caller.agentId(), principalId, ACTION,
@@ -104,19 +138,38 @@ class A2aOutbound {
                     Map.of(DECISION_HEADER, decisionId.toString()));
         }
         Instant now = clock.instant().truncatedTo(ChronoUnit.SECONDS);
-        Mandate mandate = mandates.forExchange(decision.decision().grantId(), peer.issuer());
+        if (bound != null && !bound.grantId().equals(decision.decision().grantId())) {
+            A2aResponse refused = rpc.error(403, id, JsonRpc.DENIED, "The presented mandate is for grant "
+                    + bound.grantId() + ", but the decision used grant " + decision.decision().grantId() + ".",
+                    Map.of("decisionId", decisionId.toString(), "problems", List.of(GRANT_MISMATCH)),
+                    Map.of(DECISION_HEADER, decisionId.toString()));
+            decisions.reportUndelivered(decisionId, caller.agentId(), new OutcomeReport(Outcome.FAILED,
+                    Hashes.sha256(refused.body()), "The presented mandate is for another grant.",
+                    Map.of("a2a.mandate", bound.mandateId().toString())));
+            return refused;
+        }
+        UUID mandateId;
+        String mandateToken;
+        if (bound != null) {
+            mandateId = bound.mandateId();
+            mandateToken = presented;
+        } else {
+            Mandate mandate = mandates.forExchange(decision.decision().grantId(), peer.issuer());
+            mandateId = mandate.id();
+            mandateToken = mandate.token();
+        }
         String requestToken = signer.sign(ExchangeRequest.TYPE, new ExchangeRequest(mandates.issuer(),
-                caller.agentId(), peer.issuer(), decisionId, mandate.id(), method, requestHash, now).toPayload());
+                caller.agentId(), peer.issuer(), decisionId, mandateId, method, requestHash, now).toPayload());
         UUID exchangeId = UUID.randomUUID();
         exchanges.reserve(new A2aExchange(exchangeId, A2aExchange.OUTBOUND, peerName, decisionId, caller.agentId(),
-                principalId, method, mandate.id(), mandate.token(), requestToken, requestHash, null, null, null, null,
+                principalId, method, mandateId, mandateToken, requestToken, requestHash, null, null, null, null,
                 null, null, now));
         Map<String, String> headers = new HashMap<>();
         headers.put(DECISION_HEADER, decisionId.toString());
         headers.put(EXCHANGE_HEADER, exchangeId.toString());
         A2aHttp.Reply reply;
         try {
-            reply = http.post(peer.url(), timeout(), Map.of(MANDATE_HEADER, mandate.token(),
+            reply = http.post(peer.url(), timeout(), Map.of(MANDATE_HEADER, mandateToken,
                     REQUEST_HEADER, requestToken), body, RECEIPT_HEADER);
         } catch (IOException | InterruptedException e) {
             if (e instanceof InterruptedException) {
@@ -133,7 +186,7 @@ class A2aOutbound {
             return failed;
         }
         if (reply.streamed()) {
-            Exchange exchange = new Exchange(caller.agentId(), peerName, peer, decisionId, exchangeId, mandate.id(),
+            Exchange exchange = new Exchange(caller.agentId(), peerName, peer, decisionId, exchangeId, mandateId,
                     requestHash);
             A2aHttp.Reply streamed = reply;
             return new A2aResponse(streamed.status(), null, headers, out -> relay(streamed, exchange, out));
@@ -142,7 +195,10 @@ class A2aOutbound {
         String receipt = reply.headers().get(RECEIPT_HEADER);
         Map<String, String> attributes = new LinkedHashMap<>();
         attributes.put("a2a.status", String.valueOf(reply.status()));
-        attributes.put("a2a.mandate", mandate.id().toString());
+        attributes.put("a2a.mandate", mandateId.toString());
+        if (bound != null) {
+            attributes.put("a2a.keyBinding", agent.signingKeyId());
+        }
         String receiptStatus = checkReceipt(receipt, peer, decisionId, requestHash, responseHash, attributes);
         attributes.put("a2a.receipt", receiptStatus);
         boolean failed = rpc.failed(reply.status(), reply.body());
@@ -161,6 +217,29 @@ class A2aOutbound {
         }
         headers.put(RECEIPT_STATUS_HEADER, receiptStatus);
         return new A2aResponse(reply.status(), reply.body(), headers);
+    }
+
+    private static List<String> presentationProblems(MandateClaims claims, Agent agent, String principalId,
+                                                     LedgerProperties.A2a.Peer peer) {
+        List<String> problems = new ArrayList<>();
+        if (!agent.agentId().equals(claims.agentId())) {
+            problems.add(WRONG_AGENT);
+        }
+        if (!peer.issuer().equals(claims.audience())) {
+            problems.add(MandateProblem.WRONG_AUDIENCE.name());
+        }
+        if (!claims.coversAction(ACTION)) {
+            problems.add(MandateProblem.NOT_COVERED.name());
+        }
+        if (claims.grantId() == null || claims.principalId() == null) {
+            problems.add(UNDISCLOSED);
+        } else if (!claims.principalId().equals(principalId)) {
+            problems.add(WRONG_PRINCIPAL);
+        }
+        if (claims.bound() && !SigningKeys.encode(claims.holderKey()).equals(agent.signingKey())) {
+            problems.add(STALE_KEY);
+        }
+        return problems;
     }
 
     private record Exchange(String agentId, String peerName, LedgerProperties.A2a.Peer peer, UUID decisionId,

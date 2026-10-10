@@ -29,6 +29,16 @@ public final class Jwk {
         return jwk;
     }
 
+    public static Map<String, Object> confirmation(PublicKey key) {
+        byte[] encoded = key.getEncoded();
+        byte[] raw = Arrays.copyOfRange(encoded, encoded.length - 32, encoded.length);
+        Map<String, Object> jwk = new LinkedHashMap<>();
+        jwk.put("kty", "OKP");
+        jwk.put("crv", "Ed25519");
+        jwk.put("x", Jws.encode(raw));
+        return jwk;
+    }
+
     public static PublicKey publicKey(JsonNode jwk) {
         if (!"OKP".equals(jwk.path("kty").asString(null)) || !"Ed25519".equals(jwk.path("crv").asString(null))) {
             throw new IllegalArgumentException("Only Ed25519 OKP keys are supported");

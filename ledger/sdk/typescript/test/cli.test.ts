@@ -3,7 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { INVALID, USAGE, VALID, run } from "../src/cli.js";
-import { fromHex } from "../src/index.js";
+import { PrivateKey, fromHex, presentBound } from "../src/index.js";
 import { ISSUER, LEDGER_KEY, buildPackage, entries, vector, witnessNoteKey } from "./support.js";
 
 async function cli(...args: string[]) {
@@ -52,5 +52,21 @@ describe("nexusphere-ledger-verify", () => {
     const other = await cli("mandate", "--issuer", "https://other.example", "--public-key", key, "--skip-status", "--json", token);
     expect(other.code).toBe(INVALID);
     expect(JSON.parse(other.out).problems[0].code).toBe("UNTRUSTED_ISSUER");
+  });
+
+  it("verifies a key-bound mandate", async () => {
+    const v = vector("mandate-key-binding.json");
+    const agent = await PrivateKey.fromSeed(fromHex(v.agentSeed));
+    const presented = await presentBound(v.token, agent, v.audience, v.nonce);
+    const common = ["mandate", "--issuer", ISSUER, "--public-key", LEDGER_KEY.publicKey.encoded, "--skip-status"];
+    const valid = await cli(...common, "--nonce", v.nonce, presented);
+    expect(valid.code).toBe(VALID);
+    expect(valid.out).toContain("Agent key   : " + agent.keyId);
+    const replayed = await cli(...common, "--nonce", "00".repeat(32), presented);
+    expect(replayed.code).toBe(INVALID);
+    expect(replayed.out).toContain("KEY_BINDING_INVALID");
+    const unbound = await cli(...common, "--require-key-binding", vector("mandate.json").token);
+    expect(unbound.code).toBe(INVALID);
+    expect(unbound.out).toContain("KEY_NOT_BOUND");
   });
 });

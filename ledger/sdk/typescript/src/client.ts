@@ -238,6 +238,12 @@ export class LedgerClient {
     return this.post("/api/v1/agents", compact({ agentId, name, ownerId }));
   }
 
+  setSigningKey(agentId: string, publicKey: string | { encoded: string }): Promise<Json> {
+    const encoded = typeof publicKey === "string" ? publicKey : publicKey.encoded;
+    return this.request("PUT", `/api/v1/agents/${encodeURIComponent(agentId)}/signing-key`, undefined,
+      { publicKey: encoded }) as Promise<Json>;
+  }
+
   createGrant(grant: {
     principalId: string;
     agentId: string;

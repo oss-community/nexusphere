@@ -25,7 +25,7 @@ public final class VerifierCli {
             [--keys <keys.json>] [--witness <verifier key>]... [--witnesses-required <n>] [--json] <package.json>
                    nexusphere-ledger-verify mandate --issuer <url> [--issuer <url>] [--audience <aud>] \
             [--action <action> --target <target>] [--public-key <key> | --public-key-file <file>] [--skip-status] \
-            [--json] <token | token file | ->
+            [--nonce <nonce>] [--require-key-binding] [--json] <token | token file | ->
                    nexusphere-ledger-verify statement [--public-key <key> | --public-key-file <file>] \
             [--receipt <receipt.cose>] <statement.cose>""";
 

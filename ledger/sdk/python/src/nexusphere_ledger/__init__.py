@@ -5,7 +5,7 @@ from .evidence import (GENESIS, ChainVerification, ChainVerifier, Checkpoint, Ev
                        content_hash, entry_hash, link_hash, verify_chain)
 from .keys import KeyRevocation, KeyRotation, PrivateKey, PublicKey, trusted_keys
 from .mandate import (Disclosure, JwksKeys, Jws, MandateCheck, MandateClaims, MandateVerifier, Problem, SdJwt,
-                      StaticKeys, StatusList)
+                      StaticKeys, StatusList, present_bound, sd_hash)
 from .note import LogCheckpoint, Note, NoteKey
 from .package import PackageReport, verify_package
 
@@ -16,6 +16,6 @@ __all__ = [
     "EvidenceLink", "EvidenceStatement", "GENESIS", "JwksKeys", "Jws", "KeyRevocation", "KeyRotation", "LedgerClient", "LedgerError",
     "LogCheckpoint", "LogReceipt", "MandateCheck", "MandateClaims", "MandateVerifier", "Note", "NoteKey",
     "PackageReport", "PrivateKey", "Problem", "PublicKey", "SdJwt", "StaticKeys", "StatusList", "canonical_bytes",
-    "canonical_content", "canonical_json", "content_hash", "entry_hash", "hash_of", "link_hash", "sha256_hex",
-    "trusted_keys", "verify_chain", "verify_package",
+    "canonical_content", "canonical_json", "content_hash", "entry_hash", "hash_of", "link_hash", "present_bound",
+    "sd_hash", "sha256_hex", "trusted_keys", "verify_chain", "verify_package",
 ]
