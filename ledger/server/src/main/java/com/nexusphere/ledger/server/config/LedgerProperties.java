@@ -41,7 +41,8 @@ public record LedgerProperties(Security security, Signing signing, Checkpoint ch
     public record Checkpoint(Duration interval) {
     }
 
-    public record Compliance(List<String> profiles, String profileDirectory, String region) {
+    public record Compliance(List<String> profiles, String profileDirectory, String region,
+                             Duration retentionInterval) {
     }
 
     public record Log(String origin, Duration witnessTimeout, Map<String, Witness> witnesses,

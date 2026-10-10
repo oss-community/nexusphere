@@ -24,6 +24,7 @@
 * [HTTP Message Signatures](#http-message-signatures)
 * [Compliance Profiles](#compliance-profiles)
 * [Erasure](#erasure)
+* [Retention and Legal Holds](#retention-and-legal-holds)
 * [Conformance Vectors](#conformance-vectors)
 * [API](#api)
 * [End-to-End Tests](ledger-e2e-tests/README.md)
@@ -294,6 +295,7 @@ LEDGER_CHECKPOINT_INTERVAL: 1m
 LEDGER_COMPLIANCE_PROFILES: baseline
 LEDGER_COMPLIANCE_PROFILE_DIRECTORY:
 LEDGER_COMPLIANCE_REGION:
+LEDGER_COMPLIANCE_RETENTION_INTERVAL: 1h
 LEDGER_LOG_ORIGIN:
 LEDGER_LOG_WITNESS_TIMEOUT: 10s
 LEDGER_LOG_WITNESSES_{NAME}_URL:
@@ -1130,12 +1132,12 @@ curl -s -X POST http://localhost:8090/mcp/check -H "Authorization: Bearer {agent
 <p style="text-align: justify;">
 
 The ledger knows no law itself. The rules of a country or region live in a compliance profile, a JSON file that says
-how long each kind of evidence is kept at least, whether personal data can be erased on request and how fast, where
-the ledger data may be kept, which evidence fields are required, which RFC 3161 timestamp authorities are accepted and
-which report templates apply. `LEDGER_COMPLIANCE_PROFILES` lists the active profiles, `baseline` by default. When
-several are active the strictest rule wins: the longest retention, the shortest erasure deadline, the regions and
-timestamp authorities all of them allow, and every field any of them requires. A profile is a starting point for
-your own legal review, not legal advice. The ledger ships three:
+how long each kind of evidence is kept at least and at most, whether personal data can be erased on request and how
+fast, where the ledger data may be kept, which evidence fields are required, which RFC 3161 timestamp authorities are
+accepted and which report templates apply. `LEDGER_COMPLIANCE_PROFILES` lists the active profiles, `baseline` by
+default. When several are active the strictest rule wins: the longest minimum and the shortest maximum retention, the
+shortest erasure deadline, the regions and timestamp authorities all of them allow, and every field any of them
+requires. A profile is a starting point for your own legal review, not legal advice. The ledger ships three:
 
 </p>
 
@@ -1211,14 +1213,16 @@ curl -s -X POST http://localhost:8090/api/v1/checkpoints -H "Authorization: Bear
 
 `POST /api/v1/principals/{principalId}/erasure` erases what the ledger holds about a principal, by crypto-shredding.
 For each entry whose retention under the active [compliance profiles](#compliance-profiles) has passed, the encrypted
-values and salts are deleted; an entry still inside its retention keeps them and the answer says how many and until
-when. When nothing is retained the principal's data key is destroyed and the principal's name in grants, decisions,
-mandates and A2A exchanges becomes `erased:{principalRef}`; a later request for the same principal answers HTTP 404.
-The chain, the transparency log, every checkpoint and every package stay valid, because the hash of each entry covers
-only the commitments of its personal fields. A principal with an `ACTIVE` or `PENDING` grant is refused with HTTP 409
-`GRANTS_OPEN`, so revoke or deny the grants first. Each erasure is recorded as `principal/erase` evidence by the agent
-`ledger`, naming only the principal reference. Backups hold the data until they expire, so keep them no longer than
-the erasure deadline of your profiles; see [Operations](../docs/operations.md).
+values and salts are deleted; an entry still inside its retention, or of a principal under a [legal
+hold](#retention-and-legal-holds), keeps them and the answer says how many and until when. The ledger continues such a
+pending erasure on its own once the retention ends and the hold is released. When nothing is retained the principal's
+data key is destroyed and the principal's name in grants, decisions, mandates and A2A exchanges becomes
+`erased:{principalRef}`; a later request for the same principal answers HTTP 404. The chain, the transparency log,
+every checkpoint and every package stay valid, because the hash of each entry covers only the commitments of its
+personal fields. A principal with an `ACTIVE` or `PENDING` grant is refused with HTTP 409 `GRANTS_OPEN`, so revoke or
+deny the grants first. Each erasure is recorded as `principal/erase` evidence by the agent `ledger`, naming only the
+principal reference. Backups hold the data until they expire, so keep them no longer than the erasure deadline of your
+profiles; see [Operations](../docs/operations.md).
 
 </p>
 
@@ -1245,6 +1249,74 @@ Step 4. Verify the chain; the answer must show `"valid":true`:
 
 ```shell
 curl -s http://localhost:8090/api/v1/verification -H "Authorization: Bearer $LEDGER_API_KEY" | jq -c '{valid, checkedEntries}'
+```
+
+## Retention and Legal Holds
+
+<p style="text-align: justify;">
+
+A retention rule of a [compliance profile](#compliance-profiles) can set a `maximum` next to its `minimum`, an
+ISO-8601 period no shorter than the minimum. Every `LEDGER_COMPLIANCE_RETENTION_INTERVAL`, one hour by default, the
+ledger erases the personal fields of each entry older than the shortest maximum of the active profiles for its action,
+by the same crypto-shredding as an [erasure](#erasure), records how many as `retention/expire` evidence and continues
+the pending erasures whose retention has ended. `POST /api/v1/retention/sweep` runs the same pass at once. Profiles
+whose maximum for an action is shorter than another profile's minimum cannot be combined, and the ledger does not
+start.
+
+</p>
+
+<p style="text-align: justify;">
+
+A legal hold keeps everything about a principal for a dispute, an investigation or a court order, whatever the
+profiles say: while a hold is active, neither an erasure nor the retention pass deletes anything about that principal.
+`POST /api/v1/legal-holds` places one with a required `reason`, `POST /api/v1/legal-holds/{id}/release` releases it,
+and both are recorded as `legal-hold/place` and `legal-hold/release` evidence by the agent `ledger`. The Privacy page
+of the web UI does the same.
+
+</p>
+
+Step 1. Save a profile that keeps evidence at most a year as `profiles/short.json`:
+
+```json
+{
+  "id": "short",
+  "version": 1,
+  "name": "Short",
+  "retention": [{"actions": "*", "minimum": "P1D", "maximum": "P1Y"}]
+}
+```
+
+Step 2. Start the ledger with it:
+
+```shell
+export LEDGER_COMPLIANCE_PROFILES=short
+export LEDGER_COMPLIANCE_PROFILE_DIRECTORY=$PWD/profiles
+```
+
+Step 3. Record evidence from 2019 for `dave` and `erin`, and place a legal hold on `erin`:
+
+```shell
+for p in dave erin; do curl -s -X POST http://localhost:8090/api/v1/evidence -H "Authorization: Bearer $LEDGER_API_KEY" -H "Content-Type: application/json" -d '{"agentId":"invoice-agent","principalId":"'$p'","action":"tools/call","target":"read_invoice","outcome":"SUCCEEDED","occurredAt":"2019-01-01T00:00:00Z"}' | jq -r .id > $p.txt; done
+curl -s -X POST http://localhost:8090/api/v1/legal-holds -H "Authorization: Bearer $LEDGER_API_KEY" -H "Content-Type: application/json" -d '{"principalId":"erin","reason":"dispute 42"}' | jq -r .id > hold.txt
+```
+
+Step 4. Run the retention pass; the answer must show `"expiredEntries":1`:
+
+```shell
+curl -s -X POST http://localhost:8090/api/v1/retention/sweep -H "Authorization: Bearer $LEDGER_API_KEY" | jq -c .
+```
+
+Step 5. Read both entries; `dave` must show `"erased":true` and `erin` `"erased":false`:
+
+```shell
+for p in dave erin; do curl -s http://localhost:8090/api/v1/evidence/$(cat $p.txt) -H "Authorization: Bearer $LEDGER_API_KEY" | jq -c '{erased, principalId}'; done
+```
+
+Step 6. Release the hold and run the pass again; the answer must show `"expiredEntries":1` for `erin`:
+
+```shell
+curl -s -X POST http://localhost:8090/api/v1/legal-holds/$(cat hold.txt)/release -H "Authorization: Bearer $LEDGER_API_KEY" -H "Content-Type: application/json" -d '{"reason":"dispute settled"}' | jq -c '{releasedAt, releaseReason}'
+curl -s -X POST http://localhost:8090/api/v1/retention/sweep -H "Authorization: Bearer $LEDGER_API_KEY" | jq -c .
 ```
 
 ## Conformance Vectors
@@ -1295,6 +1367,11 @@ API key, except `/api/v1/principal/**`, which requires a principal token from th
 | GET    | `/api/v1/grants/{id}`                      | Get a grant with its status and uses                                                                   |
 | POST   | `/api/v1/grants/{id}/revoke`               | Revoke a grant with an optional `reason` (operator)                                                    |
 | POST   | `/api/v1/principals/{principalId}/erasure` | Erase the principal's personal data past retention, with an optional `reason` (operator)               |
+| POST   | `/api/v1/legal-holds`                      | Place a legal hold on a `principalId` with a `reason` (operator)                                       |
+| GET    | `/api/v1/legal-holds`                      | List legal holds, only the active ones with `active=true` (operator)                                   |
+| GET    | `/api/v1/legal-holds/{id}`                 | Get a legal hold (operator)                                                                            |
+| POST   | `/api/v1/legal-holds/{id}/release`         | Release a legal hold with a `reason` (operator)                                                        |
+| POST   | `/api/v1/retention/sweep`                  | Erase what the profiles no longer allow and continue pending erasures now (operator)                   |
 | GET    | `/api/v1/principal/evidence`               | The evidence about the principal by `after` and `limit`                                                |
 | GET    | `/api/v1/principal`                        | The signed-in principal                                                                                |
 | GET    | `/api/v1/principal/grants`                 | List the principal's grants by `state`, `after` and `limit`                                            |

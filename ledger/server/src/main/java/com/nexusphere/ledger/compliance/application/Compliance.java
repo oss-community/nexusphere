@@ -53,13 +53,27 @@ public final class Compliance {
                 .max(Comparator.comparing(REFERENCE::plus));
     }
 
+    public Optional<Period> maximum(String action) {
+        return profiles.stream().flatMap(profile -> profile.retention().stream())
+                .filter(rule -> rule.maximum() != null && rule.covers(action))
+                .map(ComplianceProfile.Retention::maximum)
+                .min(Comparator.comparing(REFERENCE::plus));
+    }
+
+    public Optional<Period> shortestMaximum() {
+        return profiles.stream().flatMap(profile -> profile.retention().stream())
+                .map(ComplianceProfile.Retention::maximum).filter(p -> p != null)
+                .min(Comparator.comparing(REFERENCE::plus));
+    }
+
     public List<Rule> retentionRules() {
-        Map<String, Period> strictest = new TreeMap<>();
-        profiles.forEach(profile -> profile.retention().forEach(rule -> strictest.merge(rule.actions(),
-                rule.minimum(), (a, b) -> REFERENCE.plus(a).isAfter(REFERENCE.plus(b)) ? a : b)));
-        return strictest.keySet().stream().map(actions -> new Rule(actions,
-                retention(actions.endsWith("*") ? actions.substring(0, actions.length() - 1) : actions)
-                        .orElseThrow().toString())).toList();
+        Set<String> patterns = new TreeSet<>();
+        profiles.forEach(profile -> profile.retention().forEach(rule -> patterns.add(rule.actions())));
+        return patterns.stream().map(actions -> {
+            String action = example(actions);
+            return new Rule(actions, retention(action).orElseThrow().toString(),
+                    maximum(action).map(Period::toString).orElse(null));
+        }).toList();
     }
 
     public boolean erasureOnRequest() {
@@ -123,6 +137,17 @@ public final class Compliance {
                         + names + ", which allow " + residency.get());
             }
         }
+        for (ComplianceProfile profile : profiles) {
+            for (ComplianceProfile.Retention rule : profile.retention()) {
+                String action = example(rule.actions());
+                Optional<Period> maximum = maximum(action);
+                Period minimum = retention(action).orElseThrow();
+                if (maximum.isPresent() && REFERENCE.plus(maximum.get()).isBefore(REFERENCE.plus(minimum))) {
+                    throw new IllegalStateException("The compliance profiles keep " + rule.actions() + " at least "
+                            + minimum + " but at most " + maximum.get());
+                }
+            }
+        }
         if (timestampAuthorities().map(Set::isEmpty).orElse(false)) {
             throw new IllegalStateException("The compliance profiles accept no common timestamp authority");
         }
@@ -143,6 +168,10 @@ public final class Compliance {
         return Optional.ofNullable(common);
     }
 
-    public record Rule(String actions, String minimum) {
+    private static String example(String actions) {
+        return actions.endsWith("*") ? actions.substring(0, actions.length() - 1) : actions;
+    }
+
+    public record Rule(String actions, String minimum, String maximum) {
     }
 }

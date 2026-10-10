@@ -150,7 +150,9 @@ the pinned key. Pass `key_list` with the list from `GET /api/v1/keys` to apply k
 digest of each [compliance profile](../../README.md#compliance-profiles) the checkpoint signs, and
 `client.compliance()` returns the active profiles and their combined rules from the ledger. An entry whose personal
 fields were [erased](../../README.md#erasure) still verifies from its commitments, and
-`client.erase_principal(principal_id, reason)` asks the ledger to erase a principal.
+`client.erase_principal(principal_id, reason)` asks the ledger to erase a principal. `place_legal_hold`,
+`release_legal_hold`, `legal_holds` and `sweep_retention` manage [legal holds](../../README.md#retention-and-legal-holds)
+and the retention pass.
 
 </p>
 

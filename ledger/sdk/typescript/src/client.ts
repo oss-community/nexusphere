@@ -300,6 +300,22 @@ export class LedgerClient {
     return this.post(`/api/v1/principals/${encodeURIComponent(principalId)}/erasure`, compact({ reason }));
   }
 
+  placeLegalHold(principalId: string, reason: string): Promise<Json> {
+    return this.post("/api/v1/legal-holds", { principalId, reason });
+  }
+
+  releaseLegalHold(holdId: string, reason: string): Promise<Json> {
+    return this.post(`/api/v1/legal-holds/${encodeURIComponent(holdId)}/release`, { reason });
+  }
+
+  legalHolds(active = false): Promise<Json> {
+    return this.get("/api/v1/legal-holds", active ? { active: "true" } : {});
+  }
+
+  sweepRetention(): Promise<Json> {
+    return this.post("/api/v1/retention/sweep", {});
+  }
+
   compliance(): Promise<Json> {
     return this.get("/public/v1/compliance");
   }

@@ -41,6 +41,7 @@ ledger:
     profiles: ${LEDGER_COMPLIANCE_PROFILES:baseline}
     profile-directory: ${LEDGER_COMPLIANCE_PROFILE_DIRECTORY:}
     region: ${LEDGER_COMPLIANCE_REGION:}
+    retention-interval: ${LEDGER_COMPLIANCE_RETENTION_INTERVAL:1h}
   log:
     origin: ${LEDGER_LOG_ORIGIN:}
     witness-timeout: ${LEDGER_LOG_WITNESS_TIMEOUT:10s}

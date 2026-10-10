@@ -47,7 +47,8 @@ checkpoints of a revoked key came before its compromise.
 `ComplianceE2ETest` restarts a `StandaloneLedger` with different compliance profiles and regions against one
 PostgreSQL container, so profile changes are recorded once and a disallowed region stops the start.
 `ErasureE2ETest` erases principals on the shared ledger and on a `StandaloneLedger` with the `us` profile, whose
-retention keeps recent entries.
+retention keeps recent entries. `RetentionE2ETest` starts a `StandaloneLedger` with its own short profile, so entries
+expire and a pending erasure completes within the test.
 `WitnessE2ETest` starts two `StandaloneLedger`s with their own PostgreSQL containers: one is the log and asks the
 other, which watches it, to cosign its log checkpoints over the C2SP witness protocol.
 
@@ -69,6 +70,8 @@ other, which watches it, to cosign its log checkpoints over the C2SP witness pro
 | `ErasureE2ETest`          | Erasing a principal removes its personal data and keeps the chain             |
 |                           | Open grants block the erasure and are then pseudonymized                      |
 |                           | The retention of the profiles keeps recent entries                            |
+| `LegalHoldE2ETest`        | A legal hold keeps the personal data until it is released                     |
+|                           | A legal hold needs a known principal, a reason and the operator               |
 | `PackageE2ETest`          | A package discloses only the requested evidence and verifies offline          |
 |                           | A package starts at the last checkpoint before the evidence                   |
 |                           | Any change to a package is detected                                           |
@@ -142,6 +145,8 @@ other, which watches it, to cosign its log checkpoints over the C2SP witness pro
 | `KeyRevocationE2ETest`    | A revoked key stays valid only where witnesses prove the time                 |
 | `ComplianceE2ETest`       | The active profiles are enforced, signed in checkpoints and recorded          |
 |                           | A ledger outside the allowed region does not start                            |
+| `RetentionE2ETest`        | Personal data past the maximum retention is erased unless held                |
+|                           | A pending erasure completes once the retention ends                           |
 | `TransparencyLogE2ETest`  | The log checkpoint is a signed note over the Merkle root                      |
 |                           | An entry is proven in the signed tree                                         |
 |                           | A later tree is proven to extend an earlier one                               |

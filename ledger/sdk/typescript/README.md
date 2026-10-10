@@ -153,7 +153,8 @@ the same fields as the Java `PackageReport`. `report.complianceProfiles` lists t
 [compliance profile](../../README.md#compliance-profiles) the checkpoint signs, and `client.compliance()` returns the
 active profiles and their combined rules from the ledger. An entry whose personal fields were
 [erased](../../README.md#erasure) still verifies from its commitments, and `client.erasePrincipal(principalId, reason)`
-asks the ledger to erase a principal.
+asks the ledger to erase a principal. `placeLegalHold`, `releaseLegalHold`, `legalHolds` and `sweepRetention` manage
+[legal holds](../../README.md#retention-and-legal-holds) and the retention pass.
 
 </p>
 
