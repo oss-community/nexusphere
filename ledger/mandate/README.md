@@ -26,6 +26,8 @@ proof, its revocation list and the verifier the receiving side uses.
 * `StatusList`: the signed revocation list in the IETF Token Status List format
 * `MandateVerifier`: trusted issuers, keys from the issuer's JWKS, signature, time, audience, coverage and revocation,
   failing closed
+* `TrackRecordClaims`, `TrackRecords` and `TrackRecordVerifier`: the agent track record as an SD-JWT VC with the
+  agent's evidence counts up to a checkpoint, its selective claims and key binding, and its verifier
 * `ExchangeRequest` and `ExchangeReceipt`: the signed request proof and receipt of an A2A exchange between two ledgers
 
 ## Dependencies

@@ -4,6 +4,7 @@ import com.nexusphere.ledger.chain.Hashes;
 import com.nexusphere.ledger.chain.IndexRoot;
 import com.nexusphere.ledger.chain.SigningKeys;
 import com.nexusphere.ledger.chain.SparseMerkleTree;
+import com.nexusphere.ledger.mandate.TrackRecordClaims;
 import tools.jackson.databind.JsonNode;
 
 import java.time.Instant;
@@ -139,5 +140,24 @@ public final class IndexProofVerifier {
         }
         return nodes.stream().anyMatch(node -> keyId.equals(node.path("keyId").asString(null))
                 && node.path("revocation").isObject());
+    }
+
+    public static List<String> matchTrackRecord(TrackRecordClaims claims, JsonNode proof, IndexCheck check) {
+        List<String> problems = new ArrayList<>();
+        if (!"agent".equals(check.term().get("type")) || !claims.agentId().equals(check.term().get("agentId"))) {
+            problems.add("The index proof is not about the agent " + claims.agentId());
+        }
+        if (check.sequence() == null || check.sequence() != claims.checkpointSequence()
+                || !claims.headHash().equals(check.headHash())
+                || !claims.indexRoot().equals(proof.path("index").path("root").asString(null))) {
+            problems.add("The index proof is for another checkpoint or index root than the track record");
+        }
+        long count = check.present() ? check.count() : 0;
+        if (count != claims.total() || !java.util.Objects.equals(check.present() ? check.firstSequence() : null,
+                claims.firstSequence()) || !java.util.Objects.equals(check.present() ? check.lastSequence() : null,
+                claims.lastSequence())) {
+            problems.add("The track record claims " + claims.total() + " entries but the index proves " + count);
+        }
+        return problems;
     }
 }

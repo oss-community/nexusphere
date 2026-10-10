@@ -1,0 +1,63 @@
+{
+  "description" : "SD-JWT VC agent track record that matches the agent term of index-proof.json; salts are random, so check it rather than reproduce it",
+  "token" : "eyJhbGciOiJFZERTQSIsInR5cCI6ImRjK3NkLWp3dCIsImtpZCI6IjA2ZTNmZDhmZGEyOWJiNjAifQ.eyJpc3MiOiJodHRwczovL2xlZGdlci5leGFtcGxlIiwidmN0IjoidXJuOm5leHVzcGhlcmU6dmN0OmFnZW50LXRyYWNrLXJlY29yZDoxIiwic3ViIjoiaW52b2ljZS1hZ2VudCIsImp0aSI6IjAwMDAwMDAwLTAwMDAtNDAwMC04MDAwLTAwMDAwMDAwMDBkZCIsImlhdCI6MTc5MDg0MjIwMCwibmJmIjoxNzkwODQyMjAwLCJleHAiOjE4MjIzNzc2MDAsInJlY29yZCI6eyJjaGVja3BvaW50Ijp7InNlcXVlbmNlIjozLCJoZWFkSGFzaCI6ImJhYjFmZDg3MzRhM2E2YmI3YmI3NDMxYzViOGYzNWUyNjY0MGZjMzIxMDZhYjIwNTRmOGMyNzQxNmU0YzA3NGIiLCJpbmRleFJvb3QiOiIxNDIyNzg2YThkYzY5NTI5OGExNzhjYzU1NjJlYzkzYzBmNDdjMmUyNzgzNjY2MmE4OTdhZDRlMTI1MTNiZWJmIn0sInRvdGFsIjoyLCJmaXJzdFNlcXVlbmNlIjoxLCJsYXN0U2VxdWVuY2UiOjIsImZpcnN0QXQiOiIyMDI2LTEwLTAxVDA4OjAwOjAwLjEyODQ1NloiLCJsYXN0QXQiOiIyMDI2LTEwLTAxVDA4OjAwOjAxLjEyODQ1NloiLCJfc2QiOlsiLUxUQ0lFVXg0U1VWaktsLUp4UUZPcEN4XzZqUDhHVFZUSDQweGdYdmlCVSIsIjRMYTdlbjl2aTVzaFBxUHZkcUlDUmdjZEROeTFoNVBsb25jcy1iQW5jZ1EiLCJKcU12Tzc3R1NkanFhWl9wcmw0UVVGRGluR3VDMjZHOVZkTlNnXy1ZVFJrIl19LCJfc2RfYWxnIjoic2hhLTI1NiJ9.E3UpH__Mw-Rztr0QmbfeNpsTUHupUz2yANYC7zc3UW08C8uwDfNUIgRx1pOGFb6pawtvcMvZnuz3vW32J-9tDw~WyJDd2NfNm50dWRERGtZQWxoNkRZU2RRIiwib3V0Y29tZXMiLHsiREVOSUVEIjoxLCJTVUNDRUVERUQiOjF9XQ~WyJ4NXZXRGJKXzFzNENhVmVmMjdkRmFnIiwicHJpbmNpcGFscyIsMV0~WyJuNUtFOGQxN2l2WnJrbkxjV3Z1eHZ3IiwiYWN0aW9ucyIseyJ0b29scy9jYWxsIjoyfV0~",
+  "presentedWithOutcomesOnly" : "eyJhbGciOiJFZERTQSIsInR5cCI6ImRjK3NkLWp3dCIsImtpZCI6IjA2ZTNmZDhmZGEyOWJiNjAifQ.eyJpc3MiOiJodHRwczovL2xlZGdlci5leGFtcGxlIiwidmN0IjoidXJuOm5leHVzcGhlcmU6dmN0OmFnZW50LXRyYWNrLXJlY29yZDoxIiwic3ViIjoiaW52b2ljZS1hZ2VudCIsImp0aSI6IjAwMDAwMDAwLTAwMDAtNDAwMC04MDAwLTAwMDAwMDAwMDBkZCIsImlhdCI6MTc5MDg0MjIwMCwibmJmIjoxNzkwODQyMjAwLCJleHAiOjE4MjIzNzc2MDAsInJlY29yZCI6eyJjaGVja3BvaW50Ijp7InNlcXVlbmNlIjozLCJoZWFkSGFzaCI6ImJhYjFmZDg3MzRhM2E2YmI3YmI3NDMxYzViOGYzNWUyNjY0MGZjMzIxMDZhYjIwNTRmOGMyNzQxNmU0YzA3NGIiLCJpbmRleFJvb3QiOiIxNDIyNzg2YThkYzY5NTI5OGExNzhjYzU1NjJlYzkzYzBmNDdjMmUyNzgzNjY2MmE4OTdhZDRlMTI1MTNiZWJmIn0sInRvdGFsIjoyLCJmaXJzdFNlcXVlbmNlIjoxLCJsYXN0U2VxdWVuY2UiOjIsImZpcnN0QXQiOiIyMDI2LTEwLTAxVDA4OjAwOjAwLjEyODQ1NloiLCJsYXN0QXQiOiIyMDI2LTEwLTAxVDA4OjAwOjAxLjEyODQ1NloiLCJfc2QiOlsiLUxUQ0lFVXg0U1VWaktsLUp4UUZPcEN4XzZqUDhHVFZUSDQweGdYdmlCVSIsIjRMYTdlbjl2aTVzaFBxUHZkcUlDUmdjZEROeTFoNVBsb25jcy1iQW5jZ1EiLCJKcU12Tzc3R1NkanFhWl9wcmw0UVVGRGluR3VDMjZHOVZkTlNnXy1ZVFJrIl19LCJfc2RfYWxnIjoic2hhLTI1NiJ9.E3UpH__Mw-Rztr0QmbfeNpsTUHupUz2yANYC7zc3UW08C8uwDfNUIgRx1pOGFb6pawtvcMvZnuz3vW32J-9tDw~WyJDd2NfNm50dWRERGtZQWxoNkRZU2RRIiwib3V0Y29tZXMiLHsiREVOSUVEIjoxLCJTVUNDRUVERUQiOjF9XQ~",
+  "indexProof" : {
+    "format" : "nexusphere-ledger/index-proof/v1",
+    "term" : {
+      "type" : "agent",
+      "agentId" : "invoice-agent"
+    },
+    "key" : "f0b94589182744740c2b43de46707c95fce3aeb22750a89cc5f38380f858046d",
+    "leaf" : {
+      "count" : 2,
+      "firstSequence" : 1,
+      "lastSequence" : 2
+    },
+    "siblings" : [ "4907e2e1db4d30b6477eeb05bb881cf47767e6fe6367c37a644fb83376a1836b", "8f4f8032866ab675aee632ec1dd5b308c0c7c3038d355020f82c878d6b744323", "7168d7ba7a44437684f7f6cf4fcfe002358d7a7d41beb22ae5704f11441635ed" ],
+    "otherLeaf" : null,
+    "index" : {
+      "format" : "nexusphere-ledger/index/v1",
+      "sequence" : 3,
+      "headHash" : "bab1fd8734a3a6bb7bb7431c5b8f35e26640fc32106ab2054f8c27416e4c074b",
+      "root" : "1422786a8dc695298a178cc5562ec93c0f47c2e27836662a897ad4e12513bebf",
+      "createdAt" : "2026-10-01T08:02:00.123456Z",
+      "keyId" : "06e3fd8fda29bb60",
+      "signature" : "GgVnyVGohrl4+SA2PgHJQO2hyd81BQuAwYpVJrltf/MRsTtv5hLGvUaPLob9GgIARtlTtclD33T5Lf05bSMTDA=="
+    },
+    "keys" : [ {
+      "keyId" : "06e3fd8fda29bb60",
+      "algorithm" : "Ed25519",
+      "publicKey" : "MCowBQYDK2VwAyEA11qYAYKxCrfVS/7TyWQHOg7hcvPapiMlrwIaaPcHURo="
+    } ]
+  },
+  "claims" : {
+    "iss" : "https://ledger.example",
+    "vct" : "urn:nexusphere:vct:agent-track-record:1",
+    "sub" : "invoice-agent",
+    "jti" : "00000000-0000-4000-8000-0000000000dd",
+    "iat" : 1790842200,
+    "nbf" : 1790842200,
+    "exp" : 1822377600,
+    "record" : {
+      "checkpoint" : {
+        "sequence" : 3,
+        "headHash" : "bab1fd8734a3a6bb7bb7431c5b8f35e26640fc32106ab2054f8c27416e4c074b",
+        "indexRoot" : "1422786a8dc695298a178cc5562ec93c0f47c2e27836662a897ad4e12513bebf"
+      },
+      "total" : 2,
+      "firstSequence" : 1,
+      "lastSequence" : 2,
+      "firstAt" : "2026-10-01T08:00:00.128456Z",
+      "lastAt" : "2026-10-01T08:00:01.128456Z",
+      "outcomes" : {
+        "DENIED" : 1,
+        "SUCCEEDED" : 1
+      },
+      "principals" : 1,
+      "actions" : {
+        "tools/call" : 2
+      }
+    }
+  }
+}

@@ -1,6 +1,7 @@
 package com.nexusphere.ledger.agent.api.rest;
 
 import com.nexusphere.ledger.agent.application.AgentService;
+import com.nexusphere.ledger.agent.application.TrackRecordService;
 import com.nexusphere.ledger.agent.domain.model.Agent;
 import com.nexusphere.ledger.agent.domain.model.AgentRegistration;
 import com.nexusphere.ledger.agent.domain.model.IssuedAgent;
@@ -53,9 +54,11 @@ class AgentController {
     }
 
     private final AgentService agents;
+    private final TrackRecordService trackRecords;
 
-    AgentController(AgentService agents) {
+    AgentController(AgentService agents, TrackRecordService trackRecords) {
         this.agents = agents;
+        this.trackRecords = trackRecords;
     }
 
     @PostMapping
@@ -102,5 +105,12 @@ class AgentController {
     IssuedAgentResponse rotateKey(Caller caller, @PathVariable String agentId) {
         caller.requireOperator();
         return IssuedAgentResponse.of(agents.rotateKey(agentId));
+    }
+
+    @PostMapping("/{agentId}/track-record")
+    TrackRecordService.IssuedTrackRecord trackRecord(Caller caller, @PathVariable String agentId,
+                                                     @RequestBody(required = false)
+                                                     TrackRecordService.TrackRecordRequest request) {
+        return trackRecords.issue(caller, agentId, request);
     }
 }

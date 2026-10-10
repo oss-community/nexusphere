@@ -21,6 +21,7 @@
 * [MCP Gateway](#mcp-gateway)
 * [Mandates](#mandates)
 * [Agent Keys and Key Binding](#agent-keys-and-key-binding)
+* [Agent Track Records](#agent-track-records)
 * [A2A Gateway](#a2a-gateway)
 * [HTTP Message Signatures](#http-message-signatures)
 * [Model and Prompt](#model-and-prompt)
@@ -1055,6 +1056,61 @@ python3 -c "from nexusphere_ledger import PrivateKey, present_bound; from crypto
 java -jar ledger/verifier/target/verifier-1.0.0-SNAPSHOT-exec.jar mandate --issuer http://localhost:8090 --audience https://supplier.example --nonce "$(python3 -c "print('ab' * 32)")" presented.jwt
 ```
 
+## Agent Track Records
+
+<p style="text-align: justify;">
+
+Another organization that is about to trust an agent wants to know how it has behaved, without reading the evidence.
+`POST /api/v1/agents/{agentId}/track-record`, called by the operator or by the agent itself, answers a signed SD-JWT VC
+of type `urn:nexusphere:vct:agent-track-record:1` with `typ` `dc+sd-jwt`. It counts the evidence that names the agent
+up to the latest checkpoint: the `total`, the first and last sequence and when the ledger recorded them, and, as
+claims the agent may withhold, the `outcomes`, the number of distinct `principals` and the count of each action. It
+names the checkpoint `sequence`, its `headHash` and the signed index root of [Index Proofs](#index-proofs), so the
+`total` must equal the count an index proof gives for the agent at the same checkpoint. The body takes an optional
+`audience` and `validFor`, an ISO-8601 duration between `PT1M` and `P365D`, by default `P30D`. When the agent has a
+signing key, the credential names it in `cnf` and must be presented with a key binding as a mandate is. The ledger
+records `track-record/issue` with the SHA-256 of the credential.
+
+</p>
+
+<p style="text-align: justify;">
+
+`nexusphere-ledger-verify track-record` checks the credential against the issuer's published keys and, with
+`--index-proof`, that a proof for the `agent` term at the same checkpoint verifies and gives the same index root and
+counts. A track record is a snapshot: it does not say what happened after its checkpoint, and it is not revoked; it
+expires.
+
+</p>
+
+Step 1. Start the ledger as in [Run](#run), register an agent and record two actions under it:
+
+```shell
+AGENT_KEY=$(curl -s -X POST http://localhost:8090/api/v1/agents -H "Authorization: Bearer $LEDGER_API_KEY" -H "Content-Type: application/json" -d '{"agentId":"quote-agent","name":"Quote agent","ownerId":"acme"}' | jq -r .apiKey)
+curl -s -X POST http://localhost:8090/api/v1/evidence -H "Authorization: Bearer $AGENT_KEY" -H "Content-Type: application/json" -d '{"agentId":"quote-agent","principalId":"alice","action":"tools/call","outcome":"SUCCEEDED"}' | jq -c '{sequence}'
+curl -s -X POST http://localhost:8090/api/v1/evidence -H "Authorization: Bearer $AGENT_KEY" -H "Content-Type: application/json" -d '{"agentId":"quote-agent","principalId":"bob","action":"tools/call","outcome":"FAILED"}' | jq -c '{sequence}'
+```
+
+Step 2. Sign a checkpoint and let the agent ask for its track record for a supplier:
+
+```shell
+curl -s -X POST http://localhost:8090/api/v1/checkpoints -H "Authorization: Bearer $LEDGER_API_KEY" | jq -c '{sequence}'
+curl -s -X POST http://localhost:8090/api/v1/agents/quote-agent/track-record -H "Authorization: Bearer $AGENT_KEY" -H "Content-Type: application/json" -d '{"audience":"https://supplier.example","validFor":"P7D"}' > track-record.json
+jq -r .credential track-record.json > track-record.jwt
+```
+
+Step 3. Get an index proof for the agent at the same checkpoint:
+
+```shell
+curl -s -X POST http://localhost:8090/api/v1/index/proofs -H "Authorization: Bearer $LEDGER_API_KEY" -H "Content-Type: application/json" -d "{\"term\":{\"type\":\"agent\",\"agentId\":\"quote-agent\"},\"sequence\":$(jq .checkpoint track-record.json)}" > agent-proof.json
+```
+
+Step 4. Verify both as the supplier; the output must show `Entries     : 3`, `Outcomes    : FAILED 1, SUCCEEDED 2`,
+`Principals  : 3` and `Result: VALID`:
+
+```shell
+java -jar verifier/target/verifier-1.0.0-SNAPSHOT-exec.jar track-record --issuer http://localhost:8090 --audience https://supplier.example --index-proof agent-proof.json track-record.jwt
+```
+
 ## A2A Gateway
 
 <p style="text-align: justify;">
@@ -1709,6 +1765,7 @@ API key, except `/api/v1/principal/**`, which requires a principal token from th
 | POST   | `/api/v1/agents/{agentId}/disable`         | Disable an agent and its key (operator)                                                                 |
 | POST   | `/api/v1/agents/{agentId}/key`             | Issue a new API key; the old one stops working (operator)                                               |
 | PUT    | `/api/v1/agents/{agentId}/signing-key`     | Register the agent's Ed25519 `publicKey`; the agent sets it once, the operator can replace it           |
+| POST   | `/api/v1/agents/{agentId}/track-record`    | A signed SD-JWT VC of the agent's evidence counts up to the latest checkpoint (operator or the agent)   |
 | POST   | `/api/v1/grants`                           | Create a grant (operator), or ask for one for itself (agent, only with OIDC)                            |
 | GET    | `/api/v1/grants`                           | List grants by `agentId`, `principalId`, `after` and `limit`                                            |
 | GET    | `/api/v1/grants/{id}`                      | Get a grant with its status and uses                                                                    |

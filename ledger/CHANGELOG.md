@@ -89,6 +89,11 @@ agent platforms and gateways.
   ledger signs per checkpoint; `POST /api/v1/index/proofs` proves that a term occurs, with its count, or that it never
   did up to a checkpoint, the verifiers in Java, Python and TypeScript check proofs with `index`, and an
   `index-proof.json` conformance vector holds proofs of presence and absence
+* Agent track records: `POST /api/v1/agents/{agentId}/track-record` issues an SD-JWT VC that counts the agent's
+  evidence up to a checkpoint, with outcomes, principals and actions the agent may withhold, bound to the agent's key
+  and tied to the signed index root; `TrackRecordVerifier`, the verifiers in Python and TypeScript and the
+  `track-record` command check it and cross-check it with an index proof, and an `agent-track-record.json`
+  conformance vector holds one
 * Browser verifier: one self-contained HTML page in React and TypeScript that verifies a package with the
   TypeScript SDK, pinned to the ledger key and optional witnesses, with a Content Security Policy that blocks every
   connection

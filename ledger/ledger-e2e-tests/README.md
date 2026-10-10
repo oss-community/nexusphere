@@ -174,6 +174,9 @@ other, which watches it, to cosign its log checkpoints over the C2SP witness pro
 |                           | Only the reports of the active profiles are offered                           |
 |                           | A profile can name only the reports the ledger has templates for              |
 |                           | A dispute package holds everything needed to check it                         |
+| `TrackRecordE2ETest`      | Another organization checks the track record against the signed index         |
+|                           | The agent withholds counts and proves it holds the record                     |
+|                           | Only the agent or the operator asks and the validity is bounded               |
 | `IndexE2ETest`            | The ledger proves that a grant was used and that another never was            |
 |                           | An earlier checkpoint keeps its signed index                                  |
 |                           | Only the operator asks for known terms at known checkpoints                   |

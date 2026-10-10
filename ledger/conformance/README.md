@@ -38,6 +38,7 @@ use them for real evidence.
 | `canonical-json.json`        | An object and its canonical JSON with sorted keys, no whitespace and escaped text, and its SHA-256                |
 | `evidence-chain.json`        | Three entries with values, salts, commitments, canonical content and hashes, and a signed head checkpoint         |
 | `evidence-model.json`        | An entry that names its model, version, prompt hash and config hash, with the two texts and its hashes            |
+| `agent-track-record.json`    | An agent track record that matches the agent's index proof, and a presentation that discloses only the outcomes   |
 | `index-proof.json`           | A signed index root over the three entries with proofs that two terms occur and two never do                      |
 | `merkle-tree.json`           | RFC 9162 roots, inclusion proofs and consistency proofs for every size up to 8                                    |
 | `signed-note.json`           | The C2SP signed-note log checkpoint over the three entries and its `tlog-cosignature/v1` cosignature              |
