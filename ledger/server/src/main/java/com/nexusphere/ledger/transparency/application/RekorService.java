@@ -79,6 +79,10 @@ public class RekorService {
         return new Log(base, key == null ? null : key.vkey());
     }
 
+    public List<NoteKey> keys() {
+        return key == null ? List.of() : List.of(key);
+    }
+
     public SignedCheckpoint anchor(SignedCheckpoint signed) {
         if (url == null || signed.rekor() != null) {
             return signed;

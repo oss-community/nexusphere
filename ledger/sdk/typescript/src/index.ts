@@ -16,6 +16,7 @@ export * from "./mandate.js";
 export * from "./note.js";
 export * from "./package.js";
 export * from "./rekor.js";
+export * from "./report.js";
 export * from "./timestamp.js";
 export * from "./timestamps.js";
 

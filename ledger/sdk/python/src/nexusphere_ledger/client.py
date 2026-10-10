@@ -3,7 +3,7 @@ import urllib.error
 import urllib.parse
 import urllib.request
 from contextlib import contextmanager
-from typing import Iterator, List, Optional
+from typing import Iterator, List, Optional, Union
 
 from .canonical import sha256_hex
 from .timestamps import format_instant
@@ -119,6 +119,26 @@ class LedgerClient:
                        from_sequence: Optional[int] = None, to_sequence: Optional[int] = None) -> dict:
         return self._post("/api/v1/packages", _compact({"agentId": agent_id, "principalId": principal_id,
                                                         "fromSequence": from_sequence, "toSequence": to_sequence}))
+
+    def reports(self) -> List[dict]:
+        return self._get("/api/v1/reports")
+
+    def create_report(self, report_id: str, agent_id: Optional[str] = None, principal_id: Optional[str] = None,
+                      from_sequence: Optional[int] = None, to_sequence: Optional[int] = None,
+                      html: bool = False) -> Union[dict, str]:
+        body = _compact({"agentId": agent_id, "principalId": principal_id, "fromSequence": from_sequence,
+                         "toSequence": to_sequence})
+        if html:
+            return self._request("POST", "/api/v1/reports/" + _segment(report_id), query={"format": "html"},
+                                 body=body, raw=True).decode("utf-8")
+        return self._post("/api/v1/reports/" + _segment(report_id), body)
+
+    def create_dispute(self, title: str, description: Optional[str] = None, agent_id: Optional[str] = None,
+                       principal_id: Optional[str] = None, from_sequence: Optional[int] = None,
+                       to_sequence: Optional[int] = None) -> bytes:
+        return self._request("POST", "/api/v1/disputes", body=_compact({
+            "agentId": agent_id, "principalId": principal_id, "fromSequence": from_sequence,
+            "toSequence": to_sequence, "title": title, "description": description}), raw=True)
 
     def decide(self, principal_id: str, action: str, target: Optional[str] = None, input_hash: Optional[str] = None,
                correlation_id: Optional[str] = None, attributes: Optional[dict] = None,

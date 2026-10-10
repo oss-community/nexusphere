@@ -9,6 +9,7 @@
 * [Record Evidence](#record-evidence)
 * [Decide and Report](#decide-and-report)
 * [Verify a Package](#verify-a-package)
+* [Verify a Report](#verify-a-report)
 * [Verify a Statement and Receipt](#verify-a-statement-and-receipt)
 * [Verify a Mandate](#verify-a-mandate)
 * [Present a Key-Bound Mandate](#present-a-key-bound-mandate)
@@ -194,6 +195,28 @@ const report = await verifyPackage(pkg, publicKey, { rekorKeys: [rekorVerifierKe
 console.log(report.rekorLogIndex, report.rekorOrigin);
 ```
 
+## Verify a Report
+
+<p style="text-align: justify;">
+
+The ledger signs [reports and dispute packages](../../README.md#reports-and-dispute-packages) that map the evidence of
+a package to requirements. `client.reports()` lists the reports the ledger offers, `client.createReport(id, scope)`
+and `client.createReportHtml(id, scope)` make one, and `client.createDispute({ title, description, ...scope })` returns
+the dispute package as zip bytes. `verifyReport(report, pkg, { publicKey, keys })` checks the signature with the keys
+the package is trusted with, and that the report names the package's checkpoint, scope and disclosed entries; verify
+the package itself with `verifyPackage`.
+
+</p>
+
+```typescript
+import { verifyPackage, verifyReport } from "@nexusphere/ledger";
+
+const pkg = await operator.exportPackage({ agentId: "invoice-agent" });
+const report = await operator.createReport("dispute", { agentId: "invoice-agent" });
+const check = await verifyReport(report, pkg, { publicKey });
+console.log((await verifyPackage(pkg, publicKey)).valid && check.valid, check.statuses, check.problems);
+```
+
 ## Verify a Statement and Receipt
 
 ```typescript
@@ -300,12 +323,28 @@ npx nexusphere-ledger-verify statement --public-key "{publicKey}" --receipt rece
 npx nexusphere-ledger-verify mandate --issuer http://localhost:8090 --action a2a/send --target supplier/sales "{token}"
 ```
 
+Step 5. Verify a dispute package, and a report against its package; the last line must be `Result: VALID`:
+
+```shell
+npx nexusphere-ledger-verify dispute --public-key "$LEDGER_PUBLIC_KEY" dispute.zip
+npx nexusphere-ledger-verify report --public-key "$LEDGER_PUBLIC_KEY" --package package.json report.json
+```
+
+<p style="text-align: justify;">
+
+`dispute` takes `keys.json`, the timestamp authority chain, the Rekor log key and the witness keys from the archive
+when no option gives them, and lists the last three on the `Archive` line; compare them with copies of your own. It
+requires no witness cosignature unless `--witness` or `--witnesses-required` is given.
+
+</p>
+
 ## Reference
 
 | Module      | Contents                                                                                         |
 |-------------|--------------------------------------------------------------------------------------------------|
 | `client`    | `LedgerClient` for evidence, batches, decisions, `act`, grants, mandates, packages, keys, proofs |
 | `package`   | `verifyPackage` and `PackageReport`                                                              |
+| `report`    | Signed reports: `verifyReport`, `ReportCheck`, `reportSignedBytes` and `entriesDigest`           |
 | `evidence`  | Content and link hashes, commitments, `ChainVerifier`, `Checkpoint` with its compliance profiles |
 | `timestamp` | RFC 3161 tokens, X.509 certificates, `readCertificates` and `verifyTimestamp`                    |
 | `rekor`     | Rekor v2 `hashedrekord` entries: `verifyRekorEntry` and `rekorRequest`                           |

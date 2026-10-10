@@ -36,6 +36,7 @@ database, so an auditor, a court or a counterparty can verify what a ledger hand
   refuse a checkpoint without one with `--require-timestamp`
 * Check the Rekor entry of the checkpoint and its inclusion proof, pin the log with `--rekor-key` and refuse a
   checkpoint without an entry with `--require-rekor`
+* Check a signed report against its package with `report --package`, and a whole dispute package with `dispute`
 * Check entries in evidence format v2 from their personal values and salts, or from their commitments once erased
 * Run the [Conformance Vectors](../conformance/README.md) in `ConformanceVectorsTest`
 
@@ -46,7 +47,8 @@ database, so an auditor, a court or a counterparty can verify what a ledger hand
 | `chain`, `mandate` | `server` |
 
 Usage is in [Evidence Packages](../README.md#evidence-packages), [SCITT Statements and
-Receipts](../README.md#scitt-statements-and-receipts) and [Verifying a Mandate](../README.md#verifying-a-mandate).
+Receipts](../README.md#scitt-statements-and-receipts), [Verifying a Mandate](../README.md#verifying-a-mandate) and
+[Reports and Dispute Packages](../README.md#reports-and-dispute-packages).
 
 ##
 

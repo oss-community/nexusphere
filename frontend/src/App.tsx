@@ -9,6 +9,7 @@ import { MyGrantsPage } from './pages/MyGrantsPage'
 import { Overview } from './pages/Overview'
 import { PackagesPage } from './pages/PackagesPage'
 import { PrivacyPage } from './pages/PrivacyPage'
+import { ReportsPage } from './pages/ReportsPage'
 import { SignIn } from './pages/SignIn'
 
 const OPERATOR_LINKS = [
@@ -17,6 +18,7 @@ const OPERATOR_LINKS = [
   { to: '/agents', label: 'Agents' },
   { to: '/grants', label: 'Grants' },
   { to: '/packages', label: 'Packages' },
+  { to: '/reports', label: 'Reports' },
   { to: '/exchanges', label: 'A2A exchanges' },
   { to: '/privacy', label: 'Privacy' },
 ]
@@ -85,6 +87,7 @@ export function AppRoutes() {
           <Route path="/agents" element={<AgentsPage />} />
           <Route path="/grants" element={<GrantsPage />} />
           <Route path="/packages" element={<PackagesPage />} />
+          <Route path="/reports" element={<ReportsPage />} />
           <Route path="/exchanges" element={<ExchangesPage />} />
           <Route path="/privacy" element={<PrivacyPage />} />
         </Route>

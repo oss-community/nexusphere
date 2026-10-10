@@ -1,0 +1,51 @@
+{
+  "description" : "A dispute report over the three evidence-chain entries, signed by test key 1 over its canonical JSON without signature",
+  "entryHashes" : [ "bbb7b3f48c786298b34ecb08dab9c7f2ae53b9121189c720f2478660d05ad302", "57897fef3977b07c81af53399d91740e87e089e7a76b8995f1f818356e61db06", "bab1fd8734a3a6bb7bb7431c5b8f35e26640fc32106ab2054f8c27416e4c074b" ],
+  "entriesDigest" : "ac5b0ddc99c34e10f887d889231863373a626adf4bea0840e0fd14f4f4ab2d44",
+  "signedBytes" : "{\"createdAt\":\"2026-10-01T09:00:00.123456Z\",\"evidence\":{\"checkpoint\":3,\"entries\":3,\"entriesDigest\":\"ac5b0ddc99c34e10f887d889231863373a626adf4bea0840e0fd14f4f4ab2d44\",\"headHash\":\"bab1fd8734a3a6bb7bb7431c5b8f35e26640fc32106ab2054f8c27416e4c074b\",\"valid\":true},\"format\":\"nexusphere-ledger/report/v1\",\"keyId\":\"06e3fd8fda29bb60\",\"notice\":\"This report maps recorded evidence to requirements. It is not legal advice and not a certification of compliance; the evidence package it names is the record.\",\"profiles\":[{\"digest\":\"666bc3b2a2ca3f4e8b0f1e9d7c6a5b4c3d2e1f0a9b8c7d6e5f4a3b2c1d0e9f8a\",\"id\":\"baseline\"}],\"report\":\"dispute\",\"scope\":{\"agentId\":null,\"fromSequence\":1,\"principalId\":null,\"toSequence\":3},\"sections\":[{\"entries\":[1,2,3],\"findings\":[\"#1 2026-10-01T08:00:00.123456Z: invoice-agent tools/call on read_invoice\"],\"id\":\"timeline\",\"reference\":\"Incident timeline\",\"requirement\":\"What the agents did, in order\",\"status\":\"SHOWN\"},{\"entries\":[],\"findings\":[\"Not timestamped by a timestamp authority\"],\"id\":\"integrity\",\"reference\":\"Integrity\",\"requirement\":\"The evidence has not been changed since it was recorded\",\"status\":\"PARTLY_SHOWN\"}],\"subject\":{\"description\":null,\"title\":\"Invoice 4711 paid twice\"},\"title\":\"Dispute package\"}",
+  "report" : {
+    "format" : "nexusphere-ledger/report/v1",
+    "report" : "dispute",
+    "title" : "Dispute package",
+    "createdAt" : "2026-10-01T09:00:00.123456Z",
+    "profiles" : [ {
+      "id" : "baseline",
+      "digest" : "666bc3b2a2ca3f4e8b0f1e9d7c6a5b4c3d2e1f0a9b8c7d6e5f4a3b2c1d0e9f8a"
+    } ],
+    "subject" : {
+      "title" : "Invoice 4711 paid twice",
+      "description" : null
+    },
+    "scope" : {
+      "agentId" : null,
+      "principalId" : null,
+      "fromSequence" : 1,
+      "toSequence" : 3
+    },
+    "evidence" : {
+      "checkpoint" : 3,
+      "headHash" : "bab1fd8734a3a6bb7bb7431c5b8f35e26640fc32106ab2054f8c27416e4c074b",
+      "entries" : 3,
+      "entriesDigest" : "ac5b0ddc99c34e10f887d889231863373a626adf4bea0840e0fd14f4f4ab2d44",
+      "valid" : true
+    },
+    "notice" : "This report maps recorded evidence to requirements. It is not legal advice and not a certification of compliance; the evidence package it names is the record.",
+    "sections" : [ {
+      "id" : "timeline",
+      "reference" : "Incident timeline",
+      "requirement" : "What the agents did, in order",
+      "status" : "SHOWN",
+      "findings" : [ "#1 2026-10-01T08:00:00.123456Z: invoice-agent tools/call on read_invoice" ],
+      "entries" : [ 1, 2, 3 ]
+    }, {
+      "id" : "integrity",
+      "reference" : "Integrity",
+      "requirement" : "The evidence has not been changed since it was recorded",
+      "status" : "PARTLY_SHOWN",
+      "findings" : [ "Not timestamped by a timestamp authority" ],
+      "entries" : [ ]
+    } ],
+    "keyId" : "06e3fd8fda29bb60",
+    "signature" : "cIbsCqrzN6oQfVZJXfeDVJjWUt01db9iB7jat2xOPbQvp3dB16FPKhgzx4x1brFhWUs7bc/IWub+pJ67VoWACw=="
+  }
+}

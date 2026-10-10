@@ -51,7 +51,8 @@ retention keeps recent entries. `RetentionE2ETest` starts a `StandaloneLedger` w
 expire and a pending erasure completes within the test. `TimestampE2ETest` starts `StandaloneLedger`s that use
 `FakeTimestampAuthority`, an RFC 3161 authority on a random port that signs real CMS tokens with a test chain in
 `src/test/resources/tsa`, and can be told to fail. `RekorE2ETest` does the same with `FakeRekor`, a Rekor v2 log
-on a random port that returns entries with real inclusion proofs and signed log checkpoints.
+on a random port that returns entries with real inclusion proofs and signed log checkpoints. `ReportE2ETest` starts
+`StandaloneLedger`s with the `eu` and `us` profiles and with a profile of its own.
 `WitnessE2ETest` starts two `StandaloneLedger`s with their own PostgreSQL containers: one is the log and asks the
 other, which watches it, to cosign its log checkpoints over the C2SP witness protocol.
 
@@ -168,6 +169,10 @@ other, which watches it, to cosign its log checkpoints over the C2SP witness pro
 | `RekorE2ETest`            | Every checkpoint is anchored in Rekor and the package proves it               |
 |                           | A checkpoint is anchored later when Rekor is down                             |
 |                           | The ledger needs the verifier key of the Rekor log                            |
+| `ReportE2ETest`           | Every report of the profiles is signed and bound to its package               |
+|                           | Only the reports of the active profiles are offered                           |
+|                           | A profile can name only the reports the ledger has templates for              |
+|                           | A dispute package holds everything needed to check it                         |
 
 ##
 

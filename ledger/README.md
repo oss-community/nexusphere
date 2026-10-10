@@ -27,6 +27,7 @@
 * [Retention and Legal Holds](#retention-and-legal-holds)
 * [Checkpoint Timestamps](#checkpoint-timestamps)
 * [Rekor Anchoring](#rekor-anchoring)
+* [Reports and Dispute Packages](#reports-and-dispute-packages)
 * [Conformance Vectors](#conformance-vectors)
 * [API](#api)
 * [End-to-End Tests](ledger-e2e-tests/README.md)
@@ -1142,10 +1143,11 @@ curl -s -X POST http://localhost:8090/mcp/check -H "Authorization: Bearer {agent
 The ledger knows no law itself. The rules of a country or region live in a compliance profile, a JSON file that says
 how long each kind of evidence is kept at least and at most, whether personal data can be erased on request and how
 fast, where the ledger data may be kept, which evidence fields are required, which RFC 3161 timestamp authorities are
-accepted and which report templates apply. `LEDGER_COMPLIANCE_PROFILES` lists the active profiles, `baseline` by
-default. When several are active the strictest rule wins: the longest minimum and the shortest maximum retention, the
-shortest erasure deadline, the regions and timestamp authorities all of them allow, and every field any of them
-requires. A profile is a starting point for your own legal review, not legal advice. The ledger ships three:
+accepted and which [report templates](#reports-and-dispute-packages) apply. `LEDGER_COMPLIANCE_PROFILES` lists the
+active profiles, `baseline` by default. When several are active the strictest rule wins: the longest minimum and the
+shortest maximum retention, the shortest erasure deadline, the regions and timestamp authorities all of them allow,
+and every field any of them requires. A profile is a starting point for your own legal review, not legal advice. The
+ledger ships three:
 
 </p>
 
@@ -1459,6 +1461,91 @@ curl -s -X POST http://localhost:8090/api/v1/packages -H "Authorization: Bearer 
 java -jar verifier/target/verifier-1.0.0-SNAPSHOT-exec.jar --rekor-key "$REKOR_KEY" --require-rekor package.json
 ```
 
+## Reports and Dispute Packages
+
+<p style="text-align: justify;">
+
+Each [compliance profile](#compliance-profiles) names the report templates that apply to it, and
+`GET /api/v1/reports` lists those of the active profiles. `POST /api/v1/reports/{id}` exports an evidence package for
+the scope in the body, verifies it with the timestamp authority and Rekor log the ledger uses, and maps what the
+evidence shows to the requirements of the template. Every section names a requirement and its source, says
+`SHOWN`, `PARTLY_SHOWN` or `NOT_SHOWN`, and lists the findings and entry sequences behind it. A report maps evidence to
+requirements; it is not legal advice and not a certification of compliance.
+
+</p>
+
+| Template            | Profiles | Sections                                                                            |
+|---------------------|----------|-------------------------------------------------------------------------------------|
+| `dispute`           | all      | Incident timeline, authority, outcomes, integrity, what the package shows and hides |
+| `eu-ai-act-logging` | `eu`     | EU AI Act Articles 12(1), 12(2), 12(3), 19(1) with 26(6), and the integrity of logs |
+| `dora-ict-records`  | `eu`     | DORA Articles 9(3), 9(4)(c), 17 and 28(3)                                           |
+| `finra-supervision` | `us`     | FINRA Rule 3110(a), 3110(b) and the exceptions for review                           |
+| `sec-17a-4-records` | `us`     | SEC Rule 17a-4(b), 17a-4(f)(2) for storage and time, and 17a-4(f)(3) for the copy   |
+
+<p style="text-align: justify;">
+
+The report is canonical JSON in the format `nexusphere-ledger/report/v1`, signed with the ledger key over everything
+but `signature`. It names the checkpoint, head hash, scope and a digest of the hashes of the entries it covers, so a
+verifier checks it against the package it came from: `nexusphere-ledger-verify report --package package.json
+report.json`. With `?format=html` the same report comes as one page for reading and printing. A profile that names a
+template the ledger does not have stops the ledger from starting.
+
+</p>
+
+<p style="text-align: justify;">
+
+`POST /api/v1/disputes` takes the scope with a `title` and an optional `description` of one incident and answers a
+ZIP archive for an insurer, arbitrator or court: the evidence package, the signed dispute report in JSON and HTML, the
+signing keys with their rotations and revocations, the compliance profiles, and, when the ledger uses them, the
+timestamp authority's chain, the Rekor log and the witness keys. `nexusphere-ledger-verify dispute dispute.zip` checks
+all of it at once. The keys and logs in the archive come from the ledger itself, so pin the ledger's key with
+`--public-key` from a copy obtained on your own.
+
+</p>
+
+Step 1. Start the ledger with the `eu` and `us` profiles:
+
+```shell
+export LEDGER_COMPLIANCE_PROFILES=eu,us
+export LEDGER_COMPLIANCE_REGION=eea
+```
+
+Step 2. List the reports the profiles offer; the answer must show the five templates:
+
+```shell
+curl -s http://localhost:8090/api/v1/reports -H "Authorization: Bearer $LEDGER_API_KEY" | jq -r '.[].id'
+```
+
+Step 3. Record an action and sign a checkpoint:
+
+```shell
+curl -s -X POST http://localhost:8090/api/v1/evidence -H "Authorization: Bearer $LEDGER_API_KEY" -H "Content-Type: application/json" -d '{"agentId":"payments-agent","principalId":"alice","action":"tools/call","target":"bank/pay_invoice","inputHash":"9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08","decision":"ALLOW","outcome":"SUCCEEDED"}' | jq -c '{sequence}'
+curl -s -X POST http://localhost:8090/api/v1/checkpoints -H "Authorization: Bearer $LEDGER_API_KEY" | jq -c '{sequence}'
+```
+
+Step 4. Create the EU AI Act report and its package; the answer must list the sections with their status:
+
+```shell
+curl -s -X POST http://localhost:8090/api/v1/reports/eu-ai-act-logging -H "Authorization: Bearer $LEDGER_API_KEY" -H "Content-Type: application/json" -d '{"agentId":"payments-agent"}' > report.json
+curl -s -X POST http://localhost:8090/api/v1/packages -H "Authorization: Bearer $LEDGER_API_KEY" -H "Content-Type: application/json" -d '{"agentId":"payments-agent"}' > package.json
+jq -r '.sections[] | "\(.reference): \(.status)"' report.json
+```
+
+Step 5. Verify the report against its package; the output must end with `Result: VALID` twice:
+
+```shell
+java -jar verifier/target/verifier-1.0.0-SNAPSHOT-exec.jar report --package package.json report.json
+```
+
+Step 6. Create a dispute package and verify it with the ledger's key pinned; the output must show
+`Report      : dispute (Dispute package)` and `Result: VALID`:
+
+```shell
+curl -s -X POST http://localhost:8090/api/v1/disputes -H "Authorization: Bearer $LEDGER_API_KEY" -H "Content-Type: application/json" -d '{"agentId":"payments-agent","title":"Invoice 4711 paid twice"}' -o dispute.zip
+LEDGER_PUBLIC_KEY=$(curl -s http://localhost:8090/api/v1/keys -H "Authorization: Bearer $LEDGER_API_KEY" | jq -r '.[] | select(.status == "ACTIVE") | .publicKey')
+java -jar verifier/target/verifier-1.0.0-SNAPSHOT-exec.jar dispute --public-key "$LEDGER_PUBLIC_KEY" dispute.zip
+```
+
 ## Conformance Vectors
 
 <p style="text-align: justify;">
@@ -1467,7 +1554,7 @@ java -jar verifier/target/verifier-1.0.0-SNAPSHOT-exec.jar --rekor-key "$REKOR_K
 with the published RFC 8032 test keys: canonical JSON, the evidence chain and checkpoints, Merkle roots and proofs,
 signed notes and cosignatures, SCITT statements and receipts, an SD-JWT VC mandate, a key-bound mandate with its
 KB-JWT, an HTTP message signature, a checkpoint that signs compliance profiles, an RFC 3161 token from a real
-timestamp authority and a Rekor entry from a real Rekor v2 log. Another implementation checks itself against them, and `ConformanceVectorsTest` in `ledger/verifier` fails when the ledger's own output changes.
+timestamp authority, a Rekor entry from a real Rekor v2 log and a signed dispute report. Another implementation checks itself against them, and `ConformanceVectorsTest` in `ledger/verifier` fails when the ledger's own output changes.
 
 </p>
 
@@ -1495,6 +1582,9 @@ API key, except `/api/v1/principal/**`, which requires a principal token from th
 | POST   | `/api/v1/keys/{keyId}/revocation`          | Revoke a retired key as compromised from `compromisedAt`, with a `reason` (operator)                   |
 | POST   | `/api/v1/packages`                         | Export an evidence package by `agentId`, `principalId`, `fromSequence` and `toSequence` (operator)     |
 | POST   | `/api/v1/packages/verify`                  | Verify a package with the verifier library, pinned to `publicKey` when given (operator)                |
+| GET    | `/api/v1/reports`                          | The report templates of the active compliance profiles (operator)                                      |
+| POST   | `/api/v1/reports/{id}`                     | A signed report over the package for the scope in the body; HTML with `format=html` (operator)         |
+| POST   | `/api/v1/disputes`                         | A ZIP dispute package for the scope, `title` and `description` in the body (operator)                  |
 | GET    | `/api/v1/verification`                     | Full verification report (operator)                                                                    |
 | POST   | `/api/v1/agents`                           | Register an agent and return its API key once (operator)                                               |
 | GET    | `/api/v1/agents`                           | List agents by `after` and `limit` (operator)                                                          |

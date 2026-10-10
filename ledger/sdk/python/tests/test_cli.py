@@ -3,12 +3,13 @@ import json
 import os
 import tempfile
 import unittest
+import zipfile
 
 from nexusphere_ledger.cli import INVALID, USAGE, VALID, run
 from nexusphere_ledger.keys import PrivateKey
 from nexusphere_ledger.mandate import present_bound
 
-from .support import ISSUER, LEDGER_KEY, entries, package, vector, witness_note_key
+from .support import ISSUER, LEDGER_KEY, entries, package, report, vector, witness_note_key
 
 
 class Cli(unittest.TestCase):
@@ -62,6 +63,70 @@ class Cli(unittest.TestCase):
             self.assertEqual(INVALID, code)
             self.assertIn("checkpoint 3 is not anchored in Rekor", out)
             self.assertEqual(USAGE, self.run_cli("--rekor-key", "not a key", path)[0])
+
+    def test_report(self):
+        pkg = package(entries(4), {2})
+        signed = report(pkg)
+        with tempfile.TemporaryDirectory() as directory:
+            pkg_path = self.write(directory, "package.json", json.dumps(pkg))
+            path = self.write(directory, "report.json", json.dumps(signed))
+            code, out, _ = self.run_cli("report", "--public-key", LEDGER_KEY.public_key.encoded, "--package", pkg_path,
+                                        path)
+            self.assertEqual(VALID, code, out)
+            self.assertIn("Nexusphere Ledger report\n  Report      : dispute (Dispute package)\n"
+                          "  Signed by   : %s\n  Evidence    : checkpoint 4, 1 entries\n"
+                          "  Sections    : 1 shown\nResult: VALID\n" % LEDGER_KEY.key_id, out)
+            signed["sections"][0]["findings"] = []
+            path = self.write(directory, "report.json", json.dumps(signed))
+            code, out, _ = self.run_cli("report", "--json", "--package", pkg_path, path)
+            self.assertEqual(INVALID, code)
+            result = json.loads(out)
+            self.assertEqual(["valid", "package", "report", "takenFromArchive"], list(result))
+            self.assertTrue(result["package"]["valid"])
+            self.assertEqual(["the signature of the report is not valid"], result["report"]["problems"])
+            code, _, err = self.run_cli("report", "--public-key", LEDGER_KEY.public_key.encoded, path)
+            self.assertEqual(USAGE, code)
+            self.assertIn("usage: nexusphere-ledger-verify report [package options] --package <package.json> "
+                          "<report.json>", err)
+            missing = os.path.join(directory, "missing.json")
+            self.assertEqual(USAGE, self.run_cli("report", "--package", missing, path)[0])
+            self.assertEqual(USAGE, self.run_cli("--package", pkg_path, path)[0])
+
+    def test_dispute(self):
+        pkg = package(entries(4), {2}, witness=True)
+        with tempfile.TemporaryDirectory() as directory:
+            path = os.path.join(directory, "dispute.zip")
+            with zipfile.ZipFile(path, "w") as archive:
+                archive.writestr("README.txt", "Nexusphere Ledger dispute package\n")
+                archive.writestr("package.json", json.dumps(pkg))
+                archive.writestr("report.json", json.dumps(report(pkg)))
+                archive.writestr("keys.json", json.dumps(pkg["keys"]))
+                archive.writestr("rekor.json", json.dumps({"key": vector("rekor.json")["rekorVerifierKey"]}))
+                archive.writestr("witnesses.txt", witness_note_key().vkey + "\n")
+            code, out, _ = self.run_cli("dispute", "--public-key", LEDGER_KEY.public_key.encoded, path)
+            self.assertEqual(VALID, code, out)
+            self.assertIn("Witnesses   : witness.example", out)
+            self.assertIn("  Archive     : taken from the archive itself: the Rekor log key, the witness keys\n"
+                          "Result: VALID\n", out)
+            code, out, _ = self.run_cli("dispute", "--json", path)
+            self.assertEqual(VALID, code, out)
+            result = json.loads(out)
+            self.assertEqual(["the Rekor log key", "the witness keys", "no ledger key; pass --public-key"],
+                             result["takenFromArchive"])
+            self.assertEqual(1, result["report"]["entries"])
+            code, out, _ = self.run_cli("dispute", "--witness", witness_note_key().vkey, "--witnesses-required", "2",
+                                        path)
+            self.assertEqual(INVALID, code)
+            self.assertIn("the log checkpoint is cosigned by 1 of the 2 required witnesses", out)
+            empty = os.path.join(directory, "empty.zip")
+            with zipfile.ZipFile(empty, "w") as archive:
+                archive.writestr("package.json", json.dumps(pkg))
+            code, _, err = self.run_cli("dispute", empty)
+            self.assertEqual(USAGE, code)
+            self.assertEqual("Cannot read %s: it has no package.json and report.json\n" % empty, err)
+            code, _, err = self.run_cli("dispute")
+            self.assertEqual(USAGE, code)
+            self.assertIn("usage: nexusphere-ledger-verify dispute [package options] <dispute.zip>", err)
 
     def test_statement(self):
         item = vector("scitt.json")["items"][0]

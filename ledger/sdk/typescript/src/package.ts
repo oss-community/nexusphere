@@ -459,6 +459,16 @@ async function disclosedMismatch(
   return null;
 }
 
+export async function packageTrustedKeys(
+  pkg: Json,
+  keyList: Json[],
+  pinned: string | null,
+  problems: string[],
+): Promise<Map<string, PublicKey>> {
+  const found = await readKeys(pkg, keyList, pinned, problems);
+  return found ? found.trusted : new Map();
+}
+
 async function readKeys(
   pkg: Json,
   keyList: Json[],

@@ -519,6 +519,51 @@ class ConformanceVectorsTest {
     }
 
     @Test
+    void report() throws IOException {
+        JsonNode chain = JSON.readTree(DIR.resolve("evidence-chain.json").toFile());
+        List<String> hashes = new ArrayList<>();
+        chain.path("entries").forEach(entry -> hashes.add(entry.path("hash").asString()));
+        Map<String, Object> report = ordered(
+                "format", ReportVerifier.FORMAT,
+                "report", "dispute",
+                "title", "Dispute package",
+                "createdAt", "2026-10-01T09:00:00.123456Z",
+                "profiles", List.of(ordered("id", "baseline", "digest",
+                        "666bc3b2a2ca3f4e8b0f1e9d7c6a5b4c3d2e1f0a9b8c7d6e5f4a3b2c1d0e9f8a")),
+                "subject", ordered("title", "Invoice 4711 paid twice", "description", null),
+                "scope", ordered("agentId", null, "principalId", null, "fromSequence", 1L, "toSequence", 3L),
+                "evidence", ordered("checkpoint", 3L, "headHash", hashes.getLast(), "entries", (long) hashes.size(),
+                        "entriesDigest", ReportVerifier.entriesDigest(hashes), "valid", true),
+                "notice", "This report maps recorded evidence to requirements. It is not legal advice and not a"
+                        + " certification of compliance; the evidence package it names is the record.",
+                "sections", List.of(
+                        ordered("id", "timeline", "reference", "Incident timeline", "requirement",
+                                "What the agents did, in order", "status", "SHOWN", "findings",
+                                List.of("#1 2026-10-01T08:00:00.123456Z: invoice-agent tools/call on read_invoice"),
+                                "entries", List.of(1L, 2L, 3L)),
+                        ordered("id", "integrity", "reference", "Integrity", "requirement",
+                                "The evidence has not been changed since it was recorded", "status", "PARTLY_SHOWN",
+                                "findings", List.of("Not timestamped by a timestamp authority"), "entries",
+                                List.of())),
+                "keyId", KEY_ID);
+        byte[] signedBytes = CanonicalJson.bytes(report);
+        report.put("signature", SigningKeys.sign(LEDGER_KEY, signedBytes));
+        Map<String, Object> vector = new LinkedHashMap<>();
+        vector.put("description", "A dispute report over the three evidence-chain entries, signed by test key 1 over"
+                + " its canonical JSON without signature");
+        vector.put("entryHashes", hashes);
+        vector.put("entriesDigest", ReportVerifier.entriesDigest(hashes));
+        vector.put("signedBytes", new String(signedBytes, StandardCharsets.UTF_8));
+        vector.put("report", report);
+        JsonNode stored = check("report.json", vector);
+
+        assertThat(new String(ReportVerifier.signedBytes(stored.path("report")), StandardCharsets.UTF_8))
+                .isEqualTo(stored.path("signedBytes").asString());
+        assertThat(SigningKeys.verify(LEDGER, signedBytes, stored.path("report").path("signature").asString()))
+                .isTrue();
+    }
+
+    @Test
     void timestamp() throws IOException {
         JsonNode stored = JSON.readTree(DIR.resolve("timestamp.json").toFile());
         byte[] signedBytes = stored.path("signedBytes").asString().getBytes(StandardCharsets.UTF_8);

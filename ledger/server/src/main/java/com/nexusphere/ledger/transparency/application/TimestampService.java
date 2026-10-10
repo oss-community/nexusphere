@@ -66,6 +66,10 @@ public class TimestampService {
                 .toList());
     }
 
+    public List<X509Certificate> certificates() {
+        return certificates;
+    }
+
     public SignedCheckpoint stamp(SignedCheckpoint signed) {
         if (url == null || signed.timestamp() != null) {
             return signed;

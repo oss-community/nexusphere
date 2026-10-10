@@ -1,10 +1,14 @@
 #!/usr/bin/env node
 import { existsSync, readFileSync, statSync } from "node:fs";
-import { toBase64 } from "./bytes.js";
+import { inflateRawSync } from "node:zlib";
+import { fromUtf8, toBase64 } from "./bytes.js";
 import { EvidenceStatement, LogReceipt } from "./cose.js";
+import { Json } from "./evidence.js";
 import { PublicKey } from "./keys.js";
 import { MandateCheck, MandateVerifier, StaticKeys, jwkPublicKey, mandatePayload } from "./mandate.js";
+import { NoteKey } from "./note.js";
 import { PackageReport, verifyPackage } from "./package.js";
+import { ReportCheck, verifyReport } from "./report.js";
 import { X509Certificate, readCertificates } from "./timestamp.js";
 import { epochText } from "./timestamps.js";
 
@@ -14,7 +18,9 @@ export const USAGE = 2;
 
 export const USAGE_TEXT = `Usage: nexusphere-ledger-verify [--public-key <base64 X.509 Ed25519 key> | --public-key-file <file>] [--keys <keys.json>] [--witness <verifier key>]... [--witnesses-required <n>] [--timestamp-certificates <chain.pem>] [--require-timestamp] [--rekor-key <verifier key>]... [--require-rekor] [--json] <package.json>
        nexusphere-ledger-verify mandate --issuer <url> [--issuer <url>] [--audience <aud>] [--action <action> --target <target>] [--public-key <key> | --public-key-file <file>] [--skip-status] [--nonce <nonce>] [--require-key-binding] [--json] <token | token file | ->
-       nexusphere-ledger-verify statement [--public-key <key> | --public-key-file <file>] [--receipt <receipt.cose>] <statement.cose>`;
+       nexusphere-ledger-verify statement [--public-key <key> | --public-key-file <file>] [--receipt <receipt.cose>] <statement.cose>
+       nexusphere-ledger-verify report [package options] --package <package.json> <report.json>
+       nexusphere-ledger-verify dispute [package options] <dispute.zip>`;
 
 export interface Io {
   out: (text: string) => void;
@@ -25,6 +31,11 @@ export interface Io {
 class UsageError extends Error {}
 
 const FLAGS = new Set(["--json", "--skip-status", "--require-key-binding", "--require-timestamp", "--require-rekor"]);
+const PACKAGE_OPTIONS = [
+  "--public-key", "--public-key-file", "--keys", "--witness", "--witnesses-required",
+  "--timestamp-certificates", "--require-timestamp", "--rekor-key", "--require-rekor", "--json",
+];
+const MAX_FILE = 256 * 1024 * 1024;
 
 function parse(args: string[], allowed: string[]): { options: Record<string, string[]>; positional: string | null } {
   const options: Record<string, string[]> = {};
@@ -67,6 +78,12 @@ export async function run(args: string[], io: Io): Promise<number> {
     if (args[0] === "statement") {
       return await statement(args.slice(1), io);
     }
+    if (args[0] === "report") {
+      return await report(args.slice(1), io);
+    }
+    if (args[0] === "dispute") {
+      return await dispute(args.slice(1), io);
+    }
     return await pkg(args[0] === "package" ? args.slice(1) : args, io);
   } catch (e) {
     if (e instanceof UsageError) {
@@ -78,10 +95,7 @@ export async function run(args: string[], io: Io): Promise<number> {
 }
 
 async function pkg(args: string[], io: Io): Promise<number> {
-  const { options, positional } = parse(args, [
-    "--public-key", "--public-key-file", "--keys", "--witness", "--witnesses-required",
-    "--timestamp-certificates", "--require-timestamp", "--rekor-key", "--require-rekor", "--json",
-  ]);
+  const { options, positional } = parse(args, PACKAGE_OPTIONS);
   if (positional === null) {
     throw new UsageError();
   }
@@ -129,6 +143,244 @@ async function pkg(args: string[], io: Io): Promise<number> {
     printPackage(report, certificates.length > 0, (options["--rekor-key"] ?? []).length > 0, io);
   }
   return report.valid ? VALID : INVALID;
+}
+
+interface Trust {
+  key: string | null;
+  keys: Json[] | undefined;
+  certificates: X509Certificate[];
+  witnesses: (string | NoteKey)[];
+  required: number | undefined;
+  rekorKeys: (string | NoteKey)[];
+}
+
+function witnessesRequired(options: Record<string, string[]>): number | undefined {
+  const required = options["--witnesses-required"];
+  if (required && !/^\d+$/.test(required[0])) {
+    throw new UsageError();
+  }
+  return required ? Number(required[0]) : undefined;
+}
+
+async function report(args: string[], io: Io): Promise<number> {
+  const { options, positional } = parse(args, [...PACKAGE_OPTIONS, "--package"]);
+  if (positional === null || !options["--package"]) {
+    throw new UsageError();
+  }
+  const required = witnessesRequired(options);
+  let document: unknown;
+  let data: Json;
+  let key: string | null;
+  let keys: Json[] | undefined;
+  let certificates: X509Certificate[] = [];
+  let reading = positional;
+  try {
+    key = publicKey(options);
+    document = JSON.parse(readFileSync(positional, "utf8"));
+    reading = options["--package"][0];
+    data = JSON.parse(readFileSync(reading, "utf8"));
+    if (options["--keys"]) {
+      reading = options["--keys"][0];
+      keys = JSON.parse(readFileSync(reading, "utf8"));
+    }
+    if (options["--timestamp-certificates"]) {
+      reading = options["--timestamp-certificates"][0];
+      certificates = readCertificates(new Uint8Array(readFileSync(reading)));
+    }
+  } catch (e) {
+    io.err(`Cannot read ${reading}: ${(e as Error).message}\n`);
+    return USAGE;
+  }
+  const trust = {
+    key,
+    keys,
+    certificates,
+    witnesses: options["--witness"] ?? [],
+    required,
+    rekorKeys: options["--rekor-key"] ?? [],
+  };
+  return finish(data, document, trust, options, [], io);
+}
+
+async function dispute(args: string[], io: Io): Promise<number> {
+  const { options, positional } = parse(args, PACKAGE_OPTIONS);
+  if (positional === null) {
+    throw new UsageError();
+  }
+  const required = witnessesRequired(options);
+  const rekorKeys: (string | NoteKey)[] = [...(options["--rekor-key"] ?? [])];
+  const witnesses: (string | NoteKey)[] = [...(options["--witness"] ?? [])];
+  const notes: string[] = [];
+  let document: unknown;
+  let data: Json;
+  let key: string | null;
+  let keys: Json[] | undefined;
+  let certificates: X509Certificate[] = [];
+  try {
+    key = publicKey(options);
+    const files = readZip(new Uint8Array(readFileSync(positional)));
+    const json = (name: string) => JSON.parse(fromUtf8(files.get(name)!));
+    if (!files.has("package.json") || !files.has("report.json")) {
+      throw new Error("it has no package.json and report.json");
+    }
+    data = json("package.json");
+    document = json("report.json");
+    if (options["--keys"]) {
+      keys = JSON.parse(readFileSync(options["--keys"][0], "utf8"));
+    } else if (files.has("keys.json")) {
+      keys = json("keys.json");
+    }
+    if (options["--timestamp-certificates"]) {
+      certificates = readCertificates(new Uint8Array(readFileSync(options["--timestamp-certificates"][0])));
+    } else if (files.has("timestamp-authority.pem")) {
+      certificates = readCertificates(files.get("timestamp-authority.pem")!);
+      notes.push("the timestamp authority chain");
+    }
+    if (rekorKeys.length === 0 && files.has("rekor.json")) {
+      const rekor = json("rekor.json");
+      if (rekor !== null && typeof rekor === "object" && typeof rekor.key === "string") {
+        rekorKeys.push(await NoteKey.parse(rekor.key));
+        notes.push("the Rekor log key");
+      }
+    }
+    if (witnesses.length === 0 && files.has("witnesses.txt")) {
+      for (const line of fromUtf8(files.get("witnesses.txt")!).split("\n")) {
+        if (line.trim()) {
+          witnesses.push(await NoteKey.parse(line.trim()));
+        }
+      }
+      notes.push("the witness keys");
+    }
+  } catch (e) {
+    io.err(`Cannot read ${positional}: ${(e as Error).message}\n`);
+    return USAGE;
+  }
+  if (key === null) {
+    notes.push("no ledger key; pass --public-key");
+  }
+  const trust = {
+    key,
+    keys,
+    certificates,
+    witnesses,
+    required: required === undefined && !options["--witness"] ? 0 : required,
+    rekorKeys,
+  };
+  return finish(data, document, trust, options, notes, io);
+}
+
+async function finish(
+  data: Json,
+  document: unknown,
+  trust: Trust,
+  options: Record<string, string[]>,
+  notes: string[],
+  io: Io,
+): Promise<number> {
+  let packageReport: PackageReport;
+  try {
+    packageReport = await verifyPackage(data, trust.key, {
+      witnesses: trust.witnesses,
+      requiredWitnesses: trust.required,
+      keys: trust.keys,
+      timestampCertificates: trust.certificates,
+      requireTimestamp: !!options["--require-timestamp"],
+      rekorKeys: trust.rekorKeys,
+      requireRekor: !!options["--require-rekor"],
+    });
+  } catch {
+    throw new UsageError();
+  }
+  const check = await verifyReport(document, data, { publicKey: trust.key, keys: trust.keys });
+  const valid = packageReport.valid && check.valid;
+  if (options["--json"]) {
+    io.out(JSON.stringify({ valid, package: packageReport, report: check, takenFromArchive: notes }, null, 2) + "\n");
+  } else {
+    printPackage(packageReport, trust.certificates.length > 0, trust.rekorKeys.length > 0, io);
+    printReport(check, notes, io);
+  }
+  return valid ? VALID : INVALID;
+}
+
+function printReport(check: ReportCheck, notes: string[], io: Io) {
+  const lines = [
+    "Nexusphere Ledger report",
+    `  Report      : ${check.report} (${check.title})`,
+    `  Signed by   : ${check.keyId}`,
+    `  Evidence    : checkpoint ${check.checkpointSequence}, ${check.entries} entries`,
+    `  Sections    : ${Object.entries(check.statuses)
+      .map(([status, count]) => `${count} ${status.replace(/_/g, " ").toLowerCase()}`).join(", ")}`,
+  ];
+  if (notes.length) {
+    lines.push(`  Archive     : taken from the archive itself: ${notes.join(", ")}`);
+  }
+  lines.push(check.valid ? "Result: VALID" : "Result: INVALID");
+  if (!check.valid) {
+    check.problems.forEach((problem) => lines.push("  - " + problem));
+  }
+  io.out(lines.join("\n") + "\n");
+}
+
+function readZip(data: Uint8Array): Map<string, Uint8Array> {
+  const files = new Map<string, Uint8Array>();
+  const view = new DataView(data.buffer, data.byteOffset, data.byteLength);
+  let end = data.length - 22;
+  while (end >= 0 && view.getUint32(end, true) !== 0x06054b50) {
+    end--;
+  }
+  if (end < 0) {
+    return files;
+  }
+  let offset = view.getUint32(end + 16, true);
+  for (let count = view.getUint16(end + 10, true); count > 0; count--) {
+    if (offset + 46 > data.length || view.getUint32(offset, true) !== 0x02014b50) {
+      throw new Error("the central directory is damaged");
+    }
+    const method = view.getUint16(offset + 10, true);
+    const crc = view.getUint32(offset + 16, true);
+    const compressed = view.getUint32(offset + 20, true);
+    const size = view.getUint32(offset + 24, true);
+    const nameLength = view.getUint16(offset + 28, true);
+    const local = view.getUint32(offset + 42, true);
+    const name = fromUtf8(data.subarray(offset + 46, offset + 46 + nameLength));
+    offset += 46 + nameLength + view.getUint16(offset + 30, true) + view.getUint16(offset + 32, true);
+    if (local + 30 > data.length || view.getUint32(local, true) !== 0x04034b50) {
+      throw new Error(`the local header of ${name} is damaged`);
+    }
+    if (size > MAX_FILE) {
+      throw new Error(`${name} is larger than ${MAX_FILE} bytes`);
+    }
+    const start = local + 30 + view.getUint16(local + 26, true) + view.getUint16(local + 28, true);
+    const raw = data.subarray(start, start + compressed);
+    if (method !== 0 && method !== 8) {
+      throw new Error("invalid compression method");
+    }
+    const content = method === 0 ? raw.slice() : new Uint8Array(inflateRawSync(raw, { maxOutputLength: size + 1 }));
+    if (content.length !== size) {
+      throw new Error(`invalid entry size (expected ${size} but got ${content.length} bytes)`);
+    }
+    if (crc32(content) !== crc) {
+      throw new Error(`invalid entry CRC (expected 0x${crc.toString(16)} but got 0x${crc32(content).toString(16)})`);
+    }
+    files.set(name, content);
+  }
+  return files;
+}
+
+const CRC_TABLE = Array.from({ length: 256 }, (_, n) => {
+  let c = n;
+  for (let k = 0; k < 8; k++) {
+    c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1;
+  }
+  return c >>> 0;
+});
+
+function crc32(data: Uint8Array): number {
+  let c = 0xffffffff;
+  for (const byte of data) {
+    c = CRC_TABLE[(c ^ byte) & 0xff] ^ (c >>> 8);
+  }
+  return (c ^ 0xffffffff) >>> 0;
 }
 
 function printPackage(r: PackageReport, timestampPinned: boolean, rekorPinned: boolean, io: Io) {

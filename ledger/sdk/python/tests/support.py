@@ -9,6 +9,7 @@ from nexusphere_ledger.cose import EvidenceStatement, LogReceipt
 from nexusphere_ledger.evidence import GENESIS, Checkpoint, commitments, content_hash, link_hash
 from nexusphere_ledger.keys import PrivateKey
 from nexusphere_ledger.note import COSIGNATURE, ED25519, LogCheckpoint, NoteKey, cosign
+from nexusphere_ledger.report import REPORT_FORMAT, entries_digest, report_signed_bytes
 
 VECTORS = Path(os.environ.get("NEXUSPHERE_VECTORS", Path(__file__).resolve().parents[3] / "conformance" / "vectors"))
 
@@ -129,3 +130,29 @@ def package(chain, disclose, key: PrivateKey = LEDGER_KEY, keys=None, anchor: in
             })
         pkg["log"] = {"checkpoint": note.text(), "proofs": proofs}
     return pkg
+
+
+def report(pkg: dict, key: PrivateKey = LEDGER_KEY) -> dict:
+    hashes = [link["hash"] for link in pkg["links"] if isinstance(link.get("entry"), dict)]
+    signed = {
+        "format": REPORT_FORMAT,
+        "report": "dispute",
+        "title": "Dispute package",
+        "createdAt": "2026-10-07T09:00:00Z",
+        "profiles": [],
+        "subject": None,
+        "scope": {field: pkg["scope"][field] for field in ("agentId", "principalId", "fromSequence", "toSequence")},
+        "evidence": {"checkpoint": pkg["checkpoint"]["sequence"], "headHash": pkg["checkpoint"]["headHash"],
+                     "entries": len(hashes), "entriesDigest": entries_digest(hashes), "valid": True},
+        "notice": "A mapping, not a certification",
+        "sections": [{"id": "timeline", "reference": "Incident timeline", "requirement": "What the agents did",
+                      "status": "SHOWN", "findings": ["#2 invoice-agent tools/call on read_invoice"]}],
+        "keyId": key.key_id,
+    }
+    return sign_report(signed, key)
+
+
+def sign_report(signed: dict, key: PrivateKey = LEDGER_KEY) -> dict:
+    signed.pop("signature", None)
+    signed["signature"] = key.sign_base64(report_signed_bytes(signed))
+    return signed

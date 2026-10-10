@@ -282,6 +282,11 @@ def _disclosed_mismatch(entry, link, agent_id, principal_id, low, high) -> Optio
     return None
 
 
+def trusted_package_keys(pkg: dict, key_list=None, public_key: Optional[str] = None, problems=None) -> dict:
+    found = _keys(pkg, key_list, public_key, [] if problems is None else problems)
+    return {} if found is None else found[0]
+
+
 def _keys(pkg, key_list, pinned, problems) -> Optional[tuple]:
     listed = {}
     rotations = []

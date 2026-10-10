@@ -47,6 +47,7 @@ use them for real evidence.
 | `compliance-checkpoint.json` | A compliance profile with its canonical JSON and digest, and a `checkpoint/v2` that signs it with another profile |
 | `timestamp.json`             | An RFC 3161 response and token over the evidence-chain checkpoint, with the authority's chain and time            |
 | `rekor.json`                 | An Ed25519ph signature of the evidence-chain checkpoint, its Rekor v2 request and the entry the log returned      |
+| `report.json`                | A dispute report over the three entries, its canonical signed bytes, entries digest and signature by test key 1   |
 
 <p style="text-align: justify;">
 

@@ -185,6 +185,36 @@ export class LedgerClient {
     return this.post("/api/v1/packages", compact(scope));
   }
 
+  reports(): Promise<Json[]> {
+    return this.get("/api/v1/reports") as unknown as Promise<Json[]>;
+  }
+
+  createReport(
+    id: string,
+    scope: { agentId?: string; principalId?: string; fromSequence?: number; toSequence?: number } = {},
+  ): Promise<Json> {
+    return this.post("/api/v1/reports/" + encodeURIComponent(id), compact(scope));
+  }
+
+  async createReportHtml(
+    id: string,
+    scope: { agentId?: string; principalId?: string; fromSequence?: number; toSequence?: number } = {},
+  ): Promise<string> {
+    return new TextDecoder().decode(await (this.request("POST", "/api/v1/reports/" + encodeURIComponent(id),
+      { format: "html" }, compact(scope), true) as Promise<Uint8Array>));
+  }
+
+  createDispute(dispute: {
+    title: string;
+    description?: string;
+    agentId?: string;
+    principalId?: string;
+    fromSequence?: number;
+    toSequence?: number;
+  }): Promise<Uint8Array> {
+    return this.request("POST", "/api/v1/disputes", undefined, compact(dispute), true) as Promise<Uint8Array>;
+  }
+
   async decide(input: DecideInput): Promise<Json> {
     const inputHash = input.inputHash ?? (input.input === undefined ? undefined : await hashOf(input.input));
     return this.post("/api/v1/decisions", compact({
