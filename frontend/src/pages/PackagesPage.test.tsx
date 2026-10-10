@@ -13,7 +13,8 @@ describe('PackagesPage', () => {
       'POST /api/v1/packages/verify': () => ({ body: {
         valid: false, keyId: 'new', pinnedKeyId: 'new', anchorSequence: null, checkpointSequence: 9,
         checkpointCreatedAt: '2026-10-08T10:00:00Z', complianceProfiles: [], firstSequence: 1, checkedLinks: 8, disclosedEntries: 8,
-        agentId: 'invoice-agent', principalId: null, problems: ['sequence 6: the content hash does not match'],
+        agentId: 'invoice-agent', principalId: null, timestampedAt: '2026-10-08T10:00:01Z',
+        timestampAuthority: 'CN=Test TSA,O=Nexusphere Test', problems: ['sequence 6: the content hash does not match'],
       } }),
     })
     vi.stubGlobal('URL', Object.assign(URL, { createObjectURL: () => 'blob:x', revokeObjectURL: () => undefined }))
@@ -28,6 +29,7 @@ describe('PackagesPage', () => {
 
     expect(await screen.findByText('Result: INVALID')).toBeInTheDocument()
     expect(screen.getByText('sequence 6: the content hash does not match')).toBeInTheDocument()
+    expect(screen.getByText('2026-10-08T10:00:01Z by CN=Test TSA,O=Nexusphere Test')).toBeInTheDocument()
     const verify = calls.find((c) => c.path.startsWith('/api/v1/packages/verify'))!
     expect(verify.path).toBe('/api/v1/packages/verify?publicKey=NEW')
     expect(verify.body).toEqual({ format: 'nexusphere-ledger/package/v1' })

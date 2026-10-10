@@ -1,4 +1,6 @@
 import base64
+import hashlib
+import json
 import unittest
 
 from nexusphere_ledger import merkle
@@ -12,7 +14,10 @@ from nexusphere_ledger.mandate import (KEY_BINDING_INVALID, KEY_BINDING_MISSING,
                                        present_bound, sd_hash)
 from nexusphere_ledger.note import COSIGNATURE, ED25519, LogCheckpoint, Note, NoteKey, cosign
 
-from .support import ISSUER, LEDGER_KEY, ORIGIN, WITNESS, WITNESS_KEY, vector
+from nexusphere_ledger.package import verify_package
+from nexusphere_ledger.timestamp import TimestampToken, read_certificates
+
+from .support import ISSUER, LEDGER_KEY, ORIGIN, WITNESS, WITNESS_KEY, package, vector
 
 
 def chain_entries():
@@ -115,6 +120,48 @@ class ComplianceCheckpointVector(unittest.TestCase):
         self.assertTrue(checkpoint.verify(LEDGER_KEY.public_key))
         changed = Checkpoint.of(dict(node, profiles=node["profiles"][:1]))
         self.assertFalse(changed.verify(LEDGER_KEY.public_key))
+
+
+class TimestampVector(unittest.TestCase):
+
+    def setUp(self):
+        self.v = vector("timestamp.json")
+        self.imprint = hashlib.sha256(self.v["signedBytes"].encode("utf-8")).digest()
+        self.chain = [c for pem in self.v["certificates"] for c in read_certificates(pem)]
+        self.token = TimestampToken.parse(self.v["token"])
+
+    def test_token_verifies_against_its_chain(self):
+        self.assertEqual(self.v["messageImprint"], self.imprint.hex())
+        result = self.token.verify(self.imprint, self.chain[1:])
+        self.assertTrue(result.valid, result.problem)
+        self.assertTrue(result.pinned)
+        self.assertEqual(self.v["genTime"], result.gen_time)
+        self.assertEqual(self.v["authority"], result.authority)
+        response = TimestampToken.from_response(base64.b64decode(self.v["response"]))
+        self.assertEqual(self.token.base64(), response.base64())
+
+    def test_other_data_and_other_authorities_are_rejected(self):
+        other = bytes([self.imprint[0] ^ 1]) + self.imprint[1:]
+        self.assertEqual("the timestamp is for different data", self.token.verify(other, self.chain).problem)
+        self.assertEqual("the timestamp authority is not trusted",
+                         self.token.verify(self.imprint, self.chain[2:]).problem)
+        unpinned = self.token.verify(self.imprint, [])
+        self.assertTrue(unpinned.valid)
+        self.assertFalse(unpinned.pinned)
+
+    def test_a_timestamped_package(self):
+        pkg = package(chain_entries(), {1}, log=False)
+        pkg["checkpoint"] = dict(json.loads(self.v["signedBytes"]),
+                                 signature=vector("evidence-chain.json")["checkpoint"]["signature"],
+                                 timestamp=self.v["token"])
+        report = verify_package(pkg, LEDGER_KEY.public_key.encoded, timestamp_certificates=self.chain[1:],
+                                require_timestamp=True)
+        self.assertTrue(report.valid, report.problems)
+        self.assertEqual(self.v["genTime"], report.timestamped_at)
+        self.assertEqual(self.v["authority"], report.timestamp_authority)
+        self.assertEqual(["timestampedAt", "timestampAuthority", "problems"], list(report.to_dict())[-3:])
+        pinned_root = verify_package(pkg, LEDGER_KEY.public_key.encoded, timestamp_certificates=self.chain[2:])
+        self.assertIn("the timestamp of checkpoint 3: the timestamp authority is not trusted", pinned_root.problems)
 
 
 class MerkleTreeVector(unittest.TestCase):

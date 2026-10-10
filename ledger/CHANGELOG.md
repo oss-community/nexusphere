@@ -64,6 +64,11 @@ agent platforms and gateways.
   shortest maximum on a schedule and completes pending erasures once their retention ends, and a legal hold on a
   principal stops both until it is released; holds, expiries and erasures are recorded as evidence, and the web UI
   has a Privacy page for them
+* RFC 3161 checkpoint timestamps: with `LEDGER_TIMESTAMP_URL` set, a timestamp authority timestamps every signed
+  checkpoint, later when it is down; packages carry the token, the verifiers in Java, Python, TypeScript and the
+  browser check it offline against a pinned chain with `--timestamp-certificates` and `--require-timestamp`, the
+  profiles' `timestampAuthorities` decide which authority is accepted, and a `timestamp.json` conformance vector holds
+  a token from a Sigstore timestamp authority
 * Browser verifier: one self-contained HTML page in React and TypeScript that verifies a package with the
   TypeScript SDK, pinned to the ledger key and optional witnesses, with a Content Security Policy that blocks every
   connection

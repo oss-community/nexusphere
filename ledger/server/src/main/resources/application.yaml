@@ -42,6 +42,10 @@ ledger:
     profile-directory: ${LEDGER_COMPLIANCE_PROFILE_DIRECTORY:}
     region: ${LEDGER_COMPLIANCE_REGION:}
     retention-interval: ${LEDGER_COMPLIANCE_RETENTION_INTERVAL:1h}
+  timestamp:
+    url: ${LEDGER_TIMESTAMP_URL:}
+    certificates: ${LEDGER_TIMESTAMP_CERTIFICATES:}
+    timeout: ${LEDGER_TIMESTAMP_TIMEOUT:10s}
   log:
     origin: ${LEDGER_LOG_ORIGIN:}
     witness-timeout: ${LEDGER_LOG_WITNESS_TIMEOUT:10s}

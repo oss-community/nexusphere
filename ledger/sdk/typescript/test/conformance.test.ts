@@ -17,6 +17,7 @@ import {
   PrivateKey,
   PublicKey,
   StaticKeys,
+  TimestampToken,
   canonicalContent,
   canonicalJson,
   commitments,
@@ -30,12 +31,16 @@ import {
   sdHash,
   revocationBytes,
   rotationBytes,
+  readCertificates,
   trustedAndRevoked,
   merkle,
   sha256Hex,
   toBase64,
   toHex,
   utf8,
+  verifyTimestamp,
+  fromBase64,
+  sha256,
 } from "../src/index.js";
 import { ISSUER, LEDGER_KEY, ORIGIN, WITNESS, WITNESS_KEY, vector } from "./support.js";
 
@@ -325,5 +330,32 @@ describe("key-history.json", () => {
     ]);
     expect(trusted.has(LEDGER_KEY.keyId)).toBe(true);
     expect(revoked.has(LEDGER_KEY.keyId)).toBe(true);
+  });
+});
+
+describe("timestamp.json", () => {
+  it("verifies the token against the authority's chain", async () => {
+    const v = vector("timestamp.json");
+    const imprint = await sha256(utf8(v.signedBytes));
+    expect(toHex(imprint)).toBe(v.messageImprint);
+    const chain = (v.certificates as string[]).flatMap((pem) => readCertificates(pem));
+    expect(chain.length).toBe(3);
+    const token = TimestampToken.parse(v.token);
+    expect(toHex(TimestampToken.fromResponse(fromBase64(v.response)).encoded)).toBe(toHex(token.encoded));
+    expect(token.imprintHex).toBe(v.messageImprint);
+    const pinned = await verifyTimestamp(token, imprint, chain.slice(1, 3));
+    expect(pinned).toEqual({ valid: true, genTime: v.genTime, authority: v.authority, pinned: true, problem: null });
+    expect((await verifyTimestamp(v.token, imprint, chain)).valid).toBe(true);
+    const unpinned = await verifyTimestamp(token, imprint);
+    expect(unpinned).toMatchObject({ valid: true, pinned: false, authority: v.authority });
+    expect((await verifyTimestamp(token, imprint, chain.slice(2, 3))).problem).toBe(
+      "the timestamp authority is not trusted",
+    );
+    const other = imprint.slice();
+    other[0] ^= 1;
+    expect((await verifyTimestamp(token, other, chain)).problem).toBe("the timestamp is for different data");
+    const changed = token.encoded.slice();
+    changed[changed.length - 5] ^= 1;
+    expect((await verifyTimestamp(changed, imprint, chain)).valid).toBe(false);
   });
 });

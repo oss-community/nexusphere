@@ -1,4 +1,4 @@
-import { verifyPackage } from '@nexusphere/ledger'
+import { readCertificates, verifyPackage } from '@nexusphere/ledger'
 import type { PackageReport } from '@nexusphere/ledger'
 
 export interface Entry {
@@ -16,6 +16,7 @@ export interface Entry {
 export interface Verification {
   report: PackageReport
   pinned: boolean
+  timestampPinned: boolean
   entries: Entry[]
 }
 
@@ -25,6 +26,8 @@ export interface Input {
   keyListText?: string
   witnesses: string
   requiredWitnesses: string
+  timestampCertificatesText?: string
+  requireTimestamp?: boolean
 }
 
 export async function verify(input: Input): Promise<Verification> {
@@ -60,13 +63,32 @@ export async function verify(input: Input): Promise<Verification> {
     }
     keys = parsed as Record<string, unknown>[]
   }
+  let timestampCertificates: ReturnType<typeof readCertificates> = []
+  if (input.timestampCertificatesText && input.timestampCertificatesText.trim() !== '') {
+    try {
+      timestampCertificates = readCertificates(input.timestampCertificatesText)
+    } catch {
+      throw new Error('The timestamp authority chain is not a PEM file of certificates.')
+    }
+  }
   let report: PackageReport
   try {
-    report = await verifyPackage(pkg as Record<string, unknown>, publicKey, { witnesses, requiredWitnesses, keys })
+    report = await verifyPackage(pkg as Record<string, unknown>, publicKey, {
+      witnesses,
+      requiredWitnesses,
+      keys,
+      timestampCertificates,
+      requireTimestamp: input.requireTimestamp ?? false,
+    })
   } catch (e) {
     throw new Error(`The keys cannot be read: ${(e as Error).message}`)
   }
-  return { report, pinned: publicKey !== null, entries: entriesOf(pkg as Record<string, unknown>) }
+  return {
+    report,
+    pinned: publicKey !== null,
+    timestampPinned: timestampCertificates.length > 0,
+    entries: entriesOf(pkg as Record<string, unknown>),
+  }
 }
 
 function entriesOf(pkg: Record<string, unknown>): Entry[] {

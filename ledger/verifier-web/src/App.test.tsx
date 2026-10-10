@@ -2,7 +2,16 @@ import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { App } from './App'
 import { KeyRevocation, KeyRotation, PrivateKey } from '@nexusphere/ledger'
-import { LEDGER_KEY, buildPackage, entries, erase, keyRecord, witnessNoteKey } from '../../sdk/typescript/test/support'
+import {
+  LEDGER_KEY,
+  buildPackage,
+  entries,
+  erase,
+  keyRecord,
+  timestampedPackage,
+  vector,
+  witnessNoteKey,
+} from '../../sdk/typescript/test/support'
 
 const PINNED = LEDGER_KEY.publicKey.encoded
 
@@ -85,6 +94,31 @@ describe('App', async () => {
     expect(await screen.findByTestId('verdict')).toHaveTextContent('VALID')
     expect(screen.getByText('keys.json')).toBeInTheDocument()
     expect(screen.getByText(new RegExp(`^${LEDGER_KEY.keyId}, the witnesses prove`))).toBeInTheDocument()
+  })
+
+  it('checks the checkpoint timestamp against the pinned authority chain', async () => {
+    const certificates = vector('timestamp.json').certificates as string[]
+    const user = await upload(await timestampedPackage())
+    await user.type(screen.getByLabelText('Ledger public key'), PINNED)
+    await user.upload(
+      screen.getByLabelText('Timestamp authority chain file'),
+      new File([certificates.slice(1).join('')], 'tsa-chain.pem'),
+    )
+    await user.click(screen.getByLabelText('Require a timestamp'))
+    await user.click(screen.getByRole('button', { name: 'Verify' }))
+    expect(await screen.findByTestId('verdict')).toHaveTextContent('VALID')
+    expect(screen.getByText('tsa-chain.pem')).toBeInTheDocument()
+    expect(
+      screen.getByText('2026-10-10T21:38:35Z by CN=Test TSA Timestamping,O=local (pinned)'),
+    ).toBeInTheDocument()
+  })
+
+  it('refuses a package without the required timestamp', async () => {
+    const user = await upload(await buildPackage(chain, [1]))
+    await user.click(screen.getByLabelText('Require a timestamp'))
+    await user.click(screen.getByRole('button', { name: 'Verify' }))
+    expect(await screen.findByTestId('verdict')).toHaveTextContent('INVALID')
+    expect(screen.getByText('checkpoint 4 has no timestamp')).toBeInTheDocument()
   })
 
   it('reports files that are not packages', async () => {

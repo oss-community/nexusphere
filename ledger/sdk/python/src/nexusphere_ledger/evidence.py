@@ -1,4 +1,5 @@
 import base64
+import hashlib
 import os
 import re
 import uuid
@@ -175,6 +176,7 @@ class Checkpoint:
     key_id: str
     signature: Optional[str] = None
     profiles: Optional[tuple] = None
+    timestamp: Optional[str] = None
 
     @classmethod
     def of(cls, node: dict) -> "Checkpoint":
@@ -185,7 +187,7 @@ class Checkpoint:
             profiles = tuple((_required(p, "id"), _required(p, "digest")) for p in profiles)
         return cls(_long(node.get("sequence")), _required(node, "headHash"),
                    format_instant(_required(node, "createdAt")), _required(node, "keyId"), node.get("signature"),
-                   profiles)
+                   profiles, node.get("timestamp") if isinstance(node.get("timestamp"), str) else None)
 
     @property
     def format(self) -> str:
@@ -205,7 +207,10 @@ class Checkpoint:
 
     def sign(self, key: PrivateKey) -> "Checkpoint":
         return Checkpoint(self.sequence, self.head_hash, self.created_at, self.key_id,
-                          key.sign_base64(self.signed_bytes()), self.profiles)
+                          key.sign_base64(self.signed_bytes()), self.profiles, self.timestamp)
+
+    def timestamp_imprint(self) -> bytes:
+        return hashlib.sha256(self.signed_bytes()).digest()
 
     def verify(self, key: PublicKey) -> bool:
         return (self.signature is not None and key.key_id == self.key_id

@@ -41,6 +41,21 @@ export function vector(name: string): any {
   return JSON.parse(readFileSync(resolve(VECTORS, name), "utf8"));
 }
 
+export async function timestampedPackage(): Promise<Json> {
+  const chain = vector("evidence-chain.json").entries.map((item: any) => {
+    const { commitments: _, ...content } = item.content;
+    return { ...content, ...item.values, salts: item.salts, sequence: item.sequence,
+      previousHash: item.previousHash, hash: item.hash };
+  });
+  const pkg = await buildPackage(chain, [2]);
+  Object.assign(pkg.checkpoint as Json, {
+    createdAt: "2026-10-01T08:01:00.123456Z",
+    signature: vector("evidence-chain.json").checkpoint.signature,
+    timestamp: vector("timestamp.json").token,
+  });
+  return pkg;
+}
+
 export function witnessNoteKey(): Promise<NoteKey> {
   return NoteKey.of(WITNESS, COSIGNATURE, WITNESS_KEY.publicKey);
 }

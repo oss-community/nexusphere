@@ -11,6 +11,9 @@ export function App() {
   const [keyListText, setKeyListText] = useState('')
   const [witnesses, setWitnesses] = useState('')
   const [requiredWitnesses, setRequiredWitnesses] = useState('')
+  const [chainName, setChainName] = useState<string | null>(null)
+  const [chainText, setChainText] = useState('')
+  const [requireTimestamp, setRequireTimestamp] = useState(false)
   const [result, setResult] = useState<Verification | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
@@ -35,6 +38,16 @@ export function App() {
     setResult(null)
   }
 
+  async function loadChain(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0]
+    if (!file) {
+      return
+    }
+    setChainName(file.name)
+    setChainText(await file.text())
+    setResult(null)
+  }
+
   function chosen(event: ChangeEvent<HTMLInputElement>) {
     void load(event.target.files?.[0])
   }
@@ -50,7 +63,15 @@ export function App() {
     setError(null)
     setResult(null)
     try {
-      setResult(await verify({ packageText, publicKey, keyListText, witnesses, requiredWitnesses }))
+      setResult(await verify({
+        packageText,
+        publicKey,
+        keyListText,
+        witnesses,
+        requiredWitnesses,
+        timestampCertificatesText: chainText,
+        requireTimestamp,
+      }))
     } catch (e) {
       setError((e as Error).message)
     } finally {
@@ -111,6 +132,23 @@ export function App() {
             placeholder="all"
           />
         </label>
+        <label className="drop small">
+          <span>{chainName ?? 'Optional: the timestamp authority chain (PEM), to pin who timestamped the checkpoint'}</span>
+          <input
+            type="file"
+            accept=".pem,.crt,application/x-pem-file"
+            aria-label="Timestamp authority chain file"
+            onChange={(event) => void loadChain(event)}
+          />
+        </label>
+        <label className="check">
+          <input
+            type="checkbox"
+            checked={requireTimestamp}
+            onChange={(event) => setRequireTimestamp(event.target.checked)}
+          />
+          Require a timestamp
+        </label>
         <button type="submit" disabled={busy || packageText === ''}>
           {busy ? 'Verifying…' : 'Verify'}
         </button>
@@ -126,7 +164,7 @@ export function App() {
 }
 
 function Result({ verification }: { verification: Verification }) {
-  const { report, pinned, entries } = verification
+  const { report, pinned, timestampPinned, entries } = verification
   const rows: [string, string][] = [
     ['Signing key', report.keyId ?? 'none'],
     ['Pinned key', report.pinnedKeyId ?? 'not pinned'],
@@ -134,6 +172,10 @@ function Result({ verification }: { verification: Verification }) {
     ['Compliance profiles', report.complianceProfiles.length
       ? report.complianceProfiles.map((p) => `${p.id} (${p.digest.slice(0, 12)})`).join(', ') + ', signed in the checkpoint'
       : 'none signed'],
+    ['Timestamp', report.timestampedAt
+      ? `${report.timestampedAt} by ${report.timestampAuthority}` +
+        (timestampPinned ? ' (pinned)' : ', authority not pinned')
+      : 'none'],
     ['Anchor', report.anchorSequence === null ? 'none, the chain starts at entry 1' : String(report.anchorSequence)],
     ['Checked links', `${report.checkedLinks} from sequence ${report.firstSequence}`],
     ['Disclosed entries', String(report.disclosedEntries)],

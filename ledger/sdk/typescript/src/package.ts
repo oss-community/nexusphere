@@ -1,4 +1,5 @@
 import { equal, fromBase64, fromHex } from "./bytes.js";
+import { sha256 } from "./canonical.js";
 import { EvidenceStatement, LogReceipt } from "./cose.js";
 import {
   ChainVerifier,
@@ -16,8 +17,11 @@ import {
 import { KeyRevocation, KeyRotation, PublicKey, revokedKeys, trustedAndRevoked } from "./keys.js";
 import { leafHash, verifyInclusion } from "./merkle.js";
 import { ED25519, LogCheckpoint, Note, NoteKey } from "./note.js";
+import { TimestampToken, TimestampVerification, X509Certificate } from "./timestamp.js";
+import { parseMicros } from "./timestamps.js";
 
 export const PACKAGE_FORMAT = "nexusphere-ledger/package/v1";
+const MAX_TIMESTAMP_SKEW_MICROS = 5n * 60n * 1_000_000n;
 
 export interface PackageReport {
   valid: boolean;
@@ -38,6 +42,8 @@ export interface PackageReport {
   receiptedEntries: number;
   witnesses: string[];
   revokedKeys: string[];
+  timestampedAt: string | null;
+  timestampAuthority: string | null;
   problems: string[];
 }
 
@@ -45,6 +51,8 @@ export interface PackageOptions {
   witnesses?: (string | NoteKey)[];
   requiredWitnesses?: number;
   keys?: Json[];
+  timestampCertificates?: X509Certificate[];
+  requireTimestamp?: boolean;
 }
 
 interface LogResult {
@@ -106,6 +114,7 @@ export async function verifyPackage(
   if (anchor && anchorKey && !(await anchor.verify(anchorKey))) {
     problems.push(`the signature of anchor checkpoint ${anchor.sequence} is not valid`);
   }
+  const stamp = await verifyTimestampOf(checkpoint, (pkg.checkpoint as Json).timestamp, options, problems);
   const first = anchor ? anchor.sequence + 1 : 1;
   const chain = new ChainVerifier(first, anchor ? anchor.headHash : GENESIS);
   let disclosed = 0;
@@ -174,7 +183,39 @@ export async function verifyPackage(
     log,
     revoked,
     problems,
+    stamp,
   );
+}
+
+async function verifyTimestampOf(
+  checkpoint: Checkpoint,
+  timestamp: unknown,
+  options: PackageOptions,
+  problems: string[],
+): Promise<TimestampVerification | null> {
+  const sequence = checkpoint.sequence;
+  if (typeof timestamp !== "string") {
+    if (options.requireTimestamp) {
+      problems.push(`checkpoint ${sequence} has no timestamp`);
+    }
+    return null;
+  }
+  let result: TimestampVerification;
+  try {
+    result = await TimestampToken.parse(timestamp).verify(await sha256(checkpoint.signedBytes()),
+      options.timestampCertificates ?? []);
+  } catch {
+    problems.push(`the timestamp of checkpoint ${sequence} cannot be read`);
+    return null;
+  }
+  if (!result.valid) {
+    problems.push(`the timestamp of checkpoint ${sequence}: ${result.problem}`);
+    return null;
+  }
+  if (parseMicros(result.genTime!) + MAX_TIMESTAMP_SKEW_MICROS < parseMicros(checkpoint.createdAt)) {
+    problems.push(`the timestamp of checkpoint ${sequence} predates the checkpoint`);
+  }
+  return result;
 }
 
 function revokedUsed(
@@ -480,6 +521,7 @@ function report(
   log: LogResult,
   revokedKeys: string[],
   problems: string[],
+  stamp: TimestampVerification | null = null,
 ): PackageReport {
   return {
     valid,
@@ -500,6 +542,8 @@ function report(
     receiptedEntries: log.receipted,
     witnesses: [...log.witnesses],
     revokedKeys: [...revokedKeys],
+    timestampedAt: stamp ? stamp.genTime : null,
+    timestampAuthority: stamp ? stamp.authority : null,
     problems: [...problems],
   };
 }

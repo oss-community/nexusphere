@@ -47,6 +47,12 @@ export function Overview() {
               <><dt>Compliance profiles</dt>
                 <dd>{data.checkpoint.profiles.map((p) => p.id).join(', ')}, signed in the checkpoint</dd></>
             )}
+            {data.checkpoint && (
+              <><dt>Timestamp</dt>
+                <dd>{data.checkpoint.timestampedAt
+                  ? <><Time value={data.checkpoint.timestampedAt} />, RFC 3161 token from the timestamp authority</>
+                  : 'none'}</dd></>
+            )}
           </dl>
         )}
         {report && (

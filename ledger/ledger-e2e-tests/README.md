@@ -48,7 +48,9 @@ checkpoints of a revoked key came before its compromise.
 PostgreSQL container, so profile changes are recorded once and a disallowed region stops the start.
 `ErasureE2ETest` erases principals on the shared ledger and on a `StandaloneLedger` with the `us` profile, whose
 retention keeps recent entries. `RetentionE2ETest` starts a `StandaloneLedger` with its own short profile, so entries
-expire and a pending erasure completes within the test.
+expire and a pending erasure completes within the test. `TimestampE2ETest` starts `StandaloneLedger`s that use
+`FakeTimestampAuthority`, an RFC 3161 authority on a random port that signs real CMS tokens with a test chain in
+`src/test/resources/tsa`, and can be told to fail.
 `WitnessE2ETest` starts two `StandaloneLedger`s with their own PostgreSQL containers: one is the log and asks the
 other, which watches it, to cosign its log checkpoints over the C2SP witness protocol.
 
@@ -159,6 +161,9 @@ other, which watches it, to cosign its log checkpoints over the C2SP witness pro
 |                           | A receipt can be asked for at an earlier log checkpoint                       |
 |                           | Statements and receipts belong to the evidence owner                          |
 |                           | A package carries a statement and receipt for every disclosed entry           |
+| `TimestampE2ETest`        | Every checkpoint is timestamped and the package proves it                     |
+|                           | A checkpoint is timestamped later when the authority is down                  |
+|                           | The profiles decide which timestamp authority is accepted                     |
 
 ##
 

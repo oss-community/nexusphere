@@ -45,12 +45,15 @@ use them for real evidence.
 | `mandate-key-binding.json`   | A mandate bound to RFC 8032 test key 3 with `cnf`, its KB-JWT presentation, nonce and `sd_hash`                   |
 | `http-signature.json`        | An RFC 9421 signature of a POST with its `Content-Digest`, `Signature-Input`, `Signature` and signature base      |
 | `compliance-checkpoint.json` | A compliance profile with its canonical JSON and digest, and a `checkpoint/v2` that signs it with another profile |
+| `timestamp.json`             | An RFC 3161 response and token over the evidence-chain checkpoint, with the authority's chain and time            |
 
 <p style="text-align: justify;">
 
 SD-JWT disclosures carry random salts, so `mandate.json` and the token in `mandate-key-binding.json` are checked
 rather than rebuilt: their signatures, digests and claims must verify. The KB-JWT is deterministic, so the SDKs
-rebuild the key-bound presentation from the agent seed and compare it.
+rebuild the key-bound presentation from the agent seed and compare it. `timestamp.json` comes from a Sigstore timestamp
+authority whose keys are not kept, so it is never rebuilt: the token must be for the SHA-256 of `signedBytes`, verify
+against `certificates` and give `genTime` and `authority`, and only the root of the chain is not enough to trust it.
 
 </p>
 
@@ -61,7 +64,7 @@ rebuild the key-bound presentation from the agent seed and compare it.
 The vectors were also checked with other implementations: the Merkle roots, canonical JSON, content hashes and
 checkpoint signature with Python's `hashlib` and `cryptography`; the signed note with Go's
 `golang.org/x/mod/sumdb/note`; the cosignature, COSE signatures and SD-JWT digests with Python's `cryptography` and
-`cbor2`. The [Python SDK](../sdk/python/README.md) and the [TypeScript SDK](../sdk/typescript/README.md) rebuild every
+`cbor2`; the timestamp response with `openssl ts -verify`. The [Python SDK](../sdk/python/README.md) and the [TypeScript SDK](../sdk/typescript/README.md) rebuild every
 vector except the mandate in their own test suites and check the mandate.
 
 </p>

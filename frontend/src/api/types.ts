@@ -46,6 +46,8 @@ export interface Checkpoint {
   keyId: string
   profiles: ComplianceProfileRef[] | null
   signature: string
+  timestamp: string | null
+  timestampedAt: string | null
 }
 
 export interface SigningKey {
@@ -165,6 +167,8 @@ export interface PackageReport {
   disclosedEntries: number
   agentId: string | null
   principalId: string | null
+  timestampedAt?: string | null
+  timestampAuthority?: string | null
   problems: string[]
 }
 

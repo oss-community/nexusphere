@@ -13,6 +13,9 @@ function Report({ report }: { report: PackageReport }) {
         {report.complianceProfiles?.length > 0 && (
           <><dt>Compliance</dt><dd>{report.complianceProfiles.map((p) => p.id).join(', ')}</dd></>
         )}
+        {report.timestampedAt && (
+          <><dt>Timestamp</dt><dd>{report.timestampedAt} by {report.timestampAuthority}</dd></>
+        )}
         <dt>Anchor</dt><dd>{report.anchorSequence === null ? 'genesis' : `checkpoint ${report.anchorSequence}`}</dd>
         <dt>Chain</dt><dd>{report.checkedLinks} links from sequence {report.firstSequence}</dd>
         <dt>Disclosed</dt><dd>{report.disclosedEntries} entries</dd>

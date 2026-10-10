@@ -61,10 +61,12 @@ curl -s http://localhost:8090/api/v1/keys -H "Authorization: Bearer nexusphere-l
 Step 2. Open `ledger/verifier-web/dist/index.html` in a browser, from disk or any web server.
 
 Step 3. Choose or drop `package.json`, paste the public key, and add witness keys if the log must carry their
-cosignatures. To apply key revocations, also choose the key list saved from `GET /api/v1/keys`.
+cosignatures. To apply key revocations, also choose the key list saved from `GET /api/v1/keys`. When the ledger
+[timestamps its checkpoints](../README.md#checkpoint-timestamps), choose the authority's `tsa-chain.pem` and tick
+Require a timestamp.
 
-Step 4. Press Verify; the page must show `VALID` with the signing key, the checkpoint, the log, the proofs and the
-disclosed entries, with `erased` in place of the principal and target of an entry whose personal fields were erased.
+Step 4. Press Verify; the page must show `VALID` with the signing key, the checkpoint, its timestamp, the log, the
+proofs and the disclosed entries, with `erased` in place of the principal and target of an entry whose personal fields were erased.
 Change one character of an entry in the file and verify again; the page must show `INVALID` and name the entry.
 
 <p style="text-align: justify;">
@@ -77,15 +79,16 @@ Crypto: Chrome or Edge 137, Firefox 129, Safari 17 or later.
 
 ## What It Checks
 
-| Check                                                           | Shown as                      |
-|-----------------------------------------------------------------|-------------------------------|
-| Package format and the signature of the checkpoint              | Signing key and checkpoint    |
-| The pinned key, or a key the pinned key endorsed by rotation    | Pinned key                    |
-| Every link of the hash chain from the anchor to the checkpoint  | Checked links                 |
-| Disclosed entries against their content hash and the scope      | Disclosed entries and scope   |
-| Merkle inclusion proofs and SCITT receipts of disclosed entries | Inclusion proofs and receipts |
-| Witness cosignatures on the log checkpoint                      | Witnesses                     |
-| Revoked keys, valid only where witnesses predate the compromise | Revoked keys                  |
+| Check                                                            | Shown as                      |
+|------------------------------------------------------------------|-------------------------------|
+| Package format and the signature of the checkpoint               | Signing key and checkpoint    |
+| The pinned key, or a key the pinned key endorsed by rotation     | Pinned key                    |
+| Every link of the hash chain from the anchor to the checkpoint   | Checked links                 |
+| Disclosed entries against their content hash and the scope       | Disclosed entries and scope   |
+| Merkle inclusion proofs and SCITT receipts of disclosed entries  | Inclusion proofs and receipts |
+| Witness cosignatures on the log checkpoint                       | Witnesses                     |
+| Revoked keys, valid only where witnesses predate the compromise  | Revoked keys                  |
+| The RFC 3161 timestamp of the checkpoint and the authority chain | Timestamp                     |
 
 <p style="text-align: justify;">
 

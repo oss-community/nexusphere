@@ -15,9 +15,12 @@ import com.nexusphere.ledger.chain.MerkleTree;
 import com.nexusphere.ledger.chain.NoteKey;
 import com.nexusphere.ledger.chain.SignedCheckpoint;
 import com.nexusphere.ledger.chain.SigningKeys;
+import com.nexusphere.ledger.chain.TimestampToken;
 import com.nexusphere.ledger.chain.TrustedKeys;
 import tools.jackson.databind.JsonNode;
 
+import java.security.cert.X509Certificate;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -36,6 +39,7 @@ import java.util.UUID;
 public final class PackageVerifier {
 
     public static final String FORMAT = "nexusphere-ledger/package/v1";
+    private static final Duration MAX_TIMESTAMP_SKEW = Duration.ofMinutes(5);
 
     private PackageVerifier() {
     }
@@ -51,6 +55,20 @@ public final class PackageVerifier {
 
     public static PackageReport verify(JsonNode pkg, String pinnedPublicKey, JsonNode keyList,
                                        List<NoteKey> witnessKeys, int requiredWitnesses) {
+        return verify(pkg, pinnedPublicKey, keyList, witnessKeys, requiredWitnesses, TimestampPolicy.NONE);
+    }
+
+    public record TimestampPolicy(List<X509Certificate> certificates, boolean required) {
+
+        public static final TimestampPolicy NONE = new TimestampPolicy(List.of(), false);
+
+        public TimestampPolicy {
+            certificates = List.copyOf(certificates == null ? List.of() : certificates);
+        }
+    }
+
+    public static PackageReport verify(JsonNode pkg, String pinnedPublicKey, JsonNode keyList,
+                                       List<NoteKey> witnessKeys, int requiredWitnesses, TimestampPolicy timestamps) {
         List<String> problems = new ArrayList<>();
         if (!FORMAT.equals(text(pkg, "format"))) {
             problems.add("unknown package format " + text(pkg, "format"));
@@ -77,6 +95,7 @@ public final class PackageVerifier {
         if (anchorKey != null && !anchor.verify(anchorKey)) {
             problems.add("the signature of anchor checkpoint " + anchor.checkpoint().sequence() + " is not valid");
         }
+        TimestampToken.Verification stamp = timestamp(checkpoint, timestamps, problems);
         long first = anchor == null ? 1 : anchor.checkpoint().sequence() + 1;
         ChainVerifier chain = new ChainVerifier(first, anchor == null ? Hashes.GENESIS : anchor.checkpoint().headHash());
         long disclosed = 0;
@@ -122,8 +141,35 @@ public final class PackageVerifier {
                 : revoked(trusted, used, log, Math.max(1, requiredWitnesses), problems);
         return report(problems.isEmpty(), checkpoint.checkpoint().keyId(), pinnedKeyId(pinnedPublicKey),
                 anchor == null ? null : anchor.checkpoint().sequence(), checkpoint.checkpoint().sequence(),
-                checkpoint.checkpoint().createdAt().toString(), checkpoint.checkpoint().profiles(), first, result.checkedEntries(), disclosed, pkg, log,
-                revoked, problems);
+                checkpoint.checkpoint().createdAt().toString(), checkpoint.checkpoint().profiles(), first,
+                result.checkedEntries(), disclosed, pkg, log, revoked, stamp, problems);
+    }
+
+    private static TimestampToken.Verification timestamp(SignedCheckpoint checkpoint, TimestampPolicy policy,
+                                                         List<String> problems) {
+        long sequence = checkpoint.checkpoint().sequence();
+        if (checkpoint.timestamp() == null) {
+            if (policy.required()) {
+                problems.add("checkpoint " + sequence + " has no timestamp");
+            }
+            return null;
+        }
+        TimestampToken.Verification result;
+        try {
+            result = TimestampToken.parse(checkpoint.timestamp()).verify(checkpoint.timestampImprint(),
+                    policy.certificates());
+        } catch (RuntimeException e) {
+            problems.add("the timestamp of checkpoint " + sequence + " cannot be read");
+            return null;
+        }
+        if (!result.valid()) {
+            problems.add("the timestamp of checkpoint " + sequence + ": " + result.problem());
+            return null;
+        }
+        if (result.genTime().plus(MAX_TIMESTAMP_SKEW).isBefore(checkpoint.checkpoint().createdAt())) {
+            problems.add("the timestamp of checkpoint " + sequence + " predates the checkpoint");
+        }
+        return result;
     }
 
     private static List<String> revoked(TrustedKeys trusted, Set<String> used, LogResult log, int required,
@@ -383,17 +429,28 @@ public final class PackageVerifier {
             }
         }
         return new SignedCheckpoint(new Checkpoint(node.path("sequence").asLong(), text(node, "headHash"),
-                Instant.parse(text(node, "createdAt")), text(node, "keyId"), profiles), text(node, "signature"));
+                Instant.parse(text(node, "createdAt")), text(node, "keyId"), profiles), text(node, "signature"),
+                node.path("timestamp").isString() ? node.path("timestamp").asString() : null);
     }
 
     private static PackageReport report(boolean valid, String keyId, String pinnedKeyId, Long anchor, long checkpoint,
                                         String createdAt, List<Checkpoint.Profile> profiles, long first, long checked,
                                         long disclosed, JsonNode pkg,
                                         LogResult log, List<String> revoked, List<String> problems) {
+        return report(valid, keyId, pinnedKeyId, anchor, checkpoint, createdAt, profiles, first, checked, disclosed,
+                pkg, log, revoked, null, problems);
+    }
+
+    private static PackageReport report(boolean valid, String keyId, String pinnedKeyId, Long anchor, long checkpoint,
+                                        String createdAt, List<Checkpoint.Profile> profiles, long first, long checked,
+                                        long disclosed, JsonNode pkg, LogResult log, List<String> revoked,
+                                        TimestampToken.Verification stamp, List<String> problems) {
         return new PackageReport(valid, keyId, pinnedKeyId, anchor, checkpoint, createdAt,
                 profiles == null ? List.of() : profiles, first, checked, disclosed,
                 nullable(pkg.path("scope"), "agentId"), nullable(pkg.path("scope"), "principalId"), log.origin(),
-                log.size(), log.proven(), log.receipted(), log.witnesses(), List.copyOf(revoked), List.copyOf(problems));
+                log.size(), log.proven(), log.receipted(), log.witnesses(), List.copyOf(revoked),
+                stamp == null ? null : stamp.genTime().toString(), stamp == null ? null : stamp.authority(),
+                List.copyOf(problems));
     }
 
     private static String text(JsonNode node, String field) {

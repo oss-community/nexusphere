@@ -2,12 +2,17 @@ package com.nexusphere.ledger.evidence.domain.repository;
 
 import com.nexusphere.ledger.chain.SignedCheckpoint;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 
 public interface CheckpointRepository {
 
     void append(SignedCheckpoint checkpoint);
+
+    void appendTimestamp(long sequence, byte[] token, Instant genTime, Instant recordedAt);
+
+    List<SignedCheckpoint> withoutTimestamp(int limit);
 
     Optional<SignedCheckpoint> latest();
 

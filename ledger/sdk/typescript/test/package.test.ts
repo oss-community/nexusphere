@@ -5,11 +5,12 @@ import {
   KeyRevocation,
   KeyRotation,
   PrivateKey,
+  readCertificates,
   toBase64,
   verifyPackage,
   utf8,
 } from "../src/index.js";
-import { LEDGER_KEY, buildPackage, entries, erase, keyRecord, witnessNoteKey } from "./support.js";
+import { LEDGER_KEY, buildPackage, entries, erase, keyRecord, timestampedPackage, vector, witnessNoteKey } from "./support.js";
 
 const PINNED = LEDGER_KEY.publicKey.encoded;
 
@@ -125,6 +126,38 @@ describe("verifyPackage", async () => {
     const noLog = await verifyPackage(await buildPackage(chain, [1], { log: false }), PINNED);
     expect(noLog.valid).toBe(true);
     expect(noLog.logTreeSize).toBeNull();
+  });
+
+  it("requires a timestamp when asked", async () => {
+    const report = await verifyPackage(await buildPackage(chain, [1]), PINNED, { requireTimestamp: true });
+    expect(report.valid).toBe(false);
+    expect(report.problems).toContain("checkpoint 6 has no timestamp");
+    expect((await verifyPackage(await buildPackage(chain, [1]), PINNED)).valid).toBe(true);
+  });
+
+  it("rejects a timestamp over other data", async () => {
+    const pkg = await buildPackage(chain, [1]);
+    (pkg.checkpoint as Json).timestamp = vector("timestamp.json").token;
+    const report = await verifyPackage(pkg, PINNED);
+    expect(report.valid).toBe(false);
+    expect(report.problems).toContain("the timestamp of checkpoint 6: the timestamp is for different data");
+    expect(report.timestampedAt).toBeNull();
+    (pkg.checkpoint as Json).timestamp = "AAAA";
+    expect((await verifyPackage(pkg, PINNED)).problems).toContain("the timestamp of checkpoint 6 cannot be read");
+  });
+
+  it("reports the time and authority of a timestamp", async () => {
+    const v = vector("timestamp.json");
+    const pkg = await timestampedPackage();
+    const chain = (v.certificates as string[]).flatMap((pem) => readCertificates(pem));
+    const report = await verifyPackage(pkg, PINNED, { timestampCertificates: chain.slice(1), requireTimestamp: true,
+      requiredWitnesses: 0 });
+    expect(report.problems).toEqual([]);
+    expect(report).toMatchObject({ timestampedAt: v.genTime, timestampAuthority: v.authority });
+    expect(Object.keys(report).slice(-3)).toEqual(["timestampedAt", "timestampAuthority", "problems"]);
+    expect((await verifyPackage(pkg, PINNED, { timestampCertificates: chain.slice(2) })).problems).toContain(
+      "the timestamp of checkpoint 3: the timestamp authority is not trusted",
+    );
   });
 
   it("reports unknown formats and empty packages", async () => {

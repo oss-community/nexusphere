@@ -103,10 +103,11 @@ class LiveLedger(unittest.TestCase):
         self.assertEqual("personal", self.operator.evidence(recorded["id"])["attributes"]["note"])
         hold = self.operator.place_legal_hold(principal, "dispute")
         self.assertIn(hold["id"], [h["id"] for h in self.operator.legal_holds(active=True)["items"]])
-        self.assertTrue(self.operator.erase_principal(principal)["legalHold"])
+        held = self.operator.erase_principal(principal)
+        self.assertTrue(held["legalHold"])
         self.assertIsNotNone(self.operator.release_legal_hold(hold["id"], "settled")["releasedAt"])
-        self.operator.sweep_retention()
-        erasure = self.operator.erase_principal(principal, "request of the principal")
+        swept = [e for e in self.operator.sweep_retention()["erasures"] if e["principalRef"] == held["principalRef"]]
+        erasure = swept[0] if swept else self.operator.erase_principal(principal, "request of the principal")
         if not erasure["completed"]:
             self.skipTest("the active compliance profiles still retain the evidence")
         self.assertEqual(1, erasure["erasedEntries"])

@@ -25,6 +25,7 @@
 * [Compliance Profiles](#compliance-profiles)
 * [Erasure](#erasure)
 * [Retention and Legal Holds](#retention-and-legal-holds)
+* [Checkpoint Timestamps](#checkpoint-timestamps)
 * [Conformance Vectors](#conformance-vectors)
 * [API](#api)
 * [End-to-End Tests](ledger-e2e-tests/README.md)
@@ -296,6 +297,9 @@ LEDGER_COMPLIANCE_PROFILES: baseline
 LEDGER_COMPLIANCE_PROFILE_DIRECTORY:
 LEDGER_COMPLIANCE_REGION:
 LEDGER_COMPLIANCE_RETENTION_INTERVAL: 1h
+LEDGER_TIMESTAMP_URL:
+LEDGER_TIMESTAMP_CERTIFICATES:
+LEDGER_TIMESTAMP_TIMEOUT: 10s
 LEDGER_LOG_ORIGIN:
 LEDGER_LOG_WITNESS_TIMEOUT: 10s
 LEDGER_LOG_WITNESSES_{NAME}_URL:
@@ -1319,6 +1323,66 @@ curl -s -X POST http://localhost:8090/api/v1/legal-holds/$(cat hold.txt)/release
 curl -s -X POST http://localhost:8090/api/v1/retention/sweep -H "Authorization: Bearer $LEDGER_API_KEY" | jq -c .
 ```
 
+## Checkpoint Timestamps
+
+<p style="text-align: justify;">
+
+A signed checkpoint says when it was made, but only by the ledger's own clock. With `LEDGER_TIMESTAMP_URL` set to an
+RFC 3161 timestamp authority, the ledger asks that authority to timestamp the SHA-256 of every checkpoint's signed
+bytes, and the token proves to anyone that the checkpoint, and so every entry under it, existed at that time.
+`LEDGER_TIMESTAMP_CERTIFICATES` is a PEM file with the authority's certificate chain: the ledger keeps only tokens that
+chain to it and publishes it at `GET /public/v1/timestamp-authority`. When the authority cannot be reached, the
+checkpoint is signed anyway, and the scheduler timestamps it on a later round.
+
+</p>
+
+<p style="text-align: justify;">
+
+The token travels as `timestamp` in the checkpoint of an evidence package, next to `timestampedAt` in the checkpoint
+API. Every verifier checks it offline: the token must be for this checkpoint, its signature and the signer's
+certificate must hold, and a token more than five minutes older than the checkpoint is rejected.
+`--timestamp-certificates` pins the authority's chain and `--require-timestamp` rejects a checkpoint without a token.
+When the [compliance profiles](#compliance-profiles) list `timestampAuthorities`, the ledger does not start without
+`LEDGER_TIMESTAMP_URL` or with an authority that is not listed.
+
+</p>
+
+Step 1. Install the Sigstore timestamp authority and start it; its signing chain is made in memory at every start:
+
+```shell
+go install github.com/sigstore/timestamp-authority/v2/cmd/timestamp-server@v2.1.4
+timestamp-server serve --host 127.0.0.1 --port 3004 &
+```
+
+Step 2. Save its certificate chain; the answer must show `3`:
+
+```shell
+curl -s http://127.0.0.1:3004/api/v1/timestamp/certchain > tsa-chain.pem
+grep -c BEGIN tsa-chain.pem
+```
+
+Step 3. Start the ledger with the authority:
+
+```shell
+export LEDGER_TIMESTAMP_URL=http://127.0.0.1:3004/api/v1/timestamp
+export LEDGER_TIMESTAMP_CERTIFICATES=$PWD/tsa-chain.pem
+```
+
+Step 4. Record evidence and sign a checkpoint; the answer must show a `timestampedAt`:
+
+```shell
+curl -s -X POST http://localhost:8090/api/v1/evidence -H "Authorization: Bearer $LEDGER_API_KEY" -H "Content-Type: application/json" -d '{"agentId":"invoice-agent","principalId":"alice","action":"tools/call","target":"read_invoice","outcome":"SUCCEEDED"}' | jq -c '{sequence}'
+curl -s -X POST http://localhost:8090/api/v1/checkpoints -H "Authorization: Bearer $LEDGER_API_KEY" | jq -c '{sequence, timestampedAt}'
+```
+
+Step 5. Export a package and verify it with the authority pinned; the output must show
+`Timestamp   : ... by CN=Test TSA Timestamping,O=local (pinned)` and `Result: VALID`:
+
+```shell
+curl -s -X POST http://localhost:8090/api/v1/packages -H "Authorization: Bearer $LEDGER_API_KEY" -H "Content-Type: application/json" -d '{"agentId":"invoice-agent"}' > package.json
+java -jar verifier/target/verifier-1.0.0-SNAPSHOT-exec.jar --timestamp-certificates tsa-chain.pem --require-timestamp package.json
+```
+
 ## Conformance Vectors
 
 <p style="text-align: justify;">
@@ -1326,8 +1390,8 @@ curl -s -X POST http://localhost:8090/api/v1/retention/sweep -H "Authorization: 
 [Conformance Vectors](conformance/README.md) hold fixed inputs and outputs for every format the ledger produces, made
 with the published RFC 8032 test keys: canonical JSON, the evidence chain and checkpoints, Merkle roots and proofs,
 signed notes and cosignatures, SCITT statements and receipts, an SD-JWT VC mandate, a key-bound mandate with its
-KB-JWT, an HTTP message signature and a checkpoint that signs compliance profiles. Another implementation checks
-itself against them, and `ConformanceVectorsTest` in `ledger/verifier` fails when the ledger's own output changes.
+KB-JWT, an HTTP message signature, a checkpoint that signs compliance profiles and an RFC 3161 token from a real
+timestamp authority. Another implementation checks itself against them, and `ConformanceVectorsTest` in `ledger/verifier` fails when the ledger's own output changes.
 
 </p>
 
@@ -1347,7 +1411,7 @@ API key, except `/api/v1/principal/**`, which requires a principal token from th
 | GET    | `/api/v1/evidence`                         | List entries by `agentId`, `principalId`, `after` and `limit` (max 500)                                |
 | GET    | `/api/v1/ledger/head`                      | Current sequence and hash                                                                              |
 | POST   | `/api/v1/checkpoints`                      | Sign the current head now; `409 LEDGER_EMPTY` when nothing is recorded (operator)                      |
-| GET    | `/api/v1/checkpoints/latest`               | Latest checkpoint                                                                                      |
+| GET    | `/api/v1/checkpoints/latest`               | Latest checkpoint, with its RFC 3161 `timestamp` and `timestampedAt` when timestamped                  |
 | GET    | `/api/v1/checkpoints`                      | List checkpoints by `after` and `limit`                                                                |
 | GET    | `/api/v1/log/proofs/inclusion`             | Inclusion proof for a `sequence` in the log at `treeSize`, by default the latest log checkpoint        |
 | GET    | `/api/v1/log/proofs/consistency`           | Consistency proof from `firstSize` to `secondSize`, by default the latest log checkpoint               |
@@ -1394,6 +1458,7 @@ API key, except `/api/v1/principal/**`, which requires a principal token from th
 | GET    | `/public/v1/witness/key`                   | Verifier key this ledger cosigns with as a witness, no API key                                         |
 | POST   | `/public/v1/witness/add-checkpoint`        | C2SP witness endpoint: cosign a watched log's checkpoint, `404` when it watches none, no API key       |
 | GET    | `/public/v1/compliance`                    | Active compliance profiles with their digests and the combined rules, no API key                       |
+| GET    | `/public/v1/timestamp-authority`           | The RFC 3161 timestamp authority and its certificate chain in PEM, no API key                          |
 | GET    | `/public/v1/oidc`                          | The OIDC issuer and client for principal sign-in, `404` without OIDC                                   |
 | POST   | `/mcp/{server}`                            | MCP gateway: decide, forward and record a `tools/call`; forward other messages                         |
 | GET    | `/mcp/{server}`                            | Relay the MCP server-to-client stream                                                                  |
