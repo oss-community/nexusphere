@@ -4,6 +4,7 @@ import org.junit.jupiter.api.Test;
 
 import java.security.KeyPair;
 import java.time.Instant;
+import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -30,6 +31,39 @@ class SignedCheckpointTest {
                 original.checkpoint().keyId());
 
         assertThat(new SignedCheckpoint(changed, original.signature()).verify(publicKey)).isFalse();
+    }
+
+    @Test
+    void theActiveComplianceProfilesAreSigned() {
+        Checkpoint.Profile eu = new Checkpoint.Profile("eu", Hashes.sha256(new byte[]{1}));
+        Checkpoint.Profile baseline = new Checkpoint.Profile("baseline", Hashes.sha256(new byte[]{2}));
+        Checkpoint checkpoint = new Checkpoint(3, Hashes.GENESIS, Instant.now(), publicKey.keyId(), List.of(eu, baseline));
+        SignedCheckpoint signed = new SignedCheckpoint(checkpoint,
+                SigningKeys.sign(keys.getPrivate(), checkpoint.signedBytes()));
+        Checkpoint without = new Checkpoint(3, Hashes.GENESIS, checkpoint.createdAt(), publicKey.keyId(),
+                List.of(baseline));
+
+        assertThat(checkpoint.format()).isEqualTo(Checkpoint.FORMAT_WITH_PROFILES);
+        assertThat(checkpoint.profiles()).extracting(Checkpoint.Profile::id).containsExactly("baseline", "eu");
+        assertThat(new String(checkpoint.signedBytes())).contains("\"profiles\":[{\"digest\":");
+        assertThat(signed.verify(publicKey)).isTrue();
+        assertThat(new SignedCheckpoint(without, signed.signature()).verify(publicKey)).isFalse();
+    }
+
+    @Test
+    void aCheckpointWithoutProfilesKeepsTheFirstFormat() {
+        Checkpoint checkpoint = new Checkpoint(3, Hashes.GENESIS, Instant.now(), publicKey.keyId());
+
+        assertThat(checkpoint.format()).isEqualTo(Checkpoint.FORMAT);
+        assertThat(new String(checkpoint.signedBytes())).doesNotContain("profiles");
+    }
+
+    @Test
+    void profileReferencesAreChecked() {
+        assertThatThrownBy(() -> new Checkpoint.Profile("EU", Hashes.GENESIS))
+                .isInstanceOf(IllegalArgumentException.class);
+        assertThatThrownBy(() -> new Checkpoint.Profile("eu", "abc"))
+                .isInstanceOf(IllegalArgumentException.class);
     }
 
     @Test

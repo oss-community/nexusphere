@@ -97,6 +97,19 @@ describe("evidence-chain.json", () => {
     expect(await signed.verify(LEDGER_KEY.publicKey)).toBe(true);
   });
 
+  it("signs the active compliance profiles in a checkpoint", async () => {
+    const v = vector("compliance-checkpoint.json");
+    expect(canonicalJson(v.profile)).toBe(v.canonicalProfile);
+    expect(await sha256Hex(canonicalJson(v.profile))).toBe(v.profileDigest);
+    const checkpoint = Checkpoint.of(v.checkpoint);
+    expect(checkpoint.format).toBe(v.checkpoint.format);
+    expect(new TextDecoder().decode(checkpoint.signedBytes())).toBe(v.checkpoint.signedBytes);
+    expect((await checkpoint.sign(LEDGER_KEY)).signature).toBe(v.checkpoint.signature);
+    expect(await checkpoint.verify(LEDGER_KEY.publicKey)).toBe(true);
+    const changed = Checkpoint.of({ ...v.checkpoint, profiles: v.checkpoint.profiles.slice(1) });
+    expect(await changed.verify(LEDGER_KEY.publicKey)).toBe(false);
+  });
+
   it("breaks the chain when content changes", async () => {
     const entries = chainEntries();
     entries[1].target = "delete_invoice";

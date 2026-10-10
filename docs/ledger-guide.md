@@ -283,6 +283,7 @@ docker volume prune -f
 
 * Production secrets, backups and monitoring: [Operations](operations.md)
 * Every setting and endpoint: [Nexusphere Ledger](../ledger/README.md)
+* The rules of your jurisdiction: [Compliance Profiles](../ledger/README.md#compliance-profiles)
 * The web UI: [Nexusphere Frontend](../frontend/README.md)
 
 ##

@@ -354,6 +354,8 @@ to the internet, since it can also stop floods before they reach Java.
 * Prometheus scraping the ledger, and at least one alert channel on
 * Rate limits sized for the expected traffic, plus a limit at the reverse proxy for internet-facing deployments
 * `LEDGER_OIDC_*` set so principals approve grants with their own sign-in
+* `LEDGER_COMPLIANCE_PROFILES` and `LEDGER_COMPLIANCE_REGION` set for the jurisdictions you answer to, reviewed with
+  your legal team, as in [Compliance Profiles](../ledger/README.md#compliance-profiles)
 
 ##
 

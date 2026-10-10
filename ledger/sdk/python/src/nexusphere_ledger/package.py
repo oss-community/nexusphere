@@ -19,6 +19,7 @@ class PackageReport:
     anchor_sequence: Optional[int]
     checkpoint_sequence: int
     checkpoint_created_at: Optional[str]
+    compliance_profiles: List[dict]
     first_sequence: int
     checked_links: int
     disclosed_entries: int
@@ -55,13 +56,13 @@ def verify_package(pkg: dict, public_key: Optional[str] = None, witness_keys=(),
     scope = pkg.get("scope") if isinstance(pkg.get("scope"), dict) else {}
     if pkg.get("format") != FORMAT:
         problems.append("unknown package format %s" % _show(pkg.get("format")))
-        return _report(False, None, None, None, 0, None, 0, 0, 0, scope, _Log(), [], problems)
+        return _report(False, None, None, None, 0, None, None, 0, 0, 0, scope, _Log(), [], problems)
     try:
         checkpoint = Checkpoint.of(_object(pkg.get("checkpoint")))
         anchor = Checkpoint.of(pkg["anchor"]) if isinstance(pkg.get("anchor"), dict) else None
     except (ValueError, KeyError, TypeError) as e:
         problems.append("the checkpoints cannot be read: %s" % e)
-        return _report(False, None, None, None, 0, None, 0, 0, 0, scope, _Log(), [], problems)
+        return _report(False, None, None, None, 0, None, None, 0, 0, 0, scope, _Log(), [], problems)
     found = _keys(pkg, key_list, public_key, problems)
     keys, revoked = (None, {}) if found is None else found
     pinned = public_key is not None
@@ -108,7 +109,8 @@ def verify_package(pkg: dict, public_key: Optional[str] = None, witness_keys=(),
     used = [checkpoint.key_id] + ([] if anchor is None else [anchor.key_id]) + list(log.signers)
     revoked_used = _revoked(revoked, used, log, max(1, required), problems)
     return _report(not problems, checkpoint.key_id, _pinned_key_id(public_key),
-                   None if anchor is None else anchor.sequence, checkpoint.sequence, checkpoint.created_at, first,
+                   None if anchor is None else anchor.sequence, checkpoint.sequence, checkpoint.created_at,
+                   checkpoint.profiles, first,
                    result.checked_entries, disclosed, scope, log, revoked_used, problems)
 
 
@@ -280,9 +282,11 @@ def _pinned_key_id(pinned) -> Optional[str]:
         return None
 
 
-def _report(valid, key_id, pinned_key_id, anchor, checkpoint, created_at, first, checked, disclosed, scope, log,
-            revoked, problems) -> PackageReport:
-    return PackageReport(valid, key_id, pinned_key_id, anchor, checkpoint, created_at, first, checked, disclosed,
+def _report(valid, key_id, pinned_key_id, anchor, checkpoint, created_at, profiles, first, checked, disclosed, scope,
+            log, revoked, problems) -> PackageReport:
+    compliance = [{"id": i, "digest": d} for i, d in sorted(profiles or ())]
+    return PackageReport(valid, key_id, pinned_key_id, anchor, checkpoint, created_at, compliance, first, checked,
+                         disclosed,
                          _nullable(scope, "agentId"), _nullable(scope, "principalId"), log.origin, log.size,
                          log.proven, log.receipted, list(log.witnesses), list(revoked), list(problems))
 

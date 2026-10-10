@@ -102,7 +102,7 @@ class EvidenceController {
         if (request.agentId() != null && !caller.canActAs(request.agentId())) {
             throw LedgerException.forbidden("An agent may only record evidence for itself.");
         }
-        EvidenceEntry entry = evidence.record(request.toSubmission());
+        EvidenceEntry entry = evidence.recordReported(List.of(request.toSubmission())).getFirst();
         return ResponseEntity.created(URI.create("/api/v1/evidence/" + entry.id())).body(EvidenceResponse.of(entry));
     }
 
@@ -117,7 +117,7 @@ class EvidenceController {
                 throw LedgerException.forbidden("An agent may only record evidence for itself.");
             }
         }
-        List<EvidenceEntry> entries = evidence.recordAll(items.stream().map(EvidenceRequest::toSubmission).toList());
+        List<EvidenceEntry> entries = evidence.recordReported(items.stream().map(EvidenceRequest::toSubmission).toList());
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(new EvidenceBatchResponse(entries.stream().map(EvidenceResponse::of).toList()));
     }

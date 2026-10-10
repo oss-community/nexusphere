@@ -54,7 +54,7 @@ public final class PackageVerifier {
         List<String> problems = new ArrayList<>();
         if (!FORMAT.equals(text(pkg, "format"))) {
             problems.add("unknown package format " + text(pkg, "format"));
-            return report(false, null, null, null, 0, null, 0, 0, 0, pkg, LogResult.NONE, List.of(), problems);
+            return report(false, null, null, null, 0, null, null, 0, 0, 0, pkg, LogResult.NONE, List.of(), problems);
         }
         SignedCheckpoint checkpoint;
         SignedCheckpoint anchor;
@@ -63,7 +63,7 @@ public final class PackageVerifier {
             anchor = pkg.path("anchor").isObject() ? checkpoint(pkg.path("anchor")) : null;
         } catch (RuntimeException e) {
             problems.add("the checkpoints cannot be read: " + e.getMessage());
-            return report(false, null, null, null, 0, null, 0, 0, 0, pkg, LogResult.NONE, List.of(), problems);
+            return report(false, null, null, null, 0, null, null, 0, 0, 0, pkg, LogResult.NONE, List.of(), problems);
         }
         TrustedKeys trusted = keys(pkg, keyList, pinnedPublicKey, problems);
         Map<String, SigningKeys.PublicKeyInfo> keys = trusted == null ? null : byId(trusted.all());
@@ -122,7 +122,7 @@ public final class PackageVerifier {
                 : revoked(trusted, used, log, Math.max(1, requiredWitnesses), problems);
         return report(problems.isEmpty(), checkpoint.checkpoint().keyId(), pinnedKeyId(pinnedPublicKey),
                 anchor == null ? null : anchor.checkpoint().sequence(), checkpoint.checkpoint().sequence(),
-                checkpoint.checkpoint().createdAt().toString(), first, result.checkedEntries(), disclosed, pkg, log,
+                checkpoint.checkpoint().createdAt().toString(), checkpoint.checkpoint().profiles(), first, result.checkedEntries(), disclosed, pkg, log,
                 revoked, problems);
     }
 
@@ -369,14 +369,23 @@ public final class PackageVerifier {
     }
 
     private static SignedCheckpoint checkpoint(JsonNode node) {
+        List<Checkpoint.Profile> profiles = null;
+        if (node.path("profiles").isArray()) {
+            profiles = new ArrayList<>();
+            for (JsonNode profile : node.path("profiles")) {
+                profiles.add(new Checkpoint.Profile(text(profile, "id"), text(profile, "digest")));
+            }
+        }
         return new SignedCheckpoint(new Checkpoint(node.path("sequence").asLong(), text(node, "headHash"),
-                Instant.parse(text(node, "createdAt")), text(node, "keyId")), text(node, "signature"));
+                Instant.parse(text(node, "createdAt")), text(node, "keyId"), profiles), text(node, "signature"));
     }
 
     private static PackageReport report(boolean valid, String keyId, String pinnedKeyId, Long anchor, long checkpoint,
-                                        String createdAt, long first, long checked, long disclosed, JsonNode pkg,
+                                        String createdAt, List<Checkpoint.Profile> profiles, long first, long checked,
+                                        long disclosed, JsonNode pkg,
                                         LogResult log, List<String> revoked, List<String> problems) {
-        return new PackageReport(valid, keyId, pinnedKeyId, anchor, checkpoint, createdAt, first, checked, disclosed,
+        return new PackageReport(valid, keyId, pinnedKeyId, anchor, checkpoint, createdAt,
+                profiles == null ? List.of() : profiles, first, checked, disclosed,
                 nullable(pkg.path("scope"), "agentId"), nullable(pkg.path("scope"), "principalId"), log.origin(),
                 log.size(), log.proven(), log.receipted(), log.witnesses(), List.copyOf(revoked), List.copyOf(problems));
     }

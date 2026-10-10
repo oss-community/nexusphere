@@ -93,8 +93,8 @@ public class LedgerSigner {
         return Signer.of(previousPrivateKey);
     }
 
-    public SignedCheckpoint sign(long sequence, String headHash, Instant createdAt) {
-        Checkpoint checkpoint = new Checkpoint(sequence, headHash, createdAt, publicKey.keyId());
+    public SignedCheckpoint sign(long sequence, String headHash, Instant createdAt, List<Checkpoint.Profile> profiles) {
+        Checkpoint checkpoint = new Checkpoint(sequence, headHash, createdAt, publicKey.keyId(), profiles);
         return new SignedCheckpoint(checkpoint, SigningKeys.sign(signer, checkpoint.signedBytes()));
     }
 

@@ -37,6 +37,10 @@ ledger:
       timeout: ${LEDGER_SIGNING_VAULT_TIMEOUT:10s}
   checkpoint:
     interval: ${LEDGER_CHECKPOINT_INTERVAL:1m}
+  compliance:
+    profiles: ${LEDGER_COMPLIANCE_PROFILES:baseline}
+    profile-directory: ${LEDGER_COMPLIANCE_PROFILE_DIRECTORY:}
+    region: ${LEDGER_COMPLIANCE_REGION:}
   log:
     origin: ${LEDGER_LOG_ORIGIN:}
     witness-timeout: ${LEDGER_LOG_WITNESS_TIMEOUT:10s}

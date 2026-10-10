@@ -131,6 +131,9 @@ function Result({ verification }: { verification: Verification }) {
     ['Signing key', report.keyId ?? 'none'],
     ['Pinned key', report.pinnedKeyId ?? 'not pinned'],
     ['Checkpoint', `${report.checkpointSequence} at ${report.checkpointCreatedAt ?? 'unknown time'}`],
+    ['Compliance profiles', report.complianceProfiles.length
+      ? report.complianceProfiles.map((p) => `${p.id} (${p.digest.slice(0, 12)})`).join(', ') + ', signed in the checkpoint'
+      : 'none signed'],
     ['Anchor', report.anchorSequence === null ? 'none, the chain starts at entry 1' : String(report.anchorSequence)],
     ['Checked links', `${report.checkedLinks} from sequence ${report.firstSequence}`],
     ['Disclosed entries', String(report.disclosedEntries)],

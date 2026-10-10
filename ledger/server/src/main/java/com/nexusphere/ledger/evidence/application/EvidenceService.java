@@ -1,6 +1,7 @@
 package com.nexusphere.ledger.evidence.application;
 
 import com.nexusphere.ledger.chain.EvidenceEntry;
+import com.nexusphere.ledger.compliance.application.Compliance;
 import com.nexusphere.ledger.evidence.domain.model.EvidenceQuery;
 import com.nexusphere.ledger.evidence.domain.model.EvidenceSubmission;
 import com.nexusphere.ledger.evidence.domain.model.LedgerHead;
@@ -27,9 +28,12 @@ public class EvidenceService {
     private final EvidenceRepository evidence;
     private final EvidenceMetrics metrics;
     private final TransparencyLog log;
+    private final Compliance compliance;
     private final Clock clock;
 
-    EvidenceService(EvidenceRepository evidence, EvidenceMetrics metrics, TransparencyLog log, Clock clock) {
+    EvidenceService(EvidenceRepository evidence, EvidenceMetrics metrics, TransparencyLog log, Compliance compliance,
+                    Clock clock) {
+        this.compliance = compliance;
         this.evidence = evidence;
         this.metrics = metrics;
         this.log = log;
@@ -47,6 +51,15 @@ public class EvidenceService {
 
     @Transactional
     public List<EvidenceEntry> recordAll(List<EvidenceSubmission> submissions) {
+        return recordAll(submissions, Map.of());
+    }
+
+    @Transactional
+    public List<EvidenceEntry> recordReported(List<EvidenceSubmission> submissions) {
+        return recordAll(submissions, compliance.requiredFields());
+    }
+
+    private List<EvidenceEntry> recordAll(List<EvidenceSubmission> submissions, Map<String, List<String>> required) {
         if (submissions == null || submissions.isEmpty() || submissions.size() > MAX_BATCH_SIZE) {
             throw LedgerException.invalid("The batch has invalid fields.",
                     Map.of("items", "must have between 1 and " + MAX_BATCH_SIZE + " entries"));
@@ -54,7 +67,7 @@ public class EvidenceService {
         Instant now = clock.instant();
         for (int i = 0; i < submissions.size(); i++) {
             try {
-                EvidenceValidator.validate(submissions.get(i), now);
+                EvidenceValidator.validate(submissions.get(i), now, required);
             } catch (LedgerException e) {
                 if (submissions.size() == 1) {
                     throw e;

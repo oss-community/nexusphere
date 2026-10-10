@@ -32,6 +32,7 @@ data:
   LEDGER_DATABASE_PORT: "5432"
   LEDGER_DATABASE_DB: ledger
   LEDGER_CHECKPOINT_INTERVAL: 30s
+  LEDGER_COMPLIANCE_PROFILES: baseline
   LEDGER_MCP_SERVERS_DEMO_URL: http://demo-mcp:8091/mcp
   LEDGER_OIDC_ISSUER: http://localhost:8180/realms/nexusphere
   LEDGER_OIDC_AUDIENCE: nexusphere-ledger

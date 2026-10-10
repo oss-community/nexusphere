@@ -1,6 +1,7 @@
 package com.nexusphere.ledger.evidence.application;
 
 import com.nexusphere.ledger.chain.Hashes;
+import com.nexusphere.ledger.compliance.domain.model.ComplianceProfile;
 import com.nexusphere.ledger.evidence.domain.model.Decision;
 import com.nexusphere.ledger.evidence.domain.model.EvidenceSubmission;
 import com.nexusphere.ledger.evidence.domain.model.Outcome;
@@ -9,6 +10,7 @@ import com.nexusphere.ledger.server.web.LedgerException;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.regex.Pattern;
 
@@ -24,6 +26,10 @@ final class EvidenceValidator {
     }
 
     static void validate(EvidenceSubmission s, Instant now) {
+        validate(s, now, Map.of());
+    }
+
+    static void validate(EvidenceSubmission s, Instant now, Map<String, List<String>> required) {
         EvidenceValidator v = new EvidenceValidator();
         v.text("agentId", s.agentId(), true, 200);
         v.text("principalId", s.principalId(), true, 200);
@@ -50,9 +56,31 @@ final class EvidenceValidator {
             v.errors.put("occurredAt", "must not be in the future");
         }
         v.attributes(s.attributes());
+        required.forEach((field, profiles) -> {
+            if (!v.errors.containsKey(field) && missing(s, field)) {
+                v.errors.put(field, "is required by the compliance profile " + String.join(", ", profiles));
+            }
+        });
         if (!v.errors.isEmpty()) {
             throw LedgerException.invalid("The evidence has invalid fields.", v.errors);
         }
+    }
+
+    private static boolean missing(EvidenceSubmission s, String field) {
+        if (field.startsWith(ComplianceProfile.ATTRIBUTE_FIELD)) {
+            return s.attributes() == null
+                    || s.attributes().get(field.substring(ComplianceProfile.ATTRIBUTE_FIELD.length())) == null;
+        }
+        return switch (field) {
+            case "target" -> s.target() == null;
+            case "reason" -> s.reason() == null;
+            case "delegationId" -> s.delegationId() == null;
+            case "inputHash" -> s.inputHash() == null;
+            case "outputHash" -> s.outputHash() == null;
+            case "correlationId" -> s.correlationId() == null;
+            case "occurredAt" -> s.occurredAt() == null;
+            default -> false;
+        };
     }
 
     private void text(String field, String value, boolean required, int maxLength) {

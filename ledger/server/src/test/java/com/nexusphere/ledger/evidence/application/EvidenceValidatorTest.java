@@ -10,6 +10,7 @@ import org.junit.jupiter.api.Test;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -74,5 +75,20 @@ class EvidenceValidatorTest {
                 .containsKey("attributes");
         assertThat(fieldsOf(submission(Decision.ALLOW, Outcome.SUCCEEDED, null, null, Map.of("bad name", "v"))))
                 .containsKey("attributes");
+    }
+
+    @Test
+    @SuppressWarnings("unchecked")
+    void fieldsRequiredByAComplianceProfileMustBePresent() {
+        EvidenceSubmission submission = submission(Decision.ALLOW, Outcome.SUCCEEDED, null, NOW, Map.of("k", "v"));
+        Map<String, List<String>> required = Map.of("inputHash", List.of("eu"), "attributes.model", List.of("eu", "us"),
+                "target", List.of("us"));
+
+        LedgerException e = catchThrowableOfType(LedgerException.class,
+                () -> EvidenceValidator.validate(submission, NOW, required));
+
+        assertThat((Map<String, Object>) e.details().get("fields")).containsOnly(
+                Map.entry("inputHash", "is required by the compliance profile eu"),
+                Map.entry("attributes.model", "is required by the compliance profile eu, us"));
     }
 }

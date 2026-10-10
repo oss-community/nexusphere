@@ -30,12 +30,18 @@ export interface Head {
   hash: string
 }
 
+export interface ComplianceProfileRef {
+  id: string
+  digest: string
+}
+
 export interface Checkpoint {
   format: string
   sequence: number
   headHash: string
   createdAt: string
   keyId: string
+  profiles: ComplianceProfileRef[] | null
   signature: string
 }
 
@@ -150,6 +156,7 @@ export interface PackageReport {
   anchorSequence: number | null
   checkpointSequence: number
   checkpointCreatedAt: string | null
+  complianceProfiles: ComplianceProfileRef[]
   firstSequence: number
   checkedLinks: number
   disclosedEntries: number

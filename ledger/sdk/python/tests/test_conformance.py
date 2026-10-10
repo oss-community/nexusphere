@@ -77,6 +77,25 @@ class EvidenceChainVector(unittest.TestCase):
         self.assertEqual("content does not match its hash", verifier.result().failure)
 
 
+class ComplianceCheckpointVector(unittest.TestCase):
+
+    def test_profile_digest(self):
+        v = vector("compliance-checkpoint.json")
+        self.assertEqual(v["canonicalProfile"], canonical_json(v["profile"]))
+        self.assertEqual(v["profileDigest"], sha256_hex(canonical_json(v["profile"]).encode("utf-8")))
+
+    def test_checkpoint_signs_the_profiles(self):
+        v = vector("compliance-checkpoint.json")
+        node = v["checkpoint"]
+        checkpoint = Checkpoint.of(node)
+        self.assertEqual(node["format"], checkpoint.format)
+        self.assertEqual(node["signedBytes"], checkpoint.signed_bytes().decode("utf-8"))
+        self.assertEqual(node["signature"], checkpoint.sign(LEDGER_KEY).signature)
+        self.assertTrue(checkpoint.verify(LEDGER_KEY.public_key))
+        changed = Checkpoint.of(dict(node, profiles=node["profiles"][:1]))
+        self.assertFalse(changed.verify(LEDGER_KEY.public_key))
+
+
 class MerkleTreeVector(unittest.TestCase):
 
     def setUp(self):

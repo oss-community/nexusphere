@@ -149,7 +149,9 @@ console.log(report.valid, report.disclosedEntries, report.problems);
 Pass `{ witnesses: [verifierKey], requiredWitnesses: 1 }` as the third argument to require witness cosignatures, and
 `keys` with the list from `GET /api/v1/keys` to apply key revocations, as the
 [Ledger README](../../README.md#key-revocation) describes; the command takes it as `--keys keys.json`. The report has
-the same fields as the Java `PackageReport`.
+the same fields as the Java `PackageReport`. `report.complianceProfiles` lists the id and digest of each
+[compliance profile](../../README.md#compliance-profiles) the checkpoint signs, and `client.compliance()` returns the
+active profiles and their combined rules from the ledger.
 
 </p>
 
@@ -251,7 +253,7 @@ npx nexusphere-ledger-verify mandate --issuer http://localhost:8090 --action a2a
 |-------------|--------------------------------------------------------------------------------------------------|
 | `client`    | `LedgerClient` for evidence, batches, decisions, `act`, grants, mandates, packages, keys, proofs |
 | `package`   | `verifyPackage` and `PackageReport`                                                              |
-| `evidence`  | Content and link hashes, `ChainVerifier`, `Checkpoint`                                           |
+| `evidence`  | Content and link hashes, `ChainVerifier`, `Checkpoint` with its compliance profiles              |
 | `merkle`    | RFC 9162 roots, inclusion and consistency proofs, exported as `merkle`                           |
 | `note`      | C2SP signed notes, note keys and `tlog-cosignature/v1` cosignatures                              |
 | `cose`      | `CoseSign1`, SCITT `EvidenceStatement` and RFC 9942 `LogReceipt`                                 |

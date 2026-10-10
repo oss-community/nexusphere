@@ -31,6 +31,7 @@ database, so an auditor, a court or a counterparty can verify what a ledger hand
 * Accept checkpoints signed by other keys of the ledger only when signed key rotations lead to them from the pinned key
 * Apply key revocations from the package or from the key list given with `--keys`: a revoked key counts only where
   witness cosignatures prove that the log checkpoint predates its compromise
+* Report the compliance profiles each checkpoint signs, by id and digest
 * Run the [Conformance Vectors](../conformance/README.md) in `ConformanceVectorsTest`
 
 ## Dependencies

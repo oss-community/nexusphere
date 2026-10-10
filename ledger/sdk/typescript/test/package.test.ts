@@ -1,5 +1,14 @@
 import { describe, expect, it } from "vitest";
-import { KeyRevocation, KeyRotation, PrivateKey, toBase64, verifyPackage, utf8 } from "../src/index.js";
+import {
+  Checkpoint,
+  Json,
+  KeyRevocation,
+  KeyRotation,
+  PrivateKey,
+  toBase64,
+  verifyPackage,
+  utf8,
+} from "../src/index.js";
 import { LEDGER_KEY, buildPackage, entries, keyRecord, witnessNoteKey } from "./support.js";
 
 const PINNED = LEDGER_KEY.publicKey.encoded;
@@ -24,6 +33,20 @@ describe("verifyPackage", async () => {
       logOrigin: "ledger.example",
       logTreeSize: 6,
     });
+  });
+
+  it("reports the compliance profiles the checkpoint signs", async () => {
+    const pkg = await buildPackage(chain, [2]);
+    const node = pkg.checkpoint as Json;
+    const digest = "ab".repeat(32);
+    const signed = await new Checkpoint(node.sequence as number, node.headHash as string, node.createdAt as string,
+      node.keyId as string, null, [{ id: "eu", digest }]).sign(LEDGER_KEY);
+    Object.assign(node, { format: signed.format, signature: signed.signature, profiles: [{ id: "eu", digest }] });
+    const report = await verifyPackage(pkg, PINNED);
+    expect(report.problems).toEqual([]);
+    expect(report.complianceProfiles).toEqual([{ id: "eu", digest }]);
+    (node.profiles as Json[])[0].id = "us";
+    expect((await verifyPackage(pkg, PINNED)).problems).toContain("the signature of checkpoint 6 is not valid");
   });
 
   it("starts at the anchor and keeps to the scope", async () => {

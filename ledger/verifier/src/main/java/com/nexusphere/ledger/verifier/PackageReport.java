@@ -1,5 +1,7 @@
 package com.nexusphere.ledger.verifier;
 
+import com.nexusphere.ledger.chain.Checkpoint;
+
 import java.util.List;
 
 public record PackageReport(
@@ -9,6 +11,7 @@ public record PackageReport(
         Long anchorSequence,
         long checkpointSequence,
         String checkpointCreatedAt,
+        List<Checkpoint.Profile> complianceProfiles,
         long firstSequence,
         long checkedLinks,
         long disclosedEntries,

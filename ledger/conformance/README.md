@@ -32,18 +32,19 @@ use them for real evidence.
 
 ## Vectors
 
-| File                       | Contents                                                                                                     |
-|----------------------------|--------------------------------------------------------------------------------------------------------------|
-| `keys.json`                | Seeds, PKCS#8 and X.509 keys, the key ID and the C2SP verifier keys of the log and the witness               |
-| `canonical-json.json`      | An object and its canonical JSON with sorted keys, no whitespace and escaped text, and its SHA-256           |
-| `evidence-chain.json`      | Three entries with canonical content, content hash and link hash, and a signed checkpoint of the head        |
-| `merkle-tree.json`         | RFC 9162 roots, inclusion proofs and consistency proofs for every size up to 8                               |
-| `signed-note.json`         | The C2SP signed-note log checkpoint over the three entries and its `tlog-cosignature/v1` cosignature         |
-| `key-history.json`         | A rotation from test key 1 to test key 2, and the revocation of key 1 signed by key 2                        |
-| `scitt.json`               | COSE_Sign1 SCITT statements and RFC 9942 receipts for the three entries, in hex                              |
-| `mandate.json`             | An SD-JWT VC mandate, the same mandate presented with only the grant disclosed, and its disclosed claims     |
-| `mandate-key-binding.json` | A mandate bound to RFC 8032 test key 3 with `cnf`, its KB-JWT presentation, nonce and `sd_hash`              |
-| `http-signature.json`      | An RFC 9421 signature of a POST with its `Content-Digest`, `Signature-Input`, `Signature` and signature base |
+| File                         | Contents                                                                                                          |
+|------------------------------|-------------------------------------------------------------------------------------------------------------------|
+| `keys.json`                  | Seeds, PKCS#8 and X.509 keys, the key ID and the C2SP verifier keys of the log and the witness                    |
+| `canonical-json.json`        | An object and its canonical JSON with sorted keys, no whitespace and escaped text, and its SHA-256                |
+| `evidence-chain.json`        | Three entries with canonical content, content hash and link hash, and a signed checkpoint of the head             |
+| `merkle-tree.json`           | RFC 9162 roots, inclusion proofs and consistency proofs for every size up to 8                                    |
+| `signed-note.json`           | The C2SP signed-note log checkpoint over the three entries and its `tlog-cosignature/v1` cosignature              |
+| `key-history.json`           | A rotation from test key 1 to test key 2, and the revocation of key 1 signed by key 2                             |
+| `scitt.json`                 | COSE_Sign1 SCITT statements and RFC 9942 receipts for the three entries, in hex                                   |
+| `mandate.json`               | An SD-JWT VC mandate, the same mandate presented with only the grant disclosed, and its disclosed claims          |
+| `mandate-key-binding.json`   | A mandate bound to RFC 8032 test key 3 with `cnf`, its KB-JWT presentation, nonce and `sd_hash`                   |
+| `http-signature.json`        | An RFC 9421 signature of a POST with its `Content-Digest`, `Signature-Input`, `Signature` and signature base      |
+| `compliance-checkpoint.json` | A compliance profile with its canonical JSON and digest, and a `checkpoint/v2` that signs it with another profile |
 
 <p style="text-align: justify;">
 

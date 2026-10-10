@@ -194,6 +194,9 @@ class LedgerClient:
     def witness_key(self) -> str:
         return self._request("GET", "/public/v1/witness/key", raw=True).decode("utf-8").strip()
 
+    def compliance(self) -> dict:
+        return self._request("GET", "/public/v1/compliance")
+
     def health(self) -> dict:
         return self._get("/actuator/health")
 

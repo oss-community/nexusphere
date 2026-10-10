@@ -1,0 +1,16 @@
+{
+  "id": "baseline",
+  "version": 1,
+  "name": "Baseline",
+  "description": "No jurisdiction. Keeps every record, places no limit on region, fields or timestamp authorities, and offers the dispute report.",
+  "retention": [],
+  "erasure": {
+    "onRequest": false
+  },
+  "residency": [],
+  "requiredFields": [],
+  "timestampAuthorities": [],
+  "reports": [
+    "dispute"
+  ]
+}

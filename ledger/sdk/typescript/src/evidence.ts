@@ -4,6 +4,12 @@ import { formatInstant } from "./timestamps.js";
 
 export const FORMAT = "nexusphere-ledger/evidence/v1";
 export const CHECKPOINT_FORMAT = "nexusphere-ledger/checkpoint/v1";
+export const CHECKPOINT_FORMAT_WITH_PROFILES = "nexusphere-ledger/checkpoint/v2";
+
+export interface ComplianceProfileRef {
+  id: string;
+  digest: string;
+}
 export const GENESIS = "0".repeat(64);
 
 export const CONTENT_FIELDS = [
@@ -173,28 +179,46 @@ export class Checkpoint {
     readonly createdAt: string,
     readonly keyId: string,
     readonly signature: string | null = null,
+    readonly profiles: ComplianceProfileRef[] | null = null,
   ) {
     this.createdAt = formatInstant(createdAt);
+    this.profiles = profiles === null ? null
+      : [...profiles].sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
   }
 
   static of(node: Json): Checkpoint {
+    let profiles: ComplianceProfileRef[] | null = null;
+    if (node.profiles !== undefined && node.profiles !== null) {
+      if (!Array.isArray(node.profiles)) {
+        throw new Error("profiles must be a list");
+      }
+      profiles = node.profiles.map((p) => ({ id: required(p, "id"), digest: required(p, "digest") }));
+    }
     return new Checkpoint(long(node.sequence), required(node, "headHash"), required(node, "createdAt"),
-      required(node, "keyId"), typeof node.signature === "string" ? node.signature : null);
+      required(node, "keyId"), typeof node.signature === "string" ? node.signature : null, profiles);
+  }
+
+  get format(): string {
+    return this.profiles === null ? CHECKPOINT_FORMAT : CHECKPOINT_FORMAT_WITH_PROFILES;
   }
 
   signedBytes(): Uint8Array {
-    return canonicalBytes({
-      format: CHECKPOINT_FORMAT,
+    const content: Json = {
+      format: this.format,
       sequence: this.sequence,
       headHash: this.headHash,
       createdAt: this.createdAt,
       keyId: this.keyId,
-    });
+    };
+    if (this.profiles !== null) {
+      content.profiles = this.profiles.map((p) => ({ id: p.id, digest: p.digest }));
+    }
+    return canonicalBytes(content);
   }
 
   async sign(key: PrivateKey): Promise<Checkpoint> {
     return new Checkpoint(this.sequence, this.headHash, this.createdAt, this.keyId,
-      await key.signBase64(this.signedBytes()));
+      await key.signBase64(this.signedBytes()), this.profiles);
   }
 
   async verify(key: PublicKey): Promise<boolean> {
