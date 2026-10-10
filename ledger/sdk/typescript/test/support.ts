@@ -56,6 +56,12 @@ export async function timestampedPackage(): Promise<Json> {
   return pkg;
 }
 
+export async function rekorPackage(): Promise<Json> {
+  const pkg = await timestampedPackage();
+  (pkg.checkpoint as Json).rekor = vector("rekor.json").entry;
+  return pkg;
+}
+
 export function witnessNoteKey(): Promise<NoteKey> {
   return NoteKey.of(WITNESS, COSIGNATURE, WITNESS_KEY.publicKey);
 }

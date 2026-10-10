@@ -177,6 +177,23 @@ const report = await verifyPackage(pkg, publicKey, { timestampCertificates, requ
 console.log(report.timestampedAt, report.timestampAuthority);
 ```
 
+<p style="text-align: justify;">
+
+A checkpoint may also carry a Rekor v2 `hashedrekord` entry, as the [Ledger README](../../README.md#rekor-anchoring)
+describes. Pass `rekorKeys` with the Rekor log's C2SP verifier keys to pin the log, and `requireRekor: true` to reject a
+checkpoint without an entry; the command takes them as `--rekor-key <verifier key>` and `--require-rekor`. The report
+gives `rekorLogIndex` and `rekorOrigin`, and `verifyRekorEntry(entry, signedBytes, ledgerKey, rekorKeys)` checks an
+entry on its own.
+
+</p>
+
+```typescript
+import { verifyPackage } from "@nexusphere/ledger";
+
+const report = await verifyPackage(pkg, publicKey, { rekorKeys: [rekorVerifierKey], requireRekor: true });
+console.log(report.rekorLogIndex, report.rekorOrigin);
+```
+
 ## Verify a Statement and Receipt
 
 ```typescript
@@ -269,7 +286,14 @@ Step 2. Verify a package whose checkpoint must carry a timestamp from the pinned
 npx nexusphere-ledger-verify --timestamp-certificates tsa-chain.pem --require-timestamp package.json
 ```
 
-Step 3. Verify a statement with its receipt, and a mandate for an action:
+Step 3. Verify a package whose checkpoint must be anchored in the pinned Rekor log; the output must show
+`Rekor       : entry ... (pinned)`:
+
+```shell
+npx nexusphere-ledger-verify --rekor-key "{rekorVerifierKey}" --require-rekor package.json
+```
+
+Step 4. Verify a statement with its receipt, and a mandate for an action:
 
 ```shell
 npx nexusphere-ledger-verify statement --public-key "{publicKey}" --receipt receipt.cose statement.cose
@@ -284,6 +308,7 @@ npx nexusphere-ledger-verify mandate --issuer http://localhost:8090 --action a2a
 | `package`   | `verifyPackage` and `PackageReport`                                                              |
 | `evidence`  | Content and link hashes, commitments, `ChainVerifier`, `Checkpoint` with its compliance profiles |
 | `timestamp` | RFC 3161 tokens, X.509 certificates, `readCertificates` and `verifyTimestamp`                    |
+| `rekor`     | Rekor v2 `hashedrekord` entries: `verifyRekorEntry` and `rekorRequest`                           |
 | `merkle`    | RFC 9162 roots, inclusion and consistency proofs, exported as `merkle`                           |
 | `note`      | C2SP signed notes, note keys and `tlog-cosignature/v1` cosignatures                              |
 | `cose`      | `CoseSign1`, SCITT `EvidenceStatement` and RFC 9942 `LogReceipt`                                 |

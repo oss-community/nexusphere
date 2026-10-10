@@ -63,9 +63,10 @@ Step 2. Open `ledger/verifier-web/dist/index.html` in a browser, from disk or an
 Step 3. Choose or drop `package.json`, paste the public key, and add witness keys if the log must carry their
 cosignatures. To apply key revocations, also choose the key list saved from `GET /api/v1/keys`. When the ledger
 [timestamps its checkpoints](../README.md#checkpoint-timestamps), choose the authority's `tsa-chain.pem` and tick
-Require a timestamp.
+Require a timestamp. When it [anchors them in Rekor](../README.md#rekor-anchoring), paste the log's verifier key in
+Rekor log keys and tick Require a Rekor entry.
 
-Step 4. Press Verify; the page must show `VALID` with the signing key, the checkpoint, its timestamp, the log, the
+Step 4. Press Verify; the page must show `VALID` with the signing key, the checkpoint, its timestamp and Rekor entry, the log, the
 proofs and the disclosed entries, with `erased` in place of the principal and target of an entry whose personal fields were erased.
 Change one character of an entry in the file and verify again; the page must show `INVALID` and name the entry.
 
@@ -89,6 +90,7 @@ Crypto: Chrome or Edge 137, Firefox 129, Safari 17 or later.
 | Witness cosignatures on the log checkpoint                       | Witnesses                     |
 | Revoked keys, valid only where witnesses predate the compromise  | Revoked keys                  |
 | The RFC 3161 timestamp of the checkpoint and the authority chain | Timestamp                     |
+| The Rekor entry of the checkpoint and its inclusion proof        | Rekor                         |
 
 <p style="text-align: justify;">
 

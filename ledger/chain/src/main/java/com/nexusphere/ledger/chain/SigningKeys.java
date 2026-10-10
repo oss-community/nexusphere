@@ -8,6 +8,7 @@ import java.security.KeyPairGenerator;
 import java.security.PrivateKey;
 import java.security.PublicKey;
 import java.security.Signature;
+import java.security.spec.EdDSAParameterSpec;
 import java.security.spec.PKCS8EncodedKeySpec;
 import java.security.spec.X509EncodedKeySpec;
 import java.util.Base64;
@@ -84,6 +85,32 @@ public final class SigningKeys {
             return signature.sign();
         } catch (GeneralSecurityException e) {
             throw new IllegalStateException("Signing failed", e);
+        }
+    }
+
+    public static Signer prehashed(PrivateKey key) {
+        return data -> {
+            try {
+                Signature signature = Signature.getInstance(ALGORITHM);
+                signature.setParameter(new EdDSAParameterSpec(true));
+                signature.initSign(key);
+                signature.update(data);
+                return signature.sign();
+            } catch (GeneralSecurityException e) {
+                throw new IllegalStateException("Signing failed", e);
+            }
+        };
+    }
+
+    public static boolean verifyPrehashed(PublicKey key, byte[] data, byte[] signatureBytes) {
+        try {
+            Signature signature = Signature.getInstance(ALGORITHM);
+            signature.setParameter(new EdDSAParameterSpec(true));
+            signature.initVerify(key);
+            signature.update(data);
+            return signature.verify(signatureBytes);
+        } catch (GeneralSecurityException | IllegalArgumentException e) {
+            return false;
         }
     }
 

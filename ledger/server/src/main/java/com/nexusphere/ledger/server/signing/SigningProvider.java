@@ -13,6 +13,10 @@ public interface SigningProvider {
 
     Signer signer();
 
+    default Optional<Signer> prehashSigner() {
+        return Optional.empty();
+    }
+
     default Optional<Signer> signerFor(SigningKeys.PublicKeyInfo previous) {
         return Optional.empty();
     }

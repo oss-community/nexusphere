@@ -14,6 +14,10 @@ public interface CheckpointRepository {
 
     List<SignedCheckpoint> withoutTimestamp(int limit);
 
+    void appendRekor(long sequence, long logIndex, String entry, Instant recordedAt);
+
+    List<SignedCheckpoint> withoutRekor(int limit);
+
     Optional<SignedCheckpoint> latest();
 
     Optional<SignedCheckpoint> findBySequence(long sequence);

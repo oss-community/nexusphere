@@ -4,7 +4,16 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import { INVALID, USAGE, VALID, run } from "../src/cli.js";
 import { PrivateKey, fromHex, presentBound } from "../src/index.js";
-import { ISSUER, LEDGER_KEY, buildPackage, entries, timestampedPackage, vector, witnessNoteKey } from "./support.js";
+import {
+  ISSUER,
+  LEDGER_KEY,
+  buildPackage,
+  entries,
+  rekorPackage,
+  timestampedPackage,
+  vector,
+  witnessNoteKey,
+} from "./support.js";
 
 async function cli(...args: string[]) {
   let out = "";
@@ -58,6 +67,32 @@ describe("nexusphere-ledger-verify", () => {
     const garbage = join(directory, "garbage.pem");
     writeFileSync(garbage, "not a certificate");
     expect((await cli("--timestamp-certificates", garbage, path)).code).toBe(USAGE);
+  });
+
+  it("verifies the Rekor entry of a package", async () => {
+    const v = vector("rekor.json");
+    const path = join(directory, "rekor.json");
+    writeFileSync(path, JSON.stringify(await rekorPackage()));
+    const key = LEDGER_KEY.publicKey.encoded;
+    const pinned = await cli("--public-key", key, "--rekor-key", v.rekorVerifierKey, "--require-rekor",
+      "--witnesses-required", "0", path);
+    expect(pinned.code).toBe(VALID);
+    expect(pinned.out).toContain(`  Rekor       : entry 1 in rekor.local (pinned)\n  Anchor      :`);
+    expect(pinned.out.indexOf("  Timestamp   :")).toBeLessThan(pinned.out.indexOf("  Rekor       :"));
+    const unpinned = await cli("--public-key", key, "--witnesses-required", "0", path);
+    expect(unpinned.out).toContain("  Rekor       : entry 1 in rekor.local (pass --rekor-key to pin the Rekor log)\n");
+    const json = await cli("--json", "--public-key", key, "--rekor-key", (await witnessNoteKey()).vkey,
+      "--witnesses-required", "0", path);
+    expect(json.code).toBe(INVALID);
+    expect(JSON.parse(json.out).problems).toEqual([
+      "the Rekor entry of checkpoint 3: the log checkpoint is not signed by a pinned Rekor key",
+    ]);
+    const missing = join(directory, "unanchored.json");
+    writeFileSync(missing, JSON.stringify(await buildPackage(await entries(2), [1])));
+    const required = await cli("--require-rekor", missing);
+    expect(required.code).toBe(INVALID);
+    expect(required.out).toContain("checkpoint 2 is not anchored in Rekor");
+    expect((await cli("--rekor-key", "not a key", path)).code).toBe(USAGE);
   });
 
   it("verifies a statement and its receipt", async () => {

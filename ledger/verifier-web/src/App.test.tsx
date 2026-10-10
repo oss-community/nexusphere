@@ -8,6 +8,7 @@ import {
   entries,
   erase,
   keyRecord,
+  rekorPackage,
   timestampedPackage,
   vector,
   witnessNoteKey,
@@ -119,6 +120,17 @@ describe('App', async () => {
     await user.click(screen.getByRole('button', { name: 'Verify' }))
     expect(await screen.findByTestId('verdict')).toHaveTextContent('INVALID')
     expect(screen.getByText('checkpoint 4 has no timestamp')).toBeInTheDocument()
+  })
+
+  it('checks the Rekor entry of the checkpoint against the pinned log key', async () => {
+    const rekor = vector('rekor.json')
+    const user = await upload(await rekorPackage())
+    await user.type(screen.getByLabelText('Ledger public key'), PINNED)
+    await user.type(screen.getByLabelText('Rekor log keys, one per line'), rekor.rekorVerifierKey)
+    await user.click(screen.getByLabelText('Require a Rekor entry'))
+    await user.click(screen.getByRole('button', { name: 'Verify' }))
+    expect(await screen.findByTestId('verdict')).toHaveTextContent('VALID')
+    expect(screen.getByText(`entry ${rekor.entry.logIndex} in rekor.local (pinned)`)).toBeInTheDocument()
   })
 
   it('reports files that are not packages', async () => {

@@ -155,6 +155,9 @@ fields were [erased](../../README.md#erasure) still verifies from its commitment
 and the retention pass. `timestamp_certificates`, a list of certificates or PEM text, pins the authority of the
 [checkpoint timestamp](../../README.md#checkpoint-timestamps), `require_timestamp=True` refuses a checkpoint without
 one, and `report.timestamped_at` and `report.timestamp_authority` say when and by whom it was timestamped.
+`rekor_keys`, a list of verifier keys, pins the log of the [Rekor entry](../../README.md#rekor-anchoring),
+`require_rekor=True` refuses a checkpoint without one, and `report.rekor_log_index` and `report.rekor_origin` say
+where it was anchored.
 
 </p>
 
@@ -271,6 +274,13 @@ the authority's chain; the output must show `Timestamp   : ... (pinned)` and `Re
 nexusphere-ledger-verify --timestamp-certificates tsa-chain.pem --require-timestamp package.json
 ```
 
+Step 6. Verify a package from a ledger with [Rekor anchoring](../../README.md#rekor-anchoring), pinned to the log's
+verifier key; the output must show `Rekor       : entry ... (pinned)` and `Result: VALID`:
+
+```shell
+nexusphere-ledger-verify --rekor-key "$REKOR_KEY" --require-rekor package.json
+```
+
 ## Reference
 
 | Module      | Contents                                                                                         |
@@ -278,6 +288,7 @@ nexusphere-ledger-verify --timestamp-certificates tsa-chain.pem --require-timest
 | `client`    | `LedgerClient` for evidence, batches, decisions, `act`, grants, mandates, packages, keys, proofs |
 | `package`   | `verify_package` and `PackageReport`                                                             |
 | `timestamp` | RFC 3161 `TimestampToken`, its verification against a pinned chain, and `read_certificates`      |
+| `rekor`     | Rekor v2 `hashedrekord` requests and `verify_rekor_entry` against a pinned log                   |
 | `evidence`  | Content and link hashes, commitments, `ChainVerifier`, `Checkpoint` with its compliance profiles |
 | `merkle`    | RFC 9162 roots, inclusion and consistency proofs                                                 |
 | `note`      | C2SP signed notes, note keys and `tlog-cosignature/v1` cosignatures                              |

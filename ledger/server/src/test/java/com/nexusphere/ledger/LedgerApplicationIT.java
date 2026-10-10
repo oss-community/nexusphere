@@ -74,6 +74,8 @@ class LedgerApplicationIT {
                 .hasMessageContaining("append-only");
         assertThatThrownBy(() -> jdbc.update("truncate ledger.checkpoint_timestamp"))
                 .hasMessageContaining("append-only");
+        assertThatThrownBy(() -> jdbc.update("truncate ledger.checkpoint_rekor"))
+                .hasMessageContaining("append-only");
     }
 
     @Test

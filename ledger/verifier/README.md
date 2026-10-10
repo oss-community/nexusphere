@@ -34,6 +34,8 @@ database, so an auditor, a court or a counterparty can verify what a ledger hand
 * Report the compliance profiles each checkpoint signs, by id and digest
 * Check the RFC 3161 timestamp of the checkpoint, pin the authority's chain with `--timestamp-certificates` and
   refuse a checkpoint without one with `--require-timestamp`
+* Check the Rekor entry of the checkpoint and its inclusion proof, pin the log with `--rekor-key` and refuse a
+  checkpoint without an entry with `--require-rekor`
 * Check entries in evidence format v2 from their personal values and salts, or from their commitments once erased
 * Run the [Conformance Vectors](../conformance/README.md) in `ConformanceVectorsTest`
 

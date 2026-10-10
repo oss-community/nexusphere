@@ -48,6 +48,7 @@ export interface Checkpoint {
   signature: string
   timestamp: string | null
   timestampedAt: string | null
+  rekorLogIndex: number | null
 }
 
 export interface SigningKey {
@@ -169,6 +170,8 @@ export interface PackageReport {
   principalId: string | null
   timestampedAt?: string | null
   timestampAuthority?: string | null
+  rekorLogIndex?: number | null
+  rekorOrigin?: string | null
   problems: string[]
 }
 

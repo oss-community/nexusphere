@@ -1,16 +1,28 @@
 import { describe, expect, it } from "vitest";
 import {
   Checkpoint,
+  ED25519,
   Json,
   KeyRevocation,
   KeyRotation,
+  NoteKey,
   PrivateKey,
   readCertificates,
   toBase64,
   verifyPackage,
   utf8,
 } from "../src/index.js";
-import { LEDGER_KEY, buildPackage, entries, erase, keyRecord, timestampedPackage, vector, witnessNoteKey } from "./support.js";
+import {
+  LEDGER_KEY,
+  buildPackage,
+  entries,
+  erase,
+  keyRecord,
+  rekorPackage,
+  timestampedPackage,
+  vector,
+  witnessNoteKey,
+} from "./support.js";
 
 const PINNED = LEDGER_KEY.publicKey.encoded;
 
@@ -154,9 +166,40 @@ describe("verifyPackage", async () => {
       requiredWitnesses: 0 });
     expect(report.problems).toEqual([]);
     expect(report).toMatchObject({ timestampedAt: v.genTime, timestampAuthority: v.authority });
-    expect(Object.keys(report).slice(-3)).toEqual(["timestampedAt", "timestampAuthority", "problems"]);
+    expect(Object.keys(report).slice(-5, -2)).toEqual(["timestampedAt", "timestampAuthority", "rekorLogIndex"]);
     expect((await verifyPackage(pkg, PINNED, { timestampCertificates: chain.slice(2) })).problems).toContain(
       "the timestamp of checkpoint 3: the timestamp authority is not trusted",
+    );
+  });
+
+  it("requires a Rekor entry when asked", async () => {
+    const report = await verifyPackage(await buildPackage(chain, [1]), PINNED, { requireRekor: true });
+    expect(report.valid).toBe(false);
+    expect(report.problems).toContain("checkpoint 6 is not anchored in Rekor");
+    expect(report).toMatchObject({ rekorLogIndex: null, rekorOrigin: null });
+  });
+
+  it("reports the Rekor entry of a checkpoint", async () => {
+    const v = vector("rekor.json");
+    const pkg = await rekorPackage();
+    const report = await verifyPackage(pkg, PINNED, { rekorKeys: [v.rekorVerifierKey], requireRekor: true,
+      requiredWitnesses: 0 });
+    expect(report.problems).toEqual([]);
+    expect(report).toMatchObject({ valid: true, rekorLogIndex: Number(v.entry.logIndex), rekorOrigin: "rekor.local" });
+    expect(Object.keys(report).slice(-5)).toEqual([
+      "timestampedAt", "timestampAuthority", "rekorLogIndex", "rekorOrigin", "problems",
+    ]);
+    expect((await verifyPackage(pkg, PINNED, { requiredWitnesses: 0 })).rekorOrigin).toBe("rekor.local");
+    const other = await NoteKey.of("rekor.local", ED25519, LEDGER_KEY.publicKey);
+    const unpinned = await verifyPackage(pkg, PINNED, { rekorKeys: [other], requiredWitnesses: 0 });
+    expect(unpinned.problems).toEqual([
+      "the Rekor entry of checkpoint 3: the log checkpoint is not signed by a pinned Rekor key",
+    ]);
+    expect(unpinned.rekorLogIndex).toBeNull();
+    const elsewhere = await rekorPackage();
+    (elsewhere.checkpoint as Json).rekor = { ...v.entry, logIndex: "0" };
+    expect((await verifyPackage(elsewhere, PINNED, { requiredWitnesses: 0 })).problems).toContain(
+      "the Rekor entry of checkpoint 3: the inclusion proof is for another entry",
     );
   });
 

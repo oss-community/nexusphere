@@ -144,6 +144,16 @@ class PackageVerification(unittest.TestCase):
         pkg["checkpoint"]["timestamp"] = "AAAA"
         self.assertIn("the timestamp of checkpoint 6 cannot be read", verify_package(pkg, PINNED).problems)
 
+    def test_a_required_rekor_entry_must_be_present(self):
+        report = verify_package(package(self.chain, {1}), PINNED, require_rekor=True)
+        self.assertEqual(["checkpoint 6 is not anchored in Rekor"], report.problems)
+
+    def test_a_rekor_entry_for_another_checkpoint(self):
+        pkg = package(self.chain, {1})
+        pkg["checkpoint"]["rekor"] = vector("rekor.json")["entry"]
+        self.assertIn("the Rekor entry of checkpoint 6: the entry is for different data",
+                      verify_package(pkg, PINNED).problems)
+
     def test_package_without_log(self):
         report = verify_package(package(self.chain, {1}, log=False), PINNED)
         self.assertTrue(report.valid, report.problems)

@@ -55,6 +55,14 @@ class Cli(unittest.TestCase):
             missing = os.path.join(directory, "missing.pem")
             self.assertEqual(USAGE, self.run_cli("--timestamp-certificates", missing, path)[0])
 
+    def test_rekor_flags(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = self.write(directory, "package.json", json.dumps(package(entries(3), {1})))
+            code, out, _ = self.run_cli("--require-rekor", path)
+            self.assertEqual(INVALID, code)
+            self.assertIn("checkpoint 3 is not anchored in Rekor", out)
+            self.assertEqual(USAGE, self.run_cli("--rekor-key", "not a key", path)[0])
+
     def test_statement(self):
         item = vector("scitt.json")["items"][0]
         with tempfile.TemporaryDirectory() as directory:

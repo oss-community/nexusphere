@@ -25,5 +25,7 @@ public record PackageReport(
         List<String> revokedKeys,
         String timestampedAt,
         String timestampAuthority,
+        Long rekorLogIndex,
+        String rekorOrigin,
         List<String> problems) {
 }

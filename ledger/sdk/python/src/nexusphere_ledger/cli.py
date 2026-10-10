@@ -63,6 +63,8 @@ def _package(args, out, err) -> int:
     parser.add_argument("--witnesses-required", type=int)
     parser.add_argument("--timestamp-certificates")
     parser.add_argument("--require-timestamp", action="store_true")
+    parser.add_argument("--rekor-key", action="append", default=[])
+    parser.add_argument("--require-rekor", action="store_true")
     parser.add_argument("--json", action="store_true")
     parser.add_argument("package")
     options = _parse(parser, args, err)
@@ -88,18 +90,19 @@ def _package(args, out, err) -> int:
         return USAGE
     try:
         report = verify_package(pkg, public_key, options.witness, options.witnesses_required, key_list,
-                                certificates, options.require_timestamp)
+                                certificates, options.require_timestamp, options.rekor_key,
+                                options.require_rekor)
     except ValueError as e:
         err.write("Invalid argument: %s\n" % e)
         return USAGE
     if options.json:
         out.write(json.dumps(report.to_dict(), indent=2) + "\n")
     else:
-        _print_package(report, bool(certificates), out)
+        _print_package(report, bool(certificates), bool(options.rekor_key), out)
     return VALID if report.valid else INVALID
 
 
-def _print_package(r, timestamp_pinned, out):
+def _print_package(r, timestamp_pinned, rekor_pinned, out):
     out.write("Nexusphere Ledger evidence package\n")
     if r.pinned_key_id is None:
         note = " (taken from the package; pass --public-key to pin the ledger's key)"
@@ -115,6 +118,9 @@ def _print_package(r, timestamp_pinned, out):
     if r.timestamped_at is not None:
         out.write("  Timestamp   : %s by %s%s\n" % (r.timestamped_at, r.timestamp_authority, " (pinned)"
                   if timestamp_pinned else " (pass --timestamp-certificates to pin the timestamp authority)"))
+    if r.rekor_log_index is not None:
+        out.write("  Rekor       : entry %d in %s%s\n" % (r.rekor_log_index, r.rekor_origin, " (pinned)"
+                  if rekor_pinned else " (pass --rekor-key to pin the Rekor log)"))
     out.write("  Anchor      : %s\n" % ("genesis" if r.anchor_sequence is None
                                        else "checkpoint %d" % r.anchor_sequence))
     out.write("  Chain       : %d links from sequence %d\n" % (r.checked_links, r.first_sequence))
