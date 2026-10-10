@@ -189,6 +189,49 @@ describe("nexusphere-ledger-verify", () => {
     expect(missing.err).toContain("Cannot read " + join(directory, "missing.json"));
   });
 
+  it("verifies an index proof", async () => {
+    const v = vector("index-proof.json");
+    const present = join(directory, "index-present.json");
+    const absent = join(directory, "index-absent.json");
+    const packagePath = join(directory, "index-package.json");
+    writeFileSync(present, JSON.stringify(v.proofs[0]));
+    writeFileSync(absent, JSON.stringify(v.proofs[2]));
+    const index = v.proofs[0].index;
+    writeFileSync(packagePath, JSON.stringify({ checkpoint: { sequence: 3, headHash: index.headHash } }));
+    const key = LEDGER_KEY.publicKey.encoded;
+    const valid = await cli("index", "--public-key", key, "--package", packagePath, present);
+    expect(valid.code).toBe(VALID);
+    expect(valid.out).toBe(
+      "Nexusphere Ledger index proof\n" +
+        "  Term        : agent invoice-agent\n" +
+        `  Index       : checkpoint 3, head ${index.headHash}\n` +
+        `  Signed by   : ${LEDGER_KEY.keyId}\n` +
+        "  Finding     : 2 entries, sequences 1 to 2\n" +
+        "  Package     : checkpoint 3\n" +
+        "Result: VALID\n",
+    );
+    const unpinned = await cli("index", absent);
+    expect(unpinned.code).toBe(VALID);
+    expect(unpinned.out).toContain(
+      `  Signed by   : ${LEDGER_KEY.keyId} (taken from the proof; pass --public-key to pin the ledger's key)\n` +
+        "  Finding     : no entry up to sequence 3\n" +
+        "Result: VALID\n",
+    );
+    const json = await cli("index", "--json", "--public-key", key, absent);
+    expect(Object.keys(JSON.parse(json.out))).toEqual([
+      "valid", "term", "present", "count", "firstSequence", "lastSequence", "sequence", "headHash", "keyId", "problems",
+    ]);
+    expect(JSON.parse(json.out)).toMatchObject({ valid: true, present: false, count: null, sequence: 3 });
+    writeFileSync(present, JSON.stringify({ ...v.proofs[0], leaf: { ...v.proofs[0].leaf, count: 1 } }));
+    const invalid = await cli("index", "--public-key", key, present);
+    expect(invalid.code).toBe(INVALID);
+    expect(invalid.out).toContain("Result: INVALID\n  - the proof does not lead to the signed root\n");
+    expect((await cli("index")).code).toBe(USAGE);
+    const missing = await cli("index", "--package", join(directory, "missing.json"), absent);
+    expect(missing.code).toBe(USAGE);
+    expect(missing.err).toContain("Cannot read " + join(directory, "missing.json"));
+  });
+
   it("verifies a dispute package", async () => {
     const pkg = await buildPackage(await entries(4), [2], { witness: true });
     const files = {

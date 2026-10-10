@@ -1,0 +1,115 @@
+{
+  "signedBytes" : "{\"createdAt\":\"2026-10-01T08:02:00.123456Z\",\"format\":\"nexusphere-ledger/index/v1\",\"headHash\":\"bab1fd8734a3a6bb7bb7431c5b8f35e26640fc32106ab2054f8c27416e4c074b\",\"keyId\":\"06e3fd8fda29bb60\",\"root\":\"1422786a8dc695298a178cc5562ec93c0f47c2e27836662a897ad4e12513bebf\",\"sequence\":3}",
+  "proofs" : [ {
+    "format" : "nexusphere-ledger/index-proof/v1",
+    "term" : {
+      "type" : "agent",
+      "agentId" : "invoice-agent"
+    },
+    "key" : "f0b94589182744740c2b43de46707c95fce3aeb22750a89cc5f38380f858046d",
+    "leaf" : {
+      "count" : 2,
+      "firstSequence" : 1,
+      "lastSequence" : 2
+    },
+    "siblings" : [ "4907e2e1db4d30b6477eeb05bb881cf47767e6fe6367c37a644fb83376a1836b", "8f4f8032866ab675aee632ec1dd5b308c0c7c3038d355020f82c878d6b744323", "7168d7ba7a44437684f7f6cf4fcfe002358d7a7d41beb22ae5704f11441635ed" ],
+    "otherLeaf" : null,
+    "index" : {
+      "format" : "nexusphere-ledger/index/v1",
+      "sequence" : 3,
+      "headHash" : "bab1fd8734a3a6bb7bb7431c5b8f35e26640fc32106ab2054f8c27416e4c074b",
+      "root" : "1422786a8dc695298a178cc5562ec93c0f47c2e27836662a897ad4e12513bebf",
+      "createdAt" : "2026-10-01T08:02:00.123456Z",
+      "keyId" : "06e3fd8fda29bb60",
+      "signature" : "GgVnyVGohrl4+SA2PgHJQO2hyd81BQuAwYpVJrltf/MRsTtv5hLGvUaPLob9GgIARtlTtclD33T5Lf05bSMTDA=="
+    },
+    "keys" : [ {
+      "keyId" : "06e3fd8fda29bb60",
+      "algorithm" : "Ed25519",
+      "publicKey" : "MCowBQYDK2VwAyEA11qYAYKxCrfVS/7TyWQHOg7hcvPapiMlrwIaaPcHURo="
+    } ]
+  }, {
+    "format" : "nexusphere-ledger/index-proof/v1",
+    "term" : {
+      "type" : "action",
+      "agentId" : "sales-agent",
+      "action" : "a2a/send"
+    },
+    "key" : "506942b53b7349d802d01bedef49ed9d5dbaef1080406576b76295d356fba857",
+    "leaf" : {
+      "count" : 1,
+      "firstSequence" : 3,
+      "lastSequence" : 3
+    },
+    "siblings" : [ "16a6d8851d3c809f0b30c61ed010a9a2993c2c0c005883006e7990aca28f3e88", "0000000000000000000000000000000000000000000000000000000000000000", "a0c25424ca9718e2a536fb684992e7125a3e1b60a5a1443f116170a10be95d1b" ],
+    "otherLeaf" : null,
+    "index" : {
+      "format" : "nexusphere-ledger/index/v1",
+      "sequence" : 3,
+      "headHash" : "bab1fd8734a3a6bb7bb7431c5b8f35e26640fc32106ab2054f8c27416e4c074b",
+      "root" : "1422786a8dc695298a178cc5562ec93c0f47c2e27836662a897ad4e12513bebf",
+      "createdAt" : "2026-10-01T08:02:00.123456Z",
+      "keyId" : "06e3fd8fda29bb60",
+      "signature" : "GgVnyVGohrl4+SA2PgHJQO2hyd81BQuAwYpVJrltf/MRsTtv5hLGvUaPLob9GgIARtlTtclD33T5Lf05bSMTDA=="
+    },
+    "keys" : [ {
+      "keyId" : "06e3fd8fda29bb60",
+      "algorithm" : "Ed25519",
+      "publicKey" : "MCowBQYDK2VwAyEA11qYAYKxCrfVS/7TyWQHOg7hcvPapiMlrwIaaPcHURo="
+    } ]
+  }, {
+    "format" : "nexusphere-ledger/index-proof/v1",
+    "term" : {
+      "type" : "grant",
+      "delegationId" : "grant-never-used"
+    },
+    "key" : "be51361bd15a591286f5716e27f2372eeef62724c9635133c53d2f6f2277afaf",
+    "leaf" : null,
+    "siblings" : [ "4907e2e1db4d30b6477eeb05bb881cf47767e6fe6367c37a644fb83376a1836b", "dea092f762063c58b5b3abdb85f1136796ab0e033031c7212061db2d1c5ffdea" ],
+    "otherLeaf" : {
+      "key" : "87a17bde7cddd230a030102b6850a11814a40ee7ec62a5655823a6fdeeadf580",
+      "valueHash" : "c3e6674b5827a90fb0dad1ff8cc7675b0689d02faf6b5195bc3d96f9b832fd5e"
+    },
+    "index" : {
+      "format" : "nexusphere-ledger/index/v1",
+      "sequence" : 3,
+      "headHash" : "bab1fd8734a3a6bb7bb7431c5b8f35e26640fc32106ab2054f8c27416e4c074b",
+      "root" : "1422786a8dc695298a178cc5562ec93c0f47c2e27836662a897ad4e12513bebf",
+      "createdAt" : "2026-10-01T08:02:00.123456Z",
+      "keyId" : "06e3fd8fda29bb60",
+      "signature" : "GgVnyVGohrl4+SA2PgHJQO2hyd81BQuAwYpVJrltf/MRsTtv5hLGvUaPLob9GgIARtlTtclD33T5Lf05bSMTDA=="
+    },
+    "keys" : [ {
+      "keyId" : "06e3fd8fda29bb60",
+      "algorithm" : "Ed25519",
+      "publicKey" : "MCowBQYDK2VwAyEA11qYAYKxCrfVS/7TyWQHOg7hcvPapiMlrwIaaPcHURo="
+    } ]
+  }, {
+    "format" : "nexusphere-ledger/index-proof/v1",
+    "term" : {
+      "type" : "input",
+      "inputHash" : "d63e913e23fa4f5bfa55935756319c2581220d3806005dc227d3bab06b9cfdf7"
+    },
+    "key" : "e73c9bf889c2885c57d5925103cded617fbbc2509e2fbb367b846968b65ece81",
+    "leaf" : null,
+    "siblings" : [ "4907e2e1db4d30b6477eeb05bb881cf47767e6fe6367c37a644fb83376a1836b", "8f4f8032866ab675aee632ec1dd5b308c0c7c3038d355020f82c878d6b744323", "7168d7ba7a44437684f7f6cf4fcfe002358d7a7d41beb22ae5704f11441635ed" ],
+    "otherLeaf" : {
+      "key" : "f0b94589182744740c2b43de46707c95fce3aeb22750a89cc5f38380f858046d",
+      "valueHash" : "c3e6674b5827a90fb0dad1ff8cc7675b0689d02faf6b5195bc3d96f9b832fd5e"
+    },
+    "index" : {
+      "format" : "nexusphere-ledger/index/v1",
+      "sequence" : 3,
+      "headHash" : "bab1fd8734a3a6bb7bb7431c5b8f35e26640fc32106ab2054f8c27416e4c074b",
+      "root" : "1422786a8dc695298a178cc5562ec93c0f47c2e27836662a897ad4e12513bebf",
+      "createdAt" : "2026-10-01T08:02:00.123456Z",
+      "keyId" : "06e3fd8fda29bb60",
+      "signature" : "GgVnyVGohrl4+SA2PgHJQO2hyd81BQuAwYpVJrltf/MRsTtv5hLGvUaPLob9GgIARtlTtclD33T5Lf05bSMTDA=="
+    },
+    "keys" : [ {
+      "keyId" : "06e3fd8fda29bb60",
+      "algorithm" : "Ed25519",
+      "publicKey" : "MCowBQYDK2VwAyEA11qYAYKxCrfVS/7TyWQHOg7hcvPapiMlrwIaaPcHURo="
+    } ]
+  } ]
+}

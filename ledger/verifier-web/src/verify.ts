@@ -1,5 +1,5 @@
-import { readCertificates, verifyPackage } from '@nexusphere/ledger'
-import type { PackageReport } from '@nexusphere/ledger'
+import { INDEX_PROOF_FORMAT, readCertificates, verifyIndexProof, verifyPackage } from '@nexusphere/ledger'
+import type { IndexCheck, PackageReport } from '@nexusphere/ledger'
 
 export interface Entry {
   sequence: number
@@ -22,6 +22,11 @@ export interface Verification {
   entries: Entry[]
 }
 
+export interface IndexVerification {
+  index: IndexCheck
+  pinned: boolean
+}
+
 export interface Input {
   packageText: string
   publicKey: string
@@ -34,7 +39,7 @@ export interface Input {
   requireRekor?: boolean
 }
 
-export async function verify(input: Input): Promise<Verification> {
+export async function verify(input: Input): Promise<Verification | IndexVerification> {
   let pkg: unknown
   try {
     pkg = JSON.parse(input.packageText)
@@ -66,6 +71,12 @@ export async function verify(input: Input): Promise<Verification> {
       throw new Error('The key list must be the array that GET /api/v1/keys returns.')
     }
     keys = parsed as Record<string, unknown>[]
+  }
+  if ((pkg as Record<string, unknown>).format === INDEX_PROOF_FORMAT) {
+    return {
+      index: await verifyIndexProof(pkg, { pinnedPublicKey: publicKey, keyList: keys }),
+      pinned: publicKey !== null,
+    }
   }
   let timestampCertificates: ReturnType<typeof readCertificates> = []
   if (input.timestampCertificatesText && input.timestampCertificatesText.trim() !== '') {

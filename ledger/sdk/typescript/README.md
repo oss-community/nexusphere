@@ -11,6 +11,7 @@
 * [Decide and Report](#decide-and-report)
 * [Verify a Package](#verify-a-package)
 * [Verify a Report](#verify-a-report)
+* [Verify an Index Proof](#verify-an-index-proof)
 * [Verify a Statement and Receipt](#verify-a-statement-and-receipt)
 * [Verify a Mandate](#verify-a-mandate)
 * [Present a Key-Bound Mandate](#present-a-key-bound-mandate)
@@ -250,6 +251,46 @@ const check = await verifyReport(report, pkg, { publicKey });
 console.log((await verifyPackage(pkg, publicKey)).valid && check.valid, check.statuses, check.problems);
 ```
 
+## Verify an Index Proof
+
+<p style="text-align: justify;">
+
+An [index proof](../../README.md#index-proofs) shows that a term occurs in the evidence up to a checkpoint, with how
+often and its first and last sequence, or that it never did. A term is an `agent` with `agentId`, an `action` with
+`agentId` and `action`, an `input` with `inputHash`, or a `grant` with `delegationId`. `client.indexProof(term,
+sequence)` asks the ledger for one, as the operator, at the latest checkpoint or at the checkpoint `sequence`.
+`verifyIndexProof(proof, { pinnedPublicKey, keyList, package })` checks the signature of the index with the keys the
+proof carries, reached from the pinned key through signed key rotations when one is given, refuses a revoked key, checks
+that the path leads to the signed root, and with `package` that the index is for the checkpoint of that package.
+
+</p>
+
+Step 1. Record an action and sign a checkpoint:
+
+```typescript
+await agent.record({ agentId: "invoice-agent", principalId: "acme", action: "files/read", outcome: "SUCCEEDED" });
+await operator.createCheckpoint();
+```
+
+Step 2. Ask for a proof that the agent read files and one that it never deleted any:
+
+```typescript
+const read = await operator.indexProof({ type: "action", agentId: "invoice-agent", action: "files/read" });
+const deleted = await operator.indexProof({ type: "action", agentId: "invoice-agent", action: "files/delete" });
+```
+
+Step 3. Verify both pinned to the ledger's key; it must print `true true 1`, then `true false`:
+
+```typescript
+import { verifyIndexProof } from "@nexusphere/ledger";
+
+const publicKey = await operator.activePublicKey();
+const found = await verifyIndexProof(read, { pinnedPublicKey: publicKey });
+const missing = await verifyIndexProof(deleted, { pinnedPublicKey: publicKey });
+console.log(found.valid, found.present, found.count);
+console.log(missing.valid, missing.present);
+```
+
 ## Verify a Statement and Receipt
 
 ```typescript
@@ -363,6 +404,13 @@ npx nexusphere-ledger-verify dispute --public-key "$LEDGER_PUBLIC_KEY" dispute.z
 npx nexusphere-ledger-verify report --public-key "$LEDGER_PUBLIC_KEY" --package package.json report.json
 ```
 
+Step 6. Verify an index proof, optionally against the package of the same checkpoint; the last line must be
+`Result: VALID`:
+
+```shell
+npx nexusphere-ledger-verify index --public-key "$LEDGER_PUBLIC_KEY" --package package.json proof.json
+```
+
 <p style="text-align: justify;">
 
 `dispute` takes `keys.json`, the timestamp authority chain, the Rekor log key and the witness keys from the archive
@@ -373,22 +421,23 @@ requires no witness cosignature unless `--witness` or `--witnesses-required` is 
 
 ## Reference
 
-| Module      | Contents                                                                                         |
-|-------------|--------------------------------------------------------------------------------------------------|
-| `client`    | `LedgerClient` for evidence, decisions, `act`, grants, mandates, prompts, packages, keys, proofs |
-| `package`   | `verifyPackage` and `PackageReport`                                                              |
-| `report`    | Signed reports: `verifyReport`, `ReportCheck`, `reportSignedBytes` and `entriesDigest`           |
-| `evidence`  | Content and link hashes, commitments, `ChainVerifier`, `Checkpoint` with its compliance profiles |
-| `timestamp` | RFC 3161 tokens, X.509 certificates, `readCertificates` and `verifyTimestamp`                    |
-| `rekor`     | Rekor v2 `hashedrekord` entries: `verifyRekorEntry` and `rekorRequest`                           |
-| `merkle`    | RFC 9162 roots, inclusion and consistency proofs, exported as `merkle`                           |
-| `note`      | C2SP signed notes, note keys and `tlog-cosignature/v1` cosignatures                              |
-| `cose`      | `CoseSign1`, SCITT `EvidenceStatement` and RFC 9942 `LogReceipt`                                 |
-| `mandate`   | SD-JWT VC mandates, `MandateVerifier`, status lists and JWKs                                     |
-| `httpsig`   | RFC 9421 HTTP message signatures: `signRequest`, `verifyRequest`, `contentDigest`                |
-| `keys`      | Ed25519 keys, key IDs, key rotations and trusted keys from a pinned key                          |
-| `canonical` | Canonical JSON and SHA-256                                                                       |
-| `cbor`      | Deterministic CBOR, exported as `cbor`                                                           |
+| Module       | Contents                                                                                         |
+|--------------|--------------------------------------------------------------------------------------------------|
+| `client`     | `LedgerClient` for evidence, decisions, `act`, grants, mandates, prompts, packages, keys, proofs |
+| `package`    | `verifyPackage` and `PackageReport`                                                              |
+| `report`     | Signed reports: `verifyReport`, `ReportCheck`, `reportSignedBytes` and `entriesDigest`           |
+| `indexproof` | Index proofs: `verifyIndexProof`, `IndexCheck`, `indexTerm`, `indexKey` and `indexSignedBytes`   |
+| `evidence`   | Content and link hashes, commitments, `ChainVerifier`, `Checkpoint` with its compliance profiles |
+| `timestamp`  | RFC 3161 tokens, X.509 certificates, `readCertificates` and `verifyTimestamp`                    |
+| `rekor`      | Rekor v2 `hashedrekord` entries: `verifyRekorEntry` and `rekorRequest`                           |
+| `merkle`     | RFC 9162 roots, inclusion and consistency proofs, exported as `merkle`                           |
+| `note`       | C2SP signed notes, note keys and `tlog-cosignature/v1` cosignatures                              |
+| `cose`       | `CoseSign1`, SCITT `EvidenceStatement` and RFC 9942 `LogReceipt`                                 |
+| `mandate`    | SD-JWT VC mandates, `MandateVerifier`, status lists and JWKs                                     |
+| `httpsig`    | RFC 9421 HTTP message signatures: `signRequest`, `verifyRequest`, `contentDigest`                |
+| `keys`       | Ed25519 keys, key IDs, key rotations and trusted keys from a pinned key                          |
+| `canonical`  | Canonical JSON and SHA-256                                                                       |
+| `cbor`       | Deterministic CBOR, exported as `cbor`                                                           |
 
 ## Test
 

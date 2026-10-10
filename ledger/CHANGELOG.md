@@ -85,6 +85,10 @@ agent platforms and gateways.
   exporter, and required by a profile when it lists them; `PUT /api/v1/prompts` stores prompt texts by hash, packages,
   reports and disputes carry them with `includePrompts`, every verifier checks them, the EU AI Act and dispute
   reports have a model section, and an `evidence-model.json` conformance vector holds an entry with its model
+* Index proofs: a sparse Merkle tree over agents, actions, inputs and the actions each grant allowed, with a root the
+  ledger signs per checkpoint; `POST /api/v1/index/proofs` proves that a term occurs, with its count, or that it never
+  did up to a checkpoint, the verifiers in Java, Python and TypeScript check proofs with `index`, and an
+  `index-proof.json` conformance vector holds proofs of presence and absence
 * Browser verifier: one self-contained HTML page in React and TypeScript that verifies a package with the
   TypeScript SDK, pinned to the ledger key and optional witnesses, with a Content Security Policy that blocks every
   connection

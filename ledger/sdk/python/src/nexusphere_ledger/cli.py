@@ -7,6 +7,7 @@ import zipfile
 from dataclasses import asdict
 
 from .cose import EvidenceStatement, LogReceipt
+from .index import verify_index_proof
 from .keys import PublicKey
 from .mandate import MandateVerifier, StaticKeys
 from .note import NoteKey
@@ -32,6 +33,8 @@ def run(args, out, err, stdin=None) -> int:
         return _statement(args[1:], out, err)
     if args and args[0] == "report":
         return _report(args[1:], out, err)
+    if args and args[0] == "index":
+        return _index(args[1:], out, err)
     if args and args[0] == "dispute":
         return _dispute(args[1:], out, err)
     return _package(args[1:] if args and args[0] == "package" else args, out, err)
@@ -146,6 +149,61 @@ def _report(args, out, err) -> int:
         return USAGE
     return _finish(pkg, report, public_key, key_list, certificates, options.witness, options.witnesses_required,
                    options.rekor_key, options, [], out, err)
+
+
+def _index(args, out, err) -> int:
+    parser = _package_parser("nexusphere-ledger-verify index",
+                             "%(prog)s [--public-key <key> | --public-key-file <file>] [--keys <keys.json>] "
+                             "[--package <package.json>] [--json] <proof.json>")
+    parser.add_argument("--package")
+    parser.add_argument("proof")
+    options = _parse(parser, args, err)
+    if options is None:
+        return USAGE
+    reading = options.proof
+    try:
+        public_key = _public_key(options)
+        with open(options.proof, encoding="utf-8") as file:
+            proof = json.load(file)
+        pkg = None
+        if options.package:
+            reading = options.package
+            with open(options.package, encoding="utf-8") as file:
+                pkg = json.load(file)
+        key_list = None
+        if options.keys:
+            reading = options.keys
+            with open(options.keys, encoding="utf-8") as file:
+                key_list = json.load(file)
+    except (OSError, ValueError) as e:
+        err.write("Cannot read %s: %s\n" % (reading, e))
+        return USAGE
+    check = verify_index_proof(proof, public_key, key_list, pkg)
+    if options.json:
+        out.write(json.dumps(check.to_dict(), indent=2) + "\n")
+        return VALID if check.valid else INVALID
+    out.write("Nexusphere Ledger index proof\n")
+    out.write("  Term        : %s\n" % " ".join(_show(value) for value in check.term.values()))
+    out.write("  Index       : checkpoint %s, head %s\n" % (_show(check.sequence), _show(check.head_hash)))
+    note = " (taken from the proof; pass --public-key to pin the ledger's key)" if public_key is None else ""
+    out.write("  Signed by   : %s%s\n" % (_show(check.key_id), note))
+    if check.present:
+        out.write("  Finding     : %s entries, sequences %s to %s\n"
+                  % (_show(check.count), _show(check.first_sequence), _show(check.last_sequence)))
+    else:
+        out.write("  Finding     : no entry up to sequence %s\n" % _show(check.sequence))
+    if pkg is not None:
+        checkpoint = pkg.get("checkpoint") if isinstance(pkg, dict) else None
+        sequence = checkpoint.get("sequence") if isinstance(checkpoint, dict) else None
+        out.write("  Package     : checkpoint %d\n" % (sequence if isinstance(sequence, int)
+                                                       and not isinstance(sequence, bool) else 0))
+    if check.valid:
+        out.write("Result: VALID\n")
+    else:
+        out.write("Result: INVALID\n")
+        for problem in check.problems:
+            out.write("  - %s\n" % problem)
+    return VALID if check.valid else INVALID
 
 
 def _dispute(args, out, err) -> int:

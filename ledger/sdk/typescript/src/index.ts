@@ -10,6 +10,7 @@ export {
 } from "./cose.js";
 export * from "./evidence.js";
 export * from "./httpsig.js";
+export * from "./indexproof.js";
 export * from "./keys.js";
 export * as merkle from "./merkle.js";
 export * from "./mandate.js";

@@ -1,12 +1,13 @@
 # <p align="center">Nexusphere Package Verifier for the Browser</p>
 
-<p align="center">One HTML file that verifies an evidence package in the browser, with no server and no network.</p>
+<p align="center">One HTML file that verifies an evidence package or an index proof in the browser, with no server and no network.</p>
 
 ## <p align="center">Table of Content</p>
 
 * [Purpose](#purpose)
 * [Build](#build)
 * [Verify a Package](#verify-a-package)
+* [Verify an Index Proof](#verify-an-index-proof)
 * [What It Checks](#what-it-checks)
 * [Develop](#develop)
 * [Test](#test)
@@ -80,6 +81,31 @@ Crypto: Chrome or Edge 137, Firefox 129, Safari 17 or later.
 
 </p>
 
+## Verify an Index Proof
+
+<p style="text-align: justify;">
+
+The page also takes an [index proof](../README.md#index-proofs), which it recognises by its format
+`nexusphere-ledger/index-proof/v1`: that a term occurs in the evidence up to a checkpoint, with how often, or that it
+never did. It runs the same checks as `nexusphere-ledger-verify index`, without `--package`: the term and its key, the
+signature of the index with the keys the proof carries, reached from the pinned key, a revoked key from the key list,
+and the path from the leaf to the signed root.
+
+</p>
+
+Step 1. Ask for a proof that the payments agent never deleted a file, as the operator:
+
+```shell
+curl -s -X POST http://localhost:8090/api/v1/index/proofs -H "Authorization: Bearer nexusphere-ledger-development-key-change-me" -H "Content-Type: application/json" -d '{"term":{"type":"action","agentId":"payments-agent","action":"files/delete"}}' > proof.json
+```
+
+Step 2. Open `ledger/verifier-web/dist/index.html`, choose or drop `proof.json` and paste the ledger's public key.
+
+Step 3. Press Verify; the page must show `VALID` with the Term `action payments-agent files/delete`, the Checkpoint
+with its head hash, Signed by with the key ID, and the Finding `no entry up to sequence N`, or the count with the first
+and last sequence when the term occurs. Change `files/delete` to `files/remove` in the file and verify again; the page
+must show `INVALID` and `the key does not belong to the term`.
+
 ## What It Checks
 
 | Check                                                            | Shown as                      |
@@ -94,6 +120,8 @@ Crypto: Chrome or Edge 137, Firefox 129, Safari 17 or later.
 | The RFC 3161 timestamp of the checkpoint and the authority chain | Timestamp                     |
 | The Rekor entry of the checkpoint and its inclusion proof        | Rekor                         |
 | Prompt texts against their hash and the entries that name them   | Prompts                       |
+| The term, the signed index and the path of an index proof        | Term, Checkpoint, Signed by   |
+| The count and sequences of a term, or that it never occurred     | Finding                       |
 
 <p style="text-align: justify;">
 
@@ -119,7 +147,8 @@ cd ledger/verifier-web && npm test
 ```
 
 Step 2. Build the page and run the browser tests, which open the built file from disk, verify a package, check that no
-request leaves the page and that the prompt texts and models show; they must report `2 passed`:
+request leaves the page, that the prompt texts and models show and that an index proof verifies; they must report
+`3 passed`:
 
 ```shell
 npm run build && npx playwright install chromium && npm run e2e

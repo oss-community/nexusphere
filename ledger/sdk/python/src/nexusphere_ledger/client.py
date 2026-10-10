@@ -109,6 +109,9 @@ class LedgerClient:
     def consistency_proof(self, first_size: int, second_size: Optional[int] = None) -> dict:
         return self._get("/api/v1/log/proofs/consistency", firstSize=first_size, secondSize=second_size)
 
+    def index_proof(self, term: dict, sequence: Optional[int] = None) -> dict:
+        return self._post("/api/v1/index/proofs", _compact({"term": term, "sequence": sequence}))
+
     def keys(self) -> List[dict]:
         return self._get("/api/v1/keys")
 

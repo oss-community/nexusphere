@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test'
 import { sha256Hex } from '@nexusphere/ledger'
-import { LEDGER_KEY, buildPackage, entries } from '../../sdk/typescript/test/support'
+import { LEDGER_KEY, buildPackage, entries, vector } from '../../sdk/typescript/test/support'
 
 const page = new URL('../dist/index.html', import.meta.url).href
 
@@ -44,4 +44,21 @@ test('shows the prompt texts and the models of the disclosed entries', async ({ 
   await expect(browser.getByTestId('verdict')).toHaveText('VALID')
   await expect(browser.getByText('1 prompt texts match the hashes their entries name')).toBeVisible()
   await expect(browser.getByRole('cell', { name: 'model-a 1' })).toBeVisible()
+})
+
+test('verifies an index proof from the built file without any network request', async ({ page: browser }) => {
+  const requests: string[] = []
+  browser.on('request', (request) => requests.push(request.url()))
+  await browser.goto(page)
+  await browser.getByLabel('Package file').setInputFiles({
+    name: 'proof.json',
+    mimeType: 'application/json',
+    buffer: Buffer.from(JSON.stringify(vector('index-proof.json').proofs[2])),
+  })
+  await browser.getByLabel('Ledger public key').fill(LEDGER_KEY.publicKey.encoded)
+  await browser.getByRole('button', { name: 'Verify' }).click()
+  await expect(browser.getByTestId('verdict')).toHaveText('VALID')
+  await expect(browser.getByText('grant grant-never-used')).toBeVisible()
+  await expect(browser.getByText('no entry up to sequence 3')).toBeVisible()
+  expect(requests).toEqual([page])
 })

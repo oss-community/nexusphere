@@ -4,6 +4,7 @@ import { inflateRawSync } from "node:zlib";
 import { fromUtf8, toBase64 } from "./bytes.js";
 import { EvidenceStatement, LogReceipt } from "./cose.js";
 import { Json } from "./evidence.js";
+import { IndexCheck, verifyIndexProof } from "./indexproof.js";
 import { PublicKey } from "./keys.js";
 import { MandateCheck, MandateVerifier, StaticKeys, jwkPublicKey, mandatePayload } from "./mandate.js";
 import { NoteKey } from "./note.js";
@@ -20,7 +21,8 @@ export const USAGE_TEXT = `Usage: nexusphere-ledger-verify [--public-key <base64
        nexusphere-ledger-verify mandate --issuer <url> [--issuer <url>] [--audience <aud>] [--action <action> --target <target>] [--public-key <key> | --public-key-file <file>] [--skip-status] [--nonce <nonce>] [--require-key-binding] [--json] <token | token file | ->
        nexusphere-ledger-verify statement [--public-key <key> | --public-key-file <file>] [--receipt <receipt.cose>] <statement.cose>
        nexusphere-ledger-verify report [package options] --package <package.json> <report.json>
-       nexusphere-ledger-verify dispute [package options] <dispute.zip>`;
+       nexusphere-ledger-verify dispute [package options] <dispute.zip>
+       nexusphere-ledger-verify index [--public-key <key> | --public-key-file <file>] [--keys <keys.json>] [--package <package.json>] [--json] <proof.json>`;
 
 export interface Io {
   out: (text: string) => void;
@@ -80,6 +82,9 @@ export async function run(args: string[], io: Io): Promise<number> {
     }
     if (args[0] === "report") {
       return await report(args.slice(1), io);
+    }
+    if (args[0] === "index") {
+      return await index(args.slice(1), io);
     }
     if (args[0] === "dispute") {
       return await dispute(args.slice(1), io);
@@ -200,6 +205,63 @@ async function report(args: string[], io: Io): Promise<number> {
     rekorKeys: options["--rekor-key"] ?? [],
   };
   return finish(data, document, trust, options, [], io);
+}
+
+async function index(args: string[], io: Io): Promise<number> {
+  const { options, positional } = parse(args, [...PACKAGE_OPTIONS, "--package"]);
+  if (positional === null) {
+    throw new UsageError();
+  }
+  witnessesRequired(options);
+  let proof: unknown;
+  let data: Json | null = null;
+  let key: string | null;
+  let keys: Json[] | undefined;
+  let reading = positional;
+  try {
+    key = publicKey(options);
+    proof = JSON.parse(readFileSync(positional, "utf8"));
+    if (options["--package"]) {
+      reading = options["--package"][0];
+      data = JSON.parse(readFileSync(reading, "utf8"));
+    }
+    if (options["--keys"]) {
+      reading = options["--keys"][0];
+      keys = JSON.parse(readFileSync(reading, "utf8"));
+    }
+  } catch (e) {
+    io.err(`Cannot read ${reading}: ${(e as Error).message}\n`);
+    return USAGE;
+  }
+  const check = await verifyIndexProof(proof, { pinnedPublicKey: key, keyList: keys, package: data });
+  if (options["--json"]) {
+    io.out(JSON.stringify(check, null, 2) + "\n");
+  } else {
+    printIndex(check, key !== null, data, io);
+  }
+  return check.valid ? VALID : INVALID;
+}
+
+function printIndex(check: IndexCheck, pinned: boolean, data: Json | null, io: Io) {
+  const lines = [
+    "Nexusphere Ledger index proof",
+    `  Term        : ${Object.values(check.term).join(" ")}`,
+    `  Index       : checkpoint ${check.sequence}, head ${check.headHash}`,
+    `  Signed by   : ${check.keyId}${pinned ? "" : " (taken from the proof; pass --public-key to pin the ledger's key)"}`,
+    `  Finding     : ${check.present
+      ? `${check.count} entries, sequences ${check.firstSequence} to ${check.lastSequence}`
+      : `no entry up to sequence ${check.sequence}`}`,
+  ];
+  if (data !== null) {
+    const checkpoint = data.checkpoint;
+    const sequence = checkpoint && typeof checkpoint === "object" ? (checkpoint as Json).sequence : undefined;
+    lines.push(`  Package     : checkpoint ${typeof sequence === "number" ? Math.trunc(sequence) : 0}`);
+  }
+  lines.push(check.valid ? "Result: VALID" : "Result: INVALID");
+  if (!check.valid) {
+    check.problems.forEach((problem) => lines.push("  - " + problem));
+  }
+  io.out(lines.join("\n") + "\n");
 }
 
 async function dispute(args: string[], io: Io): Promise<number> {

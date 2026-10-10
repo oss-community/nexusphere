@@ -110,6 +110,43 @@ class Cli(unittest.TestCase):
             self.assertEqual(USAGE, self.run_cli("report", "--package", missing, path)[0])
             self.assertEqual(USAGE, self.run_cli("--package", pkg_path, path)[0])
 
+    def test_index(self):
+        proofs = vector("index-proof.json")["proofs"]
+        head = proofs[0]["index"]["headHash"]
+        with tempfile.TemporaryDirectory() as directory:
+            present = self.write(directory, "present.json", json.dumps(proofs[0]))
+            absent = self.write(directory, "absent.json", json.dumps(proofs[2]))
+            pkg_path = self.write(directory, "package.json", json.dumps({"checkpoint": {"sequence": 3,
+                                                                                         "headHash": head}}))
+            code, out, _ = self.run_cli("index", "--public-key", LEDGER_KEY.public_key.encoded, present)
+            self.assertEqual(VALID, code, out)
+            self.assertEqual("Nexusphere Ledger index proof\n  Term        : agent invoice-agent\n"
+                             "  Index       : checkpoint 3, head %s\n  Signed by   : %s\n"
+                             "  Finding     : 2 entries, sequences 1 to 2\nResult: VALID\n"
+                             % (head, LEDGER_KEY.key_id), out)
+            code, out, _ = self.run_cli("index", "--package", pkg_path, absent)
+            self.assertEqual(VALID, code, out)
+            self.assertEqual("Nexusphere Ledger index proof\n  Term        : grant grant-never-used\n"
+                             "  Index       : checkpoint 3, head %s\n  Signed by   : %s (taken from the proof; pass "
+                             "--public-key to pin the ledger's key)\n  Finding     : no entry up to sequence 3\n"
+                             "  Package     : checkpoint 3\nResult: VALID\n" % (head, LEDGER_KEY.key_id), out)
+            changed = dict(proofs[0], leaf=dict(proofs[0]["leaf"], count=1))
+            path = self.write(directory, "changed.json", json.dumps(changed))
+            code, out, _ = self.run_cli("index", "--public-key", LEDGER_KEY.public_key.encoded, path)
+            self.assertEqual(INVALID, code)
+            self.assertIn("Result: INVALID\n  - the proof does not lead to the signed root\n", out)
+            code, out, _ = self.run_cli("index", "--json", path)
+            self.assertEqual(INVALID, code)
+            result = json.loads(out)
+            self.assertEqual(["valid", "term", "present", "count", "firstSequence", "lastSequence", "sequence",
+                              "headHash", "keyId", "problems"], list(result))
+            self.assertEqual(["the proof does not lead to the signed root"], result["problems"])
+            self.assertEqual(USAGE, self.run_cli("index")[0])
+            self.assertEqual(USAGE, self.run_cli("index", os.path.join(directory, "missing.json"))[0])
+            code, _, err = self.run_cli("index", "--package", os.path.join(directory, "missing.json"), present)
+            self.assertEqual(USAGE, code)
+            self.assertIn("Cannot read %s" % os.path.join(directory, "missing.json"), err)
+
     def test_dispute(self):
         pkg = package(entries(4), {2}, witness=True)
         with tempfile.TemporaryDirectory() as directory:

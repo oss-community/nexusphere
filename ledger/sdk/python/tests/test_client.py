@@ -78,6 +78,21 @@ class Client(unittest.TestCase):
         self.assertEqual(b"zip", client.create_dispute("Invoice 7", include_prompts=True))
         self.assertEqual({"title": "Invoice 7", "includePrompts": True}, opener.body())
 
+    def test_index_proof(self):
+        proof = {"format": "nexusphere-ledger/index-proof/v1", "leaf": None}
+        client, opener = self.client((200, proof), (200, proof),
+                                     (403, {"code": "FORBIDDEN", "message": "Only the operator may do this."}))
+        term = {"type": "grant", "delegationId": "grant-1"}
+        self.assertEqual(proof, client.index_proof(term))
+        self.assertEqual("POST", opener.requests[0].get_method())
+        self.assertEqual("https://ledger.example/api/v1/index/proofs", opener.requests[0].full_url)
+        self.assertEqual({"term": term}, opener.body())
+        client.index_proof(term, 7)
+        self.assertEqual({"term": term, "sequence": 7}, opener.body())
+        with self.assertRaises(LedgerError) as error:
+            client.index_proof(term)
+        self.assertEqual(403, error.exception.status)
+
 
 if __name__ == "__main__":
     unittest.main()

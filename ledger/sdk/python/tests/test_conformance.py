@@ -8,6 +8,7 @@ from nexusphere_ledger.canonical import canonical_json, sha256_hex
 from nexusphere_ledger.cose import EvidenceStatement, LogReceipt
 from nexusphere_ledger.evidence import (ChainVerifier, Checkpoint, EvidenceLink, canonical_content, commitments,
                                         content_hash, link_hash)
+from nexusphere_ledger.index import index_key, index_signed_bytes, verify_index_proof
 from nexusphere_ledger.keys import (KeyRevocation, KeyRotation, PrivateKey, PublicKey, signed_revocation_bytes,
                                     signed_rotation_bytes, trusted_and_revoked)
 from nexusphere_ledger.mandate import (KEY_BINDING_INVALID, KEY_BINDING_MISSING, MandateVerifier, StaticKeys,
@@ -270,6 +271,28 @@ class ReportVector(unittest.TestCase):
         changed = json.loads(json.dumps(v["report"]))
         changed["sections"][0]["status"] = "NOT_SHOWN"
         self.assertFalse(LEDGER_KEY.public_key.verify_base64(report_signed_bytes(changed), changed["signature"]))
+
+
+class IndexProofVector(unittest.TestCase):
+
+    def test_index_proofs(self):
+        v = vector("index-proof.json")
+        pinned = v["proofs"][0]["keys"][0]["publicKey"]
+        self.assertEqual(LEDGER_KEY.public_key.encoded, pinned)
+        self.assertEqual(v["signedBytes"], index_signed_bytes(v["proofs"][0]["index"]).decode("utf-8"))
+        self.assertTrue(LEDGER_KEY.public_key.verify_base64(v["signedBytes"].encode("utf-8"),
+                                                            v["proofs"][0]["index"]["signature"]))
+        checks = [verify_index_proof(proof, pinned) for proof in v["proofs"]]
+        for proof, check in zip(v["proofs"], checks):
+            self.assertEqual([], check.problems, proof["term"])
+            self.assertTrue(check.valid)
+            self.assertEqual(proof["key"], index_key(proof["term"]).hex())
+            self.assertEqual(proof["term"], check.term)
+            self.assertEqual(3, check.sequence)
+        self.assertTrue(checks[0].present)
+        self.assertEqual((2, 1, 2), (checks[0].count, checks[0].first_sequence, checks[0].last_sequence))
+        self.assertEqual([True, True, False, False], [check.present for check in checks])
+        self.assertEqual(1, len({proof["index"]["root"] for proof in v["proofs"]}))
 
 
 class MerkleTreeVector(unittest.TestCase):

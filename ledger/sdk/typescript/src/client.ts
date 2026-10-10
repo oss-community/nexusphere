@@ -172,6 +172,10 @@ export class LedgerClient {
     return this.get("/api/v1/log/proofs/consistency", { firstSize, secondSize });
   }
 
+  indexProof(term: Record<string, string>, sequence?: number): Promise<Json> {
+    return this.post("/api/v1/index/proofs", compact({ term, sequence }));
+  }
+
   keys(): Promise<Json[]> {
     return this.get("/api/v1/keys") as unknown as Promise<Json[]>;
   }

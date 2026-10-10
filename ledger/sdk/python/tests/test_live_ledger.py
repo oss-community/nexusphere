@@ -5,7 +5,7 @@ from datetime import datetime, timedelta, timezone
 
 from nexusphere_ledger import (Denied, EvidenceLink, EvidenceStatement, LedgerClient, LedgerError, LogReceipt,
                                MandateVerifier, Note, NoteKey, PrivateKey, PublicKey, SdJwt, hash_of,
-                               present_bound, verify_package)
+                               present_bound, verify_index_proof, verify_package)
 
 URL = os.environ.get("NEXUSPHERE_LEDGER_URL")
 OPERATOR_KEY = os.environ.get("NEXUSPHERE_LEDGER_API_KEY", "nexusphere-ledger-development-key-change-me")
@@ -144,6 +144,28 @@ class LiveLedger(unittest.TestCase):
         with self.assertRaises(LedgerError) as error:
             self.operator.erase_principal(principal)
         self.assertEqual(404, error.exception.status)
+
+    def test_index_proofs(self):
+        input_hash = hash_of(uuid.uuid4().hex)
+        recorded = self.agent.record(self.agent_id, "alice", "tools/call", "SUCCEEDED", target="read_invoice",
+                                     input_hash=input_hash)
+        checkpoint = self.operator.create_checkpoint()
+        pinned = self.operator.active_public_key()
+        present = verify_index_proof(self.operator.index_proof({"type": "input", "inputHash": input_hash},
+                                                               checkpoint["sequence"]), pinned)
+        self.assertTrue(present.valid, present.problems)
+        self.assertTrue(present.present)
+        self.assertEqual(1, present.count)
+        self.assertEqual(recorded["sequence"], present.last_sequence)
+        self.assertEqual(checkpoint["sequence"], present.sequence)
+        absent = verify_index_proof(self.operator.index_proof({"type": "grant",
+                                                               "delegationId": "never-" + uuid.uuid4().hex}), pinned)
+        self.assertTrue(absent.valid, absent.problems)
+        self.assertFalse(absent.present)
+        self.assertGreaterEqual(absent.sequence, checkpoint["sequence"])
+        with self.assertRaises(LedgerError) as error:
+            self.agent.index_proof({"type": "agent", "agentId": self.agent_id})
+        self.assertEqual(403, error.exception.status)
 
     def test_errors(self):
         with self.assertRaises(LedgerError) as error:
