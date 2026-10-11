@@ -22,6 +22,10 @@ export interface Verification {
   timestampPinned: boolean
   rekorPinned: boolean
   entries: Entry[]
+  pkg: Record<string, unknown>
+  publicKey: string | null
+  keyList: Record<string, unknown>[] | undefined
+  witnessKeys: string[]
 }
 
 export interface IndexVerification {
@@ -113,6 +117,10 @@ export async function verify(input: Input): Promise<Verification | IndexVerifica
     timestampPinned: timestampCertificates.length > 0,
     rekorPinned: rekorKeys.length > 0,
     entries: entriesOf(pkg as Record<string, unknown>),
+    pkg: pkg as Record<string, unknown>,
+    publicKey,
+    keyList: keys,
+    witnessKeys: witnesses,
   }
 }
 

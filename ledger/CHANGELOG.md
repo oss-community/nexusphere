@@ -117,6 +117,9 @@ agent platforms and gateways.
 * Principal dashboard: the activity of the agents acting for a principal per day and per agent, the approvals waiting
   for them and an export of a package of their own evidence, with browser tests
 * The demo MCP server sends its answers without the 40 ms Nagle delay that slowed every call through the gateway
+* Auditor Portal: the browser verifier gains an investigation workspace with filtered entries and per-entry checks
+  (hashes, link, inclusion proof, statement and receipt), the chain, the log signatures, signed reports, dispute
+  ZIP archives and an audit worksheet in CSV, still with no network access
 * Browser verifier: one self-contained HTML page in React and TypeScript that verifies a package with the
   TypeScript SDK, pinned to the ledger key and optional witnesses, with a Content Security Policy that blocks every
   connection

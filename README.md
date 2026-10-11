@@ -39,7 +39,7 @@ rest are references to open when they are needed. All of them are also in one bo
 | 12   | [TypeScript SDK](ledger/sdk/typescript/README.md)            | The same for Node and browsers                                      |
 | 13   | [OpenTelemetry Exporter](ledger/otel-exporter/README.md)     | Evidence from the agent spans an OpenTelemetry Collector receives   |
 | 14   | [Adapters](ledger/adapters/README.md)                        | LangGraph, OpenAI Agents SDK, AgentCore and agentgateway            |
-| 15   | [Browser Verifier](ledger/verifier-web/README.md)            | Verify a package in a browser, from one file, with no network       |
+| 15   | [Auditor Portal](ledger/verifier-web/README.md)              | Verify and investigate a package in a browser, with no network      |
 | 16   | [Changelog](ledger/CHANGELOG.md)                             | What each release contains                                          |
 
 ## Nexusphere Ledger
@@ -161,10 +161,10 @@ mvn package -DskipTests=true
 <p style="text-align: justify;">
 
 The web UI is built and tested with npm, as described in [Nexusphere Frontend](frontend/README.md). The SDKs, the
-exporter, the adapters and the browser verifier use their own tools, as described in
+exporter, the adapters and the auditor portal use their own tools, as described in
 [Python SDK](ledger/sdk/python/README.md#test), [TypeScript SDK](ledger/sdk/typescript/README.md#test),
 [OpenTelemetry Exporter](ledger/otel-exporter/README.md#test), [Adapters](ledger/adapters/README.md#test) and
-[Browser Verifier](ledger/verifier-web/README.md#test).
+[Auditor Portal](ledger/verifier-web/README.md#test).
 
 </p>
 
