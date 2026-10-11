@@ -3,6 +3,7 @@ package com.nexusphere.ledger.evidence.infrastructure.persistence;
 import com.nexusphere.ledger.chain.AgentModel;
 import com.nexusphere.ledger.chain.CanonicalJson;
 import com.nexusphere.ledger.chain.EvidenceEntry;
+import com.nexusphere.ledger.evidence.domain.model.Activity;
 import com.nexusphere.ledger.evidence.domain.model.EvidenceQuery;
 import com.nexusphere.ledger.evidence.domain.model.LedgerHead;
 import com.nexusphere.ledger.evidence.domain.model.Selection;
@@ -17,6 +18,7 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Timestamp;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -129,6 +131,14 @@ class JdbcEvidenceRepository implements EvidenceRepository {
     }
 
     @Override
+    public List<EvidenceEntry> recent(String principalId, long beforeSequence, int limit) {
+        return jdbc.query(SELECT + " where r.principal_ref = " + PRINCIPAL
+                        + " and r.sequence < :before order by r.sequence desc limit :limit",
+                new MapSqlParameterSource("principalId", principalId).addValue("before", beforeSequence)
+                        .addValue("limit", limit), this::row);
+    }
+
+    @Override
     public List<EvidenceEntry> range(long afterSequence, int limit) {
         return jdbc.query(SELECT + " where r.sequence > :after order by r.sequence limit :limit",
                 new MapSqlParameterSource("after", afterSequence).addValue("limit", limit), this::row);
@@ -138,6 +148,29 @@ class JdbcEvidenceRepository implements EvidenceRepository {
     public List<String> hashes(long afterSequence, int limit) {
         return jdbc.query("select hash from ledger.evidence_record where sequence > :after order by sequence limit :limit",
                 new MapSqlParameterSource("after", afterSequence).addValue("limit", limit), (rs, row) -> rs.getString("hash"));
+    }
+
+    @Override
+    public Activity activity(String principalId, Instant since) {
+        MapSqlParameterSource params = new MapSqlParameterSource("principalId", principalId)
+                .addValue("since", Timestamp.from(since));
+        String counts = """
+                count(*) as total,
+                count(*) filter (where decision = 'ALLOW') as allowed,
+                count(*) filter (where decision = 'DENY') as denied,
+                count(*) filter (where outcome = 'FAILED') as failed""";
+        String where = " from ledger.evidence_record where principal_ref = " + PRINCIPAL + " and occurred_at >= :since";
+        List<Activity.Day> days = jdbc.query("select (occurred_at at time zone 'UTC')::date as day, " + counts + where
+                        + " group by day order by day", params,
+                (rs, row) -> new Activity.Day(rs.getObject("day", LocalDate.class), rs.getLong("total"),
+                        rs.getLong("allowed"), rs.getLong("denied"), rs.getLong("failed")));
+        List<Activity.Agent> agents = jdbc.query("select agent_id, max(occurred_at) as last_at, " + counts + where
+                        + " group by agent_id order by total desc, agent_id", params,
+                (rs, row) -> new Activity.Agent(rs.getString("agent_id"), rs.getLong("total"), rs.getLong("allowed"),
+                        rs.getLong("denied"), rs.getLong("failed"), rs.getTimestamp("last_at").toInstant()));
+        return new Activity(since, days.stream().mapToLong(Activity.Day::total).sum(),
+                days.stream().mapToLong(Activity.Day::allowed).sum(), days.stream().mapToLong(Activity.Day::denied).sum(),
+                days.stream().mapToLong(Activity.Day::failed).sum(), days, agents);
     }
 
     @Override

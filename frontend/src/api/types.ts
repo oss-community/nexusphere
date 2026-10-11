@@ -3,6 +3,11 @@ export interface Page<T> {
   nextAfter: number | string | null
 }
 
+export interface RecentPage<T> {
+  items: T[]
+  nextBefore: number | null
+}
+
 export interface EvidenceModel {
   name: string | null
   version: string | null
@@ -302,4 +307,39 @@ export interface SignedReport {
   sections: ReportSection[]
   keyId: string
   signature: string
+}
+
+export interface ActivityCounts {
+  total: number
+  allowed: number
+  denied: number
+  failed: number
+}
+
+export interface ActivityDay extends ActivityCounts {
+  day: string
+}
+
+export interface ActivityAgent extends ActivityCounts {
+  agentId: string
+  lastAt: string
+}
+
+export interface Activity extends ActivityCounts {
+  since: string
+  days: ActivityDay[]
+  agents: ActivityAgent[]
+}
+
+export interface PrincipalPackageScope {
+  agentId?: string
+  fromSequence?: number
+  toSequence?: number
+}
+
+export interface EvidencePackage {
+  format?: string
+  scope?: { agentId: string | null; principalId: string | null; fromSequence: number; toSequence: number }
+  checkpoint?: { sequence?: number }
+  [key: string]: unknown
 }

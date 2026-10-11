@@ -1229,6 +1229,48 @@ curl -X GET "http://localhost:8090/api/v1/principal/grants?state=PENDING" -H "Au
 curl -X POST http://localhost:8090/api/v1/principal/grants/{id}/approve -H "Authorization: Bearer ${TOKEN}"
 ```
 
+### Principal Dashboard
+
+<p style="text-align: justify;">
+
+A signed-in principal sees what agents did on their behalf without asking the operator.
+`GET /api/v1/principal/activity?days=N` (1 to 366, default 30) counts the evidence about the principal since the start
+of the day `N - 1` days ago in UTC: totals, allowed and denied decisions and failed outcomes, per day and per agent with
+its last action, and `GET /api/v1/principal/evidence/recent` lists the newest evidence first, paged with `before`.
+`POST /api/v1/principal/packages` exports an evidence package of the principal's own evidence,
+optionally narrowed by `agentId`, `fromSequence` and `toSequence`; the principal is always the signed-in one, prompt
+texts are never included, and every other entry in the range carries only its link, so the package discloses nothing
+about anyone else. The package verifies like any other, offline or in the [Auditor Portal](verifier-web/README.md).
+The [frontend](../frontend/README.md#principal-dashboard) shows both with the approvals waiting for the principal.
+
+</p>
+
+Step 1. Start the ledger with OIDC as in [Getting Started](#getting-started), then record three entries for `alice`:
+
+```shell
+for t in send_email read_file; do curl -s -X POST http://localhost:8090/api/v1/evidence -H "Authorization: Bearer $LEDGER_API_KEY" -H "Content-Type: application/json" -d '{"agentId":"invoice-agent","principalId":"alice","action":"tools/call","target":"'$t'","decision":"ALLOW","outcome":"SUCCEEDED"}' | jq .sequence; done
+curl -s -X POST http://localhost:8090/api/v1/evidence -H "Authorization: Bearer $LEDGER_API_KEY" -H "Content-Type: application/json" -d '{"agentId":"invoice-agent","principalId":"alice","action":"tools/call","target":"delete_file","decision":"DENY","outcome":"DENIED"}' | jq .sequence
+```
+
+Step 2. Sign in as `alice` and read the activity of the last seven days; it must count 3 actions, 2 allowed and 1
+denied, all by `invoice-agent`:
+
+```shell
+TOKEN=$(curl -s http://localhost:8180/realms/nexusphere/protocol/openid-connect/token -d grant_type=password -d client_id=nexusphere-ledger -d username=alice -d password=alice | jq -r .access_token)
+curl -s "http://localhost:8090/api/v1/principal/activity?days=7" -H "Authorization: Bearer ${TOKEN}" | jq -c '{total, allowed, denied, failed, agents: [.agents[] | {agentId, total}]}'
+```
+
+```text
+{"total":3,"allowed":2,"denied":1,"failed":0,"agents":[{"agentId":"invoice-agent","total":3}]}
+```
+
+Step 3. Export alice's package and verify it; the result must be `VALID` with `Disclosed : 3 entries, principal alice`:
+
+```shell
+curl -s -X POST http://localhost:8090/api/v1/principal/packages -H "Authorization: Bearer ${TOKEN}" -H "Content-Type: application/json" -d '{}' -o my-package.json
+java -jar ledger/verifier/target/verifier-1.0.0-SNAPSHOT-exec.jar --public-key "$(curl -s http://localhost:8090/api/v1/keys -H "Authorization: Bearer $LEDGER_API_KEY" | jq -r '.[] | select(.status == "ACTIVE") | .publicKey')" my-package.json
+```
+
 ## MCP Gateway
 
 <p style="text-align: justify;">
@@ -2297,6 +2339,9 @@ API key, except `/api/v1/principal/**`, which requires a principal token from th
 | POST   | `/api/v1/legal-holds/{id}/release`         | Release a legal hold with a `reason` (operator)                                                         |
 | POST   | `/api/v1/retention/sweep`                  | Erase what the profiles no longer allow and continue pending erasures now (operator)                    |
 | GET    | `/api/v1/principal/evidence`               | The evidence about the principal by `after` and `limit`                                                 |
+| GET    | `/api/v1/principal/evidence/recent`        | The evidence about the principal newest first, by `before` and `limit`                                  |
+| GET    | `/api/v1/principal/activity`               | Counts of the principal's evidence per day and per agent over the last `days`                           |
+| POST   | `/api/v1/principal/packages`               | Export a package of the principal's own evidence by `agentId`, `fromSequence` and `toSequence`          |
 | GET    | `/api/v1/principal`                        | The signed-in principal                                                                                 |
 | GET    | `/api/v1/principal/grants`                 | List the principal's grants by `state`, `after` and `limit`                                             |
 | GET    | `/api/v1/principal/grants/{id}`            | Get one of the principal's grants                                                                       |

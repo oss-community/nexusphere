@@ -32,6 +32,20 @@ class PackageController {
                 .body(body);
     }
 
+    @PostMapping("/api/v1/principal/packages")
+    ResponseEntity<PackageDocuments.PackageResponse> exportOwn(Caller caller,
+                                                               @RequestBody(required = false)
+                                                               PackageDocuments.ExportRequest request) {
+        String principalId = caller.requirePrincipal().principalId();
+        PackageDocuments.ExportRequest r = request == null ? PackageDocuments.ExportRequest.empty() : request;
+        PackageDocuments.PackageResponse body = documents.export(new PackageDocuments.ExportRequest(r.agentId(),
+                principalId, r.fromSequence(), r.toSequence(), false).toRequest(), false);
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"evidence-package-"
+                        + body.checkpoint().sequence() + ".json\"")
+                .body(body);
+    }
+
     @PostMapping("/api/v1/packages/verify")
     PackageReport verify(Caller caller, @RequestParam(required = false) String publicKey,
                          @RequestBody JsonNode body) {

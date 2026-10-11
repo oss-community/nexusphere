@@ -35,7 +35,7 @@ describe('MyGrantsPage', () => {
     mockLedger({ 'GET /api/v1/principal/grants': () => ({ body: { items: [], nextAfter: null } }) })
     renderApp('/agents', ALICE)
 
-    expect(await screen.findByRole('heading', { name: 'Waiting for you (0)' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: 'Activity' })).toBeInTheDocument()
     expect(screen.queryByRole('link', { name: 'Agents' })).not.toBeInTheDocument()
   })
 })

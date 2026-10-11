@@ -1,6 +1,6 @@
 import type {
-  Agent, Anomaly, Approval, Checkpoint, OfferedReport, ReportScope, SignedReport, Erasure, Evidence, Exchange, Grant, GrantDraft, Head, IssuedAgent, LegalHold, Mandate, OidcInfo,
-  PackageReport, Page, Principal, RetentionSweep, SigningKey, VerificationReport,
+  Activity, Agent, Anomaly, Approval, Checkpoint, OfferedReport, ReportScope, SignedReport, Erasure, Evidence, EvidencePackage, Exchange, Grant, GrantDraft, Head, IssuedAgent, LegalHold, Mandate, OidcInfo,
+  PackageReport, Page, Principal, RecentPage, PrincipalPackageScope, RetentionSweep, SigningKey, VerificationReport,
 } from './types'
 
 export class ApiError extends Error {
@@ -237,6 +237,18 @@ export class LedgerApi {
 
   myEvidence(after?: number) {
     return this.request<Page<Evidence>>('GET', '/api/v1/principal/evidence', undefined, { after, limit: 100 })
+  }
+
+  myRecentEvidence(before?: number, limit = 50) {
+    return this.request<RecentPage<Evidence>>('GET', '/api/v1/principal/evidence/recent', undefined, { before, limit })
+  }
+
+  myActivity(days?: number) {
+    return this.request<Activity>('GET', '/api/v1/principal/activity', undefined, { days })
+  }
+
+  exportMyPackage(scope: PrincipalPackageScope = {}) {
+    return this.request<EvidencePackage>('POST', '/api/v1/principal/packages', scope)
   }
 
   oidc() {

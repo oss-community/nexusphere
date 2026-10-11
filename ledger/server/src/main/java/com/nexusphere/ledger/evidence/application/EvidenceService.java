@@ -2,6 +2,7 @@ package com.nexusphere.ledger.evidence.application;
 
 import com.nexusphere.ledger.chain.EvidenceEntry;
 import com.nexusphere.ledger.compliance.application.Compliance;
+import com.nexusphere.ledger.evidence.domain.model.Activity;
 import com.nexusphere.ledger.evidence.domain.model.EvidenceQuery;
 import com.nexusphere.ledger.evidence.domain.model.EvidenceSubmission;
 import com.nexusphere.ledger.evidence.domain.model.LedgerHead;
@@ -124,6 +125,17 @@ public class EvidenceService {
     public List<EvidenceEntry> find(EvidenceQuery query) {
         Paging.check(query.afterSequence(), query.limit(), MAX_PAGE_SIZE);
         return evidence.find(query);
+    }
+
+    @Transactional(readOnly = true)
+    public Activity activity(String principalId, Instant since) {
+        return evidence.activity(principalId, since);
+    }
+
+    @Transactional(readOnly = true)
+    public List<EvidenceEntry> recent(String principalId, long beforeSequence, int limit) {
+        Paging.check(0, limit, MAX_PAGE_SIZE);
+        return evidence.recent(principalId, beforeSequence, limit);
     }
 
     @Transactional(readOnly = true)
