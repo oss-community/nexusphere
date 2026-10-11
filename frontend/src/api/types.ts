@@ -343,3 +343,54 @@ export interface EvidencePackage {
   checkpoint?: { sequence?: number }
   [key: string]: unknown
 }
+
+export interface AskSentence {
+  text: string
+  citations: number[]
+}
+
+export interface AskChecks {
+  content: boolean
+  link: boolean
+  inclusion: boolean
+}
+
+export interface AskCitation {
+  sequence: number
+  id: string
+  occurredAt: string
+  agentId: string
+  principalId: string | null
+  action: string
+  target: string | null
+  decision: string | null
+  outcome: string
+  hash: string
+  erased: boolean
+  checks: AskChecks
+}
+
+export interface AskPlan {
+  agentId: string | null
+  principalId: string | null
+  action: string | null
+  target: string | null
+  decision: string | null
+  outcome: string | null
+  from: string | null
+  to: string | null
+}
+
+export interface AskAnswer {
+  question: string
+  answer: string
+  sentences: AskSentence[]
+  droppedSentences: number
+  citations: AskCitation[]
+  unverified: number[]
+  plan: AskPlan | null
+  model: string
+  considered: number
+  checkpointSize: number | null
+  recordedAs: number
+}

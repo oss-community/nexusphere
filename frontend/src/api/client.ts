@@ -1,5 +1,5 @@
 import type {
-  Activity, Agent, Anomaly, Approval, Checkpoint, OfferedReport, ReportScope, SignedReport, Erasure, Evidence, EvidencePackage, Exchange, Grant, GrantDraft, Head, IssuedAgent, LegalHold, Mandate, OidcInfo,
+  Activity, Agent, AskAnswer, Anomaly, Approval, Checkpoint, OfferedReport, ReportScope, SignedReport, Erasure, Evidence, EvidencePackage, Exchange, Grant, GrantDraft, Head, IssuedAgent, LegalHold, Mandate, OidcInfo,
   PackageReport, Page, Principal, RecentPage, PrincipalPackageScope, RetentionSweep, SigningKey, VerificationReport,
 } from './types'
 
@@ -249,6 +249,10 @@ export class LedgerApi {
 
   exportMyPackage(scope: PrincipalPackageScope = {}) {
     return this.request<EvidencePackage>('POST', '/api/v1/principal/packages', scope)
+  }
+
+  ask(endpoint: string, question: string) {
+    return this.request<AskAnswer>('POST', endpoint, { question })
   }
 
   oidc() {

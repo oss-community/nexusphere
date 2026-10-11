@@ -116,6 +116,11 @@ agent platforms and gateways.
   of a reference machine
 * Principal dashboard: the activity of the agents acting for a principal per day and per agent, the approvals waiting
   for them and an export of a package of their own evidence, with browser tests
+* Questions in plain language: `POST /api/v1/ask` and `POST /api/v1/principal/ask` answer from the evidence with a
+  built-in rule-based model or any OpenAI-compatible model you run, such as Ollama, llama.cpp or vLLM; every entry is
+  checked by its hash, link and inclusion proof before the model sees it, sentences without valid citations are
+  dropped, a principal hears only about their own evidence, each question is recorded as evidence, and the web UI has
+  an Ask page
 * The demo MCP server sends its answers without the 40 ms Nagle delay that slowed every call through the gateway
 * Auditor Portal: the browser verifier gains an investigation workspace with filtered entries and per-entry checks
   (hashes, link, inclusion proof, statement and receipt), the chain, the log signatures, signed reports, dispute

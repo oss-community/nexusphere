@@ -22,6 +22,7 @@
 * [Policies](#policies)
 * [Anomaly Alerts](#anomaly-alerts)
 * [Principal Login and Consent](#principal-login-and-consent)
+* [Questions in Plain Language](#questions-in-plain-language)
 * [MCP Gateway](#mcp-gateway)
 * [Mandates](#mandates)
 * [Agent Keys and Key Binding](#agent-keys-and-key-binding)
@@ -359,6 +360,12 @@ LEDGER_ANOMALY_BASELINE: 7d
 LEDGER_ANOMALY_MIN_HISTORY: 1d
 LEDGER_ANOMALY_THRESHOLD: 3
 LEDGER_ANOMALY_MIN_EVENTS: 10
+LEDGER_ASK_MODEL: builtin
+LEDGER_ASK_MODEL_URL: http://localhost:11434/v1
+LEDGER_ASK_MODEL_NAME: qwen2.5:7b
+LEDGER_ASK_MODEL_API_KEY:
+LEDGER_ASK_TIMEOUT: 120s
+LEDGER_ASK_MAX_EVIDENCE: 50
 ```
 
 <p style="text-align: justify;">
@@ -1269,6 +1276,91 @@ Step 3. Export alice's package and verify it; the result must be `VALID` with `D
 ```shell
 curl -s -X POST http://localhost:8090/api/v1/principal/packages -H "Authorization: Bearer ${TOKEN}" -H "Content-Type: application/json" -d '{}' -o my-package.json
 java -jar ledger/verifier/target/verifier-1.0.0-SNAPSHOT-exec.jar --public-key "$(curl -s http://localhost:8090/api/v1/keys -H "Authorization: Bearer $LEDGER_API_KEY" | jq -r '.[] | select(.status == "ACTIVE") | .publicKey')" my-package.json
+```
+
+## Questions in Plain Language
+
+<p style="text-align: justify;">
+
+`POST /api/v1/ask` answers a question such as "What did invoice-agent do for alice last week?" from the evidence, and
+`POST /api/v1/principal/ask` answers a signed-in principal about their own evidence only. The model first turns the
+question into a search by agent, principal, action, target, decision, outcome and time window, using the agents and
+actions the ledger knows. The ledger runs the search, at most `LEDGER_ASK_MAX_EVIDENCE` entries, and checks every entry
+it found before the model sees it: the content hash, the link to the entry before it and the inclusion proof in a log
+checkpoint the ledger has just signed. Only entries that pass all three reach the model, and entries that fail are
+listed as `unverified`. Every sentence of the answer must cite the entries it relies on as `[#sequence]`; the ledger
+drops a sentence with no citation or with a citation of an entry it did not give the model, counts it in
+`droppedSentences`, and shows nothing when no sentence is left. A principal's search is always narrowed to the
+principal, whatever the question names. Each question is recorded as evidence with the action `ask/question`, the
+SHA-256 of the question and of the answer, the model and the cited sequences, but not the texts.
+
+</p>
+
+<p style="text-align: justify;">
+
+`LEDGER_ASK_MODEL=builtin`, the default, is a rule-based model inside the ledger: it reads agents, actions, principals
+after "for" or "about", targets such as `email/send`, denied, allowed, failed and succeeded, and time windows such as
+today, yesterday, this week, last month, the last 7 days or since 2026-10-01, and it answers with one sentence per day,
+agent, action, target, principal, decision and outcome. It needs no network and gives the same answer every time.
+`LEDGER_ASK_MODEL=openai` sends the search and the answer to any server with the OpenAI chat completions API at
+`LEDGER_ASK_MODEL_URL`, such as Ollama, llama.cpp, vLLM or LM Studio, with the model `LEDGER_ASK_MODEL_NAME`,
+temperature 0 and `LEDGER_ASK_MODEL_API_KEY` as a bearer token when set. The evidence lines it sends name agents,
+principals and targets, so point it at a model you run yourself. A model that cannot be reached or does not answer
+with a JSON search gives `502 MODEL_UNAVAILABLE`. The [frontend](../frontend/README.md) has an Ask page for operators
+and principals.
+
+</p>
+
+Step 1. Start the ledger with OIDC as in [Getting Started](#getting-started), then record four entries for `alice` and
+one for `bob`:
+
+```shell
+for t in email/send email/send files/read_file; do curl -s -X POST http://localhost:8090/api/v1/evidence -H "Authorization: Bearer $LEDGER_API_KEY" -H "Content-Type: application/json" -d '{"agentId":"invoice-agent","principalId":"alice","action":"tools/call","target":"'$t'","decision":"ALLOW","outcome":"SUCCEEDED"}' | jq .sequence; done
+curl -s -X POST http://localhost:8090/api/v1/evidence -H "Authorization: Bearer $LEDGER_API_KEY" -H "Content-Type: application/json" -d '{"agentId":"invoice-agent","principalId":"alice","action":"tools/call","target":"files/delete","decision":"DENY","outcome":"DENIED"}' | jq .sequence
+curl -s -X POST http://localhost:8090/api/v1/evidence -H "Authorization: Bearer $LEDGER_API_KEY" -H "Content-Type: application/json" -d '{"agentId":"invoice-agent","principalId":"bob","action":"tools/call","target":"email/send","decision":"ALLOW","outcome":"SUCCEEDED"}' | jq .sequence
+```
+
+Step 2. Ask what `invoice-agent` did for `alice` today; the answer must cite alice's four entries, all verified:
+
+```shell
+curl -s -X POST http://localhost:8090/api/v1/ask -H "Authorization: Bearer $LEDGER_API_KEY" -H "Content-Type: application/json" -d '{"question":"What did invoice-agent do for alice today?"}' | jq -c '{answer, sentences: [.sentences[] | .citations], verified: [.citations[] | .checks | .content and .link and .inclusion], model, considered, recordedAs}'
+```
+
+```text
+{"answer":"4 verified entries match the question, from 2026-10-11 to 2026-10-11. On 2026-10-11, invoice-agent recorded tools/call on email/send for alice 2 times, allowed and succeeded. On 2026-10-11, invoice-agent recorded tools/call on files/read_file for alice once, allowed and succeeded. On 2026-10-11, invoice-agent recorded tools/call on files/delete for alice once, denied.","sentences":[[3,6],[3,4],[5],[6]],"verified":[true,true,true,true],"model":"builtin","considered":4,"recordedAs":8}
+```
+
+Step 3. Ask which calls were denied today; the search must hold only the decision and the start of the day, and the
+answer only the denied entry:
+
+```shell
+curl -s -X POST http://localhost:8090/api/v1/ask -H "Authorization: Bearer $LEDGER_API_KEY" -H "Content-Type: application/json" -d '{"question":"Which calls were denied today?"}' | jq -c '{answer, plan: (.plan | with_entries(select(.value != null)))}'
+```
+
+```text
+{"answer":"1 verified entry matches the question, from 2026-10-11 to 2026-10-11. On 2026-10-11, invoice-agent recorded tools/call on files/delete for alice once, denied.","plan":{"decision":"DENY","from":"2026-10-11T00:00:00Z"}}
+```
+
+Step 4. Sign in as `bob` and ask about alice; the answer must cite only bob's entry:
+
+```shell
+TOKEN=$(curl -s http://localhost:8180/realms/nexusphere/protocol/openid-connect/token -d grant_type=password -d client_id=nexusphere-ledger -d username=bob -d password=bob | jq -r .access_token)
+curl -s -X POST http://localhost:8090/api/v1/principal/ask -H "Authorization: Bearer ${TOKEN}" -H "Content-Type: application/json" -d '{"question":"What did invoice-agent do for alice?"}' | jq -c '{answer, principals: [.citations[].principalId]}'
+```
+
+```text
+{"answer":"1 verified entry matches the question, from 2026-10-11 to 2026-10-11. On 2026-10-11, invoice-agent recorded tools/call on email/send for bob once, allowed and succeeded.","principals":["bob"]}
+```
+
+Step 5. Read the entry the first question was recorded as; it must hold the hash of the question and the cited
+sequences:
+
+```shell
+curl -s "http://localhost:8090/api/v1/evidence?after=7&limit=1" -H "Authorization: Bearer $LEDGER_API_KEY" | jq -c '.items[0] | {agentId, principalId, action, inputHash, attributes}'
+```
+
+```text
+{"agentId":"ledger","principalId":"operator","action":"ask/question","inputHash":"3f49f0248242f4840f96f2685ac681c3e982b53ec2c2c9dcb7e772d96ce9a644","attributes":{"ask.citations":"3,4,5,6","ask.considered":"4","ask.model":"builtin"}}
 ```
 
 ## MCP Gateway
@@ -2290,6 +2382,7 @@ API key, except `/api/v1/principal/**`, which requires a principal token from th
 | GET    | `/api/v1/evidence/{id}/statement`          | The entry as a SCITT signed statement (`application/cose`)                                              |
 | GET    | `/api/v1/evidence/{id}/receipt`            | RFC 9942 receipt for the entry at `treeSize`, by default the latest log checkpoint                      |
 | GET    | `/api/v1/evidence`                         | List entries by `agentId`, `principalId`, `after` and `limit` (max 500)                                 |
+| POST   | `/api/v1/ask`                              | Answer a `question` from verified evidence, each sentence citing its entries (operator)                 |
 | GET    | `/api/v1/ledger/head`                      | Current sequence and hash                                                                               |
 | POST   | `/api/v1/checkpoints`                      | Sign the current head now; `409 LEDGER_EMPTY` when nothing is recorded (operator)                       |
 | GET    | `/api/v1/checkpoints/latest`               | Latest checkpoint, with its RFC 3161 `timestamp`, `timestampedAt` and Rekor `rekorLogIndex` when set    |
@@ -2342,6 +2435,7 @@ API key, except `/api/v1/principal/**`, which requires a principal token from th
 | GET    | `/api/v1/principal/evidence/recent`        | The evidence about the principal newest first, by `before` and `limit`                                  |
 | GET    | `/api/v1/principal/activity`               | Counts of the principal's evidence per day and per agent over the last `days`                           |
 | POST   | `/api/v1/principal/packages`               | Export a package of the principal's own evidence by `agentId`, `fromSequence` and `toSequence`          |
+| POST   | `/api/v1/principal/ask`                    | Answer a `question` from the principal's own verified evidence, each sentence citing its entries        |
 | GET    | `/api/v1/principal`                        | The signed-in principal                                                                                 |
 | GET    | `/api/v1/principal/grants`                 | List the principal's grants by `state`, `after` and `limit`                                             |
 | GET    | `/api/v1/principal/grants/{id}`            | Get one of the principal's grants                                                                       |

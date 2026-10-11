@@ -269,7 +269,10 @@ export function DashboardPage() {
         <GrantsCard grants={grants.data?.items ?? null} />
         <ExportCard agents={(activity.data?.agents ?? []).map((a) => a.agentId)} />
       </div>
-      <Card title="Recent actions" actions={<Link to="/my/evidence">Evidence about me</Link>}>
+      <Card title="Recent actions" actions={<>
+        <Link to="/my/ask">Ask a question</Link>
+        <Link to="/my/evidence">Evidence about me</Link>
+      </>}>
         {timeline && <Timeline items={timeline} />}
         {next !== null && (
           <button type="button" className="secondary" onClick={() => loadEvidence(next)}>Load more</button>
