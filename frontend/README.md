@@ -175,10 +175,10 @@ endpoint.
 
 </p>
 
-| Route     | Signed in as | Endpoint                         |
-|-----------|--------------|----------------------------------|
-| `/ask`    | operator     | `POST /api/v1/ask`               |
-| `/my/ask` | principal    | `POST /api/v1/principal/ask`     |
+| Route     | Signed in as | Endpoint                     |
+|-----------|--------------|------------------------------|
+| `/ask`    | operator     | `POST /api/v1/ask`           |
+| `/my/ask` | principal    | `POST /api/v1/principal/ask` |
 
 <p style="text-align: justify;">
 
