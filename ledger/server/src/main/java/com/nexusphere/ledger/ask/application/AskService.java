@@ -12,6 +12,7 @@ import com.nexusphere.ledger.server.config.LedgerProperties;
 import com.nexusphere.ledger.server.web.LedgerException;
 import com.nexusphere.ledger.transparency.application.TransparencyLog;
 import com.nexusphere.ledger.transparency.domain.repository.LogCheckpointRepository.StoredCheckpoint;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.support.TransactionTemplate;
@@ -59,6 +60,7 @@ public class AskService {
     private final int maxEvidence;
     private final Clock clock;
 
+    @Autowired
     AskService(EvidenceService evidence, TransparencyLog log, TransactionTemplate transactions,
                LedgerProperties properties, Clock clock) {
         this(evidence, log, transactions, model(properties.ask()), properties.ask() == null ? 50
