@@ -30,7 +30,7 @@ def witness_note_key() -> NoteKey:
 
 
 def entries(count: int, agents=("invoice-agent", "sales-agent"), principals=("acme", "globex"),
-            models=None) -> list:
+            models=None, attributes=None) -> list:
     chain = []
     previous = GENESIS
     for index in range(count):
@@ -56,7 +56,9 @@ def entries(count: int, agents=("invoice-agent", "sales-agent"), principals=("ac
         }
         if sequence in (models or {}):
             entry["model"] = dict(models[sequence])
-        entry["salts"] = salts(sequence, ("principalId", "target", "reason", "correlationId", "attributes.tool"))
+        entry["attributes"].update((attributes or {}).get(sequence, {}))
+        entry["salts"] = salts(sequence, ("principalId", "target", "reason", "correlationId")
+                               + tuple("attributes." + name for name in entry["attributes"]))
         entry["hash"] = link_hash(sequence, previous, content_hash(entry))
         previous = entry["hash"]
         chain.append(entry)

@@ -206,7 +206,7 @@ class TimestampVector(unittest.TestCase):
         self.assertTrue(report.valid, report.problems)
         self.assertEqual(self.v["genTime"], report.timestamped_at)
         self.assertEqual(self.v["authority"], report.timestamp_authority)
-        self.assertEqual(["timestampedAt", "timestampAuthority"], list(report.to_dict())[-6:-4])
+        self.assertEqual(["timestampedAt", "timestampAuthority"], list(report.to_dict())[-7:-5])
         pinned_root = verify_package(pkg, LEDGER_KEY.public_key.encoded, timestamp_certificates=self.chain[2:])
         self.assertIn("the timestamp of checkpoint 3: the timestamp authority is not trusted", pinned_root.problems)
 
@@ -256,7 +256,8 @@ class RekorVector(unittest.TestCase):
                                 require_rekor=True)
         self.assertTrue(report.valid, report.problems)
         self.assertEqual(self.v["origin"], report.rekor_origin)
-        self.assertEqual(["rekorLogIndex", "rekorOrigin", "disclosedPrompts", "problems"], list(report.to_dict())[-4:])
+        self.assertEqual(["rekorLogIndex", "rekorOrigin", "disclosedPrompts", "disclosedPolicies", "problems"],
+                         list(report.to_dict())[-5:])
 
 
 class ReportVector(unittest.TestCase):

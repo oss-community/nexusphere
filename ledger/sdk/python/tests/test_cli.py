@@ -57,6 +57,23 @@ class Cli(unittest.TestCase):
                           "  Prompts     : 1 prompt texts match the hashes their entries name\n"
                           "  Log         : ", out)
 
+    def test_package_with_policies(self):
+        policies = "permit(principal, action, resource);"
+        policy_hash = hashlib.sha256(policies.encode("utf-8")).hexdigest()
+        pkg = package(entries(3, attributes={2: {"policy.hash": policy_hash}}), {2})
+        with tempfile.TemporaryDirectory() as directory:
+            path = self.write(directory, "package.json", json.dumps(pkg))
+            code, out, _ = self.run_cli(path)
+            self.assertEqual(VALID, code, out)
+            self.assertNotIn("Policies", out)
+            pkg["policies"] = [{"hash": policy_hash, "text": policies}]
+            path = self.write(directory, "package.json", json.dumps(pkg))
+            code, out, _ = self.run_cli(path)
+            self.assertEqual(VALID, code, out)
+            self.assertIn("  Disclosed   : 1 entries\n"
+                          "  Policies    : 1 policy set texts match the hashes their entries name\n"
+                          "  Log         : ", out)
+
     def test_timestamped_package(self):
         v = vector("timestamp.json")
         pkg = package(entries(3), {1})

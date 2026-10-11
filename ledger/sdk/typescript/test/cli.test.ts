@@ -56,6 +56,19 @@ describe("nexusphere-ledger-verify", () => {
     expect(result.out).toMatch(/ {2}Disclosed {3}: 1 entries\n {2}Prompts {5}: 1 prompt texts match the hashes their entries name\n/);
   });
 
+  it("prints the policy set texts a package discloses", async () => {
+    const policies = "permit(principal, action, resource);";
+    const policyHash = await sha256Hex(policies);
+    const pkg = await buildPackage(await entries(3, undefined, undefined, {}, { 2: { "policy.hash": policyHash } }), [2]);
+    const path = join(directory, "policies.json");
+    writeFileSync(path, JSON.stringify(pkg));
+    expect((await cli(path)).out).not.toContain("Policies");
+    writeFileSync(path, JSON.stringify({ ...pkg, policies: [{ hash: policyHash, text: policies }] }));
+    const result = await cli(path);
+    expect(result.code).toBe(VALID);
+    expect(result.out).toMatch(/ {2}Disclosed {3}: 1 entries\n {2}Policies {4}: 1 policy set texts match the hashes their entries name\n/);
+  });
+
   it("verifies the timestamp of a package", async () => {
     const v = vector("timestamp.json");
     const path = join(directory, "timestamped.json");

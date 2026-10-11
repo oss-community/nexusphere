@@ -187,6 +187,15 @@ class LedgerClient:
     def prompt(self, prompt_hash: str) -> dict:
         return self._get("/api/v1/prompts/" + _segment(prompt_hash))
 
+    def activate_policies(self, text: str) -> dict:
+        return self._request("PUT", "/api/v1/policies", body={"text": text})
+
+    def active_policies(self) -> dict:
+        return self._get("/api/v1/policies")
+
+    def policy_set(self, policy_hash: str) -> dict:
+        return self._get("/api/v1/policies/" + _segment(policy_hash))
+
     def register_agent(self, agent_id: str, name: Optional[str] = None, owner_id: Optional[str] = None) -> dict:
         return self._post("/api/v1/agents", _compact({"agentId": agent_id, "name": name, "ownerId": owner_id}))
 

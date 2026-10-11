@@ -72,7 +72,8 @@ Step 4. Press Verify; the page must show `VALID` with the signing key, the check
 proofs and the disclosed entries, with `erased` in place of the principal and target of an entry whose personal fields were erased.
 When the entries name their [model](../README.md#model-and-prompt), the table adds a Model column with its name and
 version, and a package exported with `"includePrompts": true` adds a Prompts line with the number of prompt texts
-that match the hashes their entries name. Change one character of an entry in the file and verify again; the page must show `INVALID` and name the entry.
+that match the hashes their entries name; a package that carries `policies` adds a Policies line with the number of
+Cedar policy set texts that match the hashes their entries name in their `policy.hash` attribute. Change one character of an entry in the file and verify again; the page must show `INVALID` and name the entry.
 
 <p style="text-align: justify;">
 
@@ -145,6 +146,7 @@ show `INVALID` and `The index proof is not about the agent quote-agent`.
 | The RFC 3161 timestamp of the checkpoint and the authority chain | Timestamp                     |
 | The Rekor entry of the checkpoint and its inclusion proof        | Rekor                         |
 | Prompt texts against their hash and the entries that name them   | Prompts                       |
+| Policy set texts against their hash and the entries naming them  | Policies                      |
 | The term, the signed index and the path of an index proof        | Term, Checkpoint, Signed by   |
 | The count and sequences of a term, or that it never occurred     | Finding                       |
 | Type, disclosures, signature and validity of a track record      | Credential, Signed by, Valid  |

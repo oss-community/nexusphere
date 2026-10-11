@@ -367,6 +367,9 @@ function Result({ verification }: { verification: Verification }) {
     ...(report.disclosedPrompts > 0
       ? [['Prompts', `${report.disclosedPrompts} prompt texts match the hashes their entries name`] as [string, string]]
       : []),
+    ...(report.disclosedPolicies > 0
+      ? [['Policies', `${report.disclosedPolicies} policy set texts match the hashes their entries name`] as [string, string]]
+      : []),
     ['Scope', `agent ${report.agentId ?? 'any'}, principal ${report.principalId ?? 'any'}`],
     ['Transparency log', report.logOrigin ? `${report.logOrigin}, tree size ${report.logTreeSize}` : 'none'],
     ['Inclusion proofs', String(report.provenEntries)],

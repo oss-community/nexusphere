@@ -15,6 +15,7 @@ from .timestamps import parse_instant
 
 FORMAT = "nexusphere-ledger/package/v1"
 MAX_TIMESTAMP_SKEW = timedelta(minutes=5)
+POLICY_HASH = "policy.hash"
 
 
 @dataclass(frozen=True)
@@ -42,6 +43,7 @@ class PackageReport:
     rekor_log_index: Optional[int] = None
     rekor_origin: Optional[str] = None
     disclosed_prompts: int = 0
+    disclosed_policies: int = 0
     problems: List[str] = field(default_factory=list)
 
     def to_dict(self) -> dict:
@@ -93,6 +95,7 @@ def verify_package(pkg: dict, public_key: Optional[str] = None, witness_keys=(),
     chain = ChainVerifier(first, GENESIS if anchor is None else anchor.head_hash)
     disclosed = 0
     named = set()
+    named_policies = set()
     agent_id = _nullable(scope, "agentId")
     principal_id = _nullable(scope, "principalId")
     low = _long(scope.get("fromSequence"), 1)
@@ -112,6 +115,9 @@ def verify_package(pkg: dict, public_key: Optional[str] = None, witness_keys=(),
             for name in ("promptHash", "configHash"):
                 if isinstance(model, dict) and isinstance(model.get(name), str):
                     named.add(model[name])
+            attributes = node["entry"].get("attributes")
+            if isinstance(attributes, dict) and isinstance(attributes.get(POLICY_HASH), str):
+                named_policies.add(attributes[POLICY_HASH])
             mismatch = _disclosed_mismatch(node["entry"], link, agent_id, principal_id, low, high)
             if mismatch is not None:
                 problems.append("sequence %d: %s" % (link.sequence, mismatch))
@@ -126,7 +132,8 @@ def verify_package(pkg: dict, public_key: Optional[str] = None, witness_keys=(),
                         % (result.last_sequence, checkpoint.sequence))
     if disclosed == 0 and not unreadable:
         problems.append("the package discloses no evidence")
-    prompts = _prompts(pkg, named, problems)
+    prompts = _texts(pkg, "prompts", "prompt", named, problems)
+    policies = _texts(pkg, "policies", "policy set", named_policies, problems)
     log = _Log() if keys is None else _log(pkg, list(keys.values()), checkpoint.sequence, witness_keys, required,
                                            problems)
     used = [checkpoint.key_id] + ([] if anchor is None else [anchor.key_id]) + list(log.signers)
@@ -134,19 +141,20 @@ def verify_package(pkg: dict, public_key: Optional[str] = None, witness_keys=(),
     return _report(not problems, checkpoint.key_id, _pinned_key_id(public_key),
                    None if anchor is None else anchor.sequence, checkpoint.sequence, checkpoint.created_at,
                    checkpoint.profiles, first,
-                   result.checked_entries, disclosed, scope, log, revoked_used, problems, stamp, anchored, prompts)
+                   result.checked_entries, disclosed, scope, log, revoked_used, problems, stamp, anchored, prompts,
+                   policies)
 
 
-def _prompts(pkg, named, problems) -> int:
+def _texts(pkg, name, kind, named, problems) -> int:
     verified = 0
-    prompts = pkg.get("prompts") if isinstance(pkg.get("prompts"), list) else []
-    for prompt in prompts:
-        hash_value = _nullable(prompt, "hash")
-        text = _nullable(prompt, "text")
+    items = pkg.get(name) if isinstance(pkg.get(name), list) else []
+    for item in items:
+        hash_value = _nullable(item, "hash")
+        text = _nullable(item, "text")
         if hash_value is None or text is None or sha256_hex(text.encode("utf-8", "replace")) != hash_value:
-            problems.append("prompt %s does not match its text" % _show(hash_value))
+            problems.append("%s %s does not match its text" % (kind, _show(hash_value)))
         elif hash_value not in named:
-            problems.append("prompt %s is not named by a disclosed entry" % hash_value)
+            problems.append("%s %s is not named by a disclosed entry" % (kind, hash_value))
         else:
             verified += 1
     return verified
@@ -359,7 +367,8 @@ def _pinned_key_id(pinned) -> Optional[str]:
 
 
 def _report(valid, key_id, pinned_key_id, anchor, checkpoint, created_at, profiles, first, checked, disclosed, scope,
-            log, revoked, problems, stamp=None, anchored=None, prompts=0) -> PackageReport:
+            log, revoked, problems, stamp=None, anchored=None, prompts=0,
+            policies=0) -> PackageReport:
     compliance = [{"id": i, "digest": d} for i, d in sorted(profiles or ())]
     return PackageReport(valid, key_id, pinned_key_id, anchor, checkpoint, created_at, compliance, first, checked,
                          disclosed,
@@ -367,7 +376,8 @@ def _report(valid, key_id, pinned_key_id, anchor, checkpoint, created_at, profil
                          log.proven, log.receipted, list(log.witnesses), list(revoked),
                          None if stamp is None else stamp.gen_time, None if stamp is None else stamp.authority,
                          None if anchored is None else anchored.log_index,
-                         None if anchored is None else anchored.origin, prompts, list(problems))
+                         None if anchored is None else anchored.origin, prompts, policies,
+                         list(problems))
 
 
 def _object(node) -> dict:

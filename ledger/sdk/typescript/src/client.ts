@@ -196,6 +196,18 @@ export class LedgerClient {
     return this.get("/api/v1/prompts/" + encodeURIComponent(hash));
   }
 
+  activatePolicies(text: string): Promise<Json> {
+    return this.request("PUT", "/api/v1/policies", undefined, { text }) as Promise<Json>;
+  }
+
+  activePolicies(): Promise<Json> {
+    return this.get("/api/v1/policies");
+  }
+
+  policySet(hash: string): Promise<Json> {
+    return this.get("/api/v1/policies/" + encodeURIComponent(hash));
+  }
+
   exportPackage(scope: {
     agentId?: string;
     principalId?: string;

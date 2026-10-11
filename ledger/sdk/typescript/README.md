@@ -104,7 +104,8 @@ await agent.recordBatch([
 Evidence and decisions may name the [model](../../README.md#model-and-prompt) the agent ran in `model`: its `name`,
 `version`, and the lowercase SHA-256 `promptHash` and `configHash` of its system prompt and configuration. The content
 hash covers the model; entries without one hash as before. `client.storePrompt(text)` stores a prompt or configuration
-text and resolves to its hash, and `client.prompt(hash)` reads it back, as the operator.
+text and resolves to its hash, and `client.prompt(hash)` reads it back, as the operator. `client.activatePolicies(text)`
+activates a Cedar policy set, and `client.activePolicies()` and `client.policySet(hash)` read it back, as the operator.
 
 </p>
 
@@ -190,7 +191,7 @@ the same fields as the Java `PackageReport`. `report.complianceProfiles` lists t
 active profiles and their combined rules from the ledger. An entry whose personal fields were
 [erased](../../README.md#erasure) still verifies from its commitments, and `client.erasePrincipal(principalId, reason)`
 asks the ledger to erase a principal. A package exported with `includePrompts: true` carries `prompts`; each text must
-match its hash and be named by a disclosed entry, and `report.disclosedPrompts` counts those that do. `placeLegalHold`, `releaseLegalHold`, `legalHolds` and `sweepRetention` manage
+match its hash and be named by a disclosed entry, and `report.disclosedPrompts` counts those that do. A package carries `policies` the same way; each policy set text must match its hash and be named by the `policy.hash` attribute of a disclosed entry, and `report.disclosedPolicies` counts those that do. `placeLegalHold`, `releaseLegalHold`, `legalHolds` and `sweepRetention` manage
 [legal holds](../../README.md#retention-and-legal-holds) and the retention pass.
 
 </p>

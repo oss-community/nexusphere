@@ -53,6 +53,26 @@ class Client(unittest.TestCase):
             client.prompt("cd" * 32)
         self.assertEqual(404, error.exception.status)
 
+    def test_policies(self):
+        text = "permit(principal, action, resource);"
+        active = {"hash": "ab" * 32, "text": text, "policies": ["policy0"], "defaultEffect": "deny",
+                  "createdAt": "2026-10-01T08:00:00Z", "activatedAt": "2026-10-01T08:00:00Z"}
+        stored = dict(active, activatedAt=None)
+        client, opener = self.client((200, active), (200, active), (200, stored),
+                                     (404, {"code": "NOT_FOUND", "message": "No policy set is active."}))
+        self.assertEqual(active, client.activate_policies(text))
+        self.assertEqual("PUT", opener.requests[0].get_method())
+        self.assertEqual("https://ledger.example/api/v1/policies", opener.requests[0].full_url)
+        self.assertEqual({"text": text}, opener.body(0))
+        self.assertEqual(active, client.active_policies())
+        self.assertEqual("GET", opener.requests[1].get_method())
+        self.assertEqual("https://ledger.example/api/v1/policies", opener.requests[1].full_url)
+        self.assertEqual(stored, client.policy_set("ab" * 32))
+        self.assertEqual("https://ledger.example/api/v1/policies/" + "ab" * 32, opener.requests[2].full_url)
+        with self.assertRaises(LedgerError) as error:
+            client.active_policies()
+        self.assertEqual(404, error.exception.status)
+
     def test_evidence_and_decisions_carry_the_model(self):
         client, opener = self.client((201, {}), (200, {"items": []}), (201, {}), (201, {}))
         client.record("invoice-agent", "acme", "tools/call", "SUCCEEDED", model=MODEL)

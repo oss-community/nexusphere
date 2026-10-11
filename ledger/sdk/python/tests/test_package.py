@@ -180,6 +180,7 @@ class Prompts(unittest.TestCase):
         self.assertTrue(report.valid, report.problems)
         self.assertEqual(1, report.disclosed_prompts)
         self.assertEqual("disclosedPrompts", list(report.to_dict())[22])
+        self.assertEqual("disclosedPolicies", list(report.to_dict())[23])
         pkg["links"][1]["entry"]["model"]["version"] = "2"
         self.assertIn("sequence 2: the disclosed entry does not match its content hash",
                       verify_package(pkg, PINNED).problems)
@@ -206,6 +207,50 @@ class Prompts(unittest.TestCase):
         pkg = package(self.chain, {2})
         pkg["links"][1]["entry"]["model"]["promptHash"] = self.prompt_hash.upper()
         self.assertIn("sequence 2: the disclosed entry cannot be read", verify_package(pkg, PINNED).problems)
+
+
+class Policies(unittest.TestCase):
+
+    POLICIES = "permit(principal, action, resource);"
+
+    def setUp(self):
+        self.policy_hash = sha256_hex(self.POLICIES)
+        self.chain = entries(3, attributes={2: {"policy.hash": self.policy_hash}})
+
+    def test_policy_set_texts_match_the_hashes_their_entries_name(self):
+        pkg = package(self.chain, {2})
+        pkg["policies"] = [{"hash": self.policy_hash, "text": self.POLICIES}]
+        report = verify_package(pkg, PINNED)
+        self.assertTrue(report.valid, report.problems)
+        self.assertEqual(1, report.disclosed_policies)
+        self.assertEqual(0, report.disclosed_prompts)
+
+    def test_a_policy_set_must_match_its_text_and_be_named_by_an_entry(self):
+        other = sha256_hex("forbid(principal, action, resource);")
+        pkg = package(self.chain, {2})
+        pkg["policies"] = [{"hash": self.policy_hash, "text": "forbid(principal, action, resource);"},
+                           {"hash": other, "text": "forbid(principal, action, resource);"},
+                           {"text": "No hash."}]
+        report = verify_package(pkg, PINNED)
+        self.assertEqual(["policy set %s does not match its text" % self.policy_hash,
+                          "policy set %s is not named by a disclosed entry" % other,
+                          "policy set null does not match its text"], report.problems)
+        self.assertEqual(0, report.disclosed_policies)
+
+    def test_a_policy_set_of_an_undisclosed_entry_is_not_named(self):
+        pkg = package(self.chain, {1, 3})
+        pkg["policies"] = [{"hash": self.policy_hash, "text": self.POLICIES}]
+        self.assertEqual(["policy set %s is not named by a disclosed entry" % self.policy_hash],
+                         verify_package(pkg, PINNED).problems)
+
+    def test_policy_problems_follow_prompt_problems(self):
+        prompt = "Pay approved invoices only."
+        pkg = package(self.chain, {2})
+        pkg["policies"] = [{"hash": self.policy_hash, "text": "forbid(principal, action, resource);"}]
+        pkg["prompts"] = [{"hash": sha256_hex(prompt), "text": prompt}]
+        self.assertEqual(["prompt %s is not named by a disclosed entry" % sha256_hex(prompt),
+                          "policy set %s does not match its text" % self.policy_hash],
+                         verify_package(pkg, PINNED).problems)
 
 
 class RevokedKeys(unittest.TestCase):

@@ -172,7 +172,10 @@ print(report.valid, report.disclosed_prompts)
 
 `decide` and `record_batch` items take `model` too, and `create_report` and `create_dispute` take
 `include_prompts=True`. The verifier checks that each prompt text in a package hashes to its hash and that a
-disclosed entry names that hash as its `promptHash` or `configHash`.
+disclosed entry names that hash as its `promptHash` or `configHash`. The operator activates a Cedar policy set with
+`client.activate_policies(text)` and reads it back with `client.active_policies()` and `client.policy_set(hash)`; the
+verifier checks each policy set text in a package the same way, against the `policy.hash` attribute of a disclosed
+entry.
 
 </p>
 
@@ -212,6 +215,7 @@ one, and `report.timestamped_at` and `report.timestamp_authority` say when and b
 `rekor_keys`, a list of verifier keys, pins the log of the [Rekor entry](../../README.md#rekor-anchoring),
 `require_rekor=True` refuses a checkpoint without one, and `report.rekor_log_index` and `report.rekor_origin` say
 where it was anchored. `report.disclosed_prompts` counts the prompt texts that match the hashes their entries name.
+`report.disclosed_policies` counts the policy set texts that match the hashes their entries name.
 
 </p>
 
