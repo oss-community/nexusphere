@@ -64,8 +64,8 @@ check, and receipts both sides of an exchange hold.
 
 <p style="text-align: justify;">
 
-See also [End-to-End Tests](ledger-e2e-tests/README.md), the [Ledger Guide](../docs/ledger-guide.md) and
-[Operations](../docs/operations.md).
+See also [End-to-End Tests](ledger-e2e-tests/README.md), the [Ledger Guide](../docs/ledger-guide.md),
+[Keys and Secrets](../docs/keys-and-secrets.md) and [Operations](../docs/operations.md).
 
 </p>
 
@@ -392,9 +392,9 @@ key is its base64 X.509 encoding; the ledger refuses to start when they do not m
 `LEDGER_SIGNING_PROVIDER=vault` the private key stays in a HashiCorp Vault transit key and the `LEDGER_SIGNING_VAULT_*`
 settings replace both keys, as in [Keys in Vault](#keys-in-vault). The tables live in the `ledger` schema, so the ledger
 can share a database with other applications. Any setting can also come from a file of the same name in
-`LEDGER_SECRETS_DIR`, which is how a secret manager hands over keys; backups, keys and metrics are described in
-[Operations](../docs/operations.md). Each caller, by key or by address when it has none, gets
-`LEDGER_RATE_LIMIT_PER_MINUTE` requests a minute with bursts up to `LEDGER_RATE_LIMIT_BURST`; over it the answer is 429
+`LEDGER_SECRETS_DIR`, which is how a secret manager hands over keys; generating and handing over every key is in
+[Keys and Secrets](../docs/keys-and-secrets.md), and backups and metrics are in [Operations](../docs/operations.md).
+Each caller, by key or by address when it has none, gets `LEDGER_RATE_LIMIT_PER_MINUTE` requests a minute with bursts up to `LEDGER_RATE_LIMIT_BURST`; over it the answer is 429
 `RATE_LIMIT_EXCEEDED` with `Retry-After`, and `0` turns the limit off.
 
 </p>
@@ -886,7 +886,7 @@ curl -s http://localhost:8090/api/v1/keys -H "Authorization: Bearer $LEDGER_API_
 Step 3. Rotate the key in Vault and restart the ledger; one more key must appear, endorsed by the one before:
 
 ```shell
-docker exec -e VAULT_TOKEN=nexusphere-vault-development-token vault vault write -f transit/keys/nexusphere-ledger/rotate
+docker exec -e VAULT_ADDR=http://127.0.0.1:8200 -e VAULT_TOKEN=nexusphere-vault-development-token vault vault write -f transit/keys/nexusphere-ledger/rotate
 docker compose --file ledger/compose.yaml --project-name ledger restart ledger
 ```
 

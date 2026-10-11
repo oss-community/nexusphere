@@ -1,6 +1,7 @@
 package com.nexusphere.ledger.server.security;
 
 import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.support.DefaultListableBeanFactory;
 import org.springframework.mock.env.MockEnvironment;
 
 import static org.assertj.core.api.Assertions.assertThatCode;
@@ -13,7 +14,7 @@ class DevelopmentSecretGuardTest {
         DevelopmentSecretGuard.DEVELOPMENT_SECRETS.forEach((property, secret) -> {
             MockEnvironment environment = new MockEnvironment().withProperty(property, secret);
 
-            assertThatThrownBy(() -> new DevelopmentSecretGuard(environment).afterPropertiesSet())
+            assertThatThrownBy(() -> check(environment))
                     .isInstanceOf(IllegalStateException.class)
                     .hasMessageContaining(property);
         });
@@ -25,7 +26,12 @@ class DevelopmentSecretGuardTest {
                 .withProperty("ledger.security.api-key", "nexusphere-ledger-development-key-change-me");
         environment.setActiveProfiles(DevelopmentSecretGuard.DEVELOPMENT_PROFILE);
 
-        assertThatCode(() -> new DevelopmentSecretGuard(environment).afterPropertiesSet())
-                .doesNotThrowAnyException();
+        assertThatCode(() -> check(environment)).doesNotThrowAnyException();
+    }
+
+    private static void check(MockEnvironment environment) {
+        DevelopmentSecretGuard guard = new DevelopmentSecretGuard();
+        guard.setEnvironment(environment);
+        guard.postProcessBeanFactory(new DefaultListableBeanFactory());
     }
 }
