@@ -88,7 +88,7 @@ curl http://localhost:8090/actuator/health
 <p style="text-align: justify;">
 
 The development operator key is `nexusphere-ledger-development-key-change-me`. It only works with the `dev` profile;
-production keys and secrets are described in [Operations](operations.md).
+production keys and secrets are described in [Keys and Secrets](keys-and-secrets.md).
 
 </p>
 
@@ -294,7 +294,8 @@ docker volume prune -f
 
 ## Next Steps
 
-* Production secrets, backups and monitoring: [Operations](operations.md)
+* Production keys and secrets: [Keys and Secrets](keys-and-secrets.md)
+* Backups and monitoring: [Operations](operations.md)
 * Every setting and endpoint: [Nexusphere Ledger](../ledger/README.md)
 * The rules of your jurisdiction: [Compliance Profiles](../ledger/README.md#compliance-profiles)
 * The web UI: [Nexusphere Frontend](../frontend/README.md)

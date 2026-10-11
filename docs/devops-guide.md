@@ -21,7 +21,8 @@
 
 The pipeline is the simplest one mvn-devops offers, its `maven-basic` pipeline with Maven running on this machine:
 Maven builds and tests the project, the ledger becomes a container image in a Docker registry, and Docker Compose runs
-that image with its own PostgreSQL in four environments on one machine. Without a machine of your own, the machine is
+that image with its own PostgreSQL in four environments on one machine, with the keys of each environment from a
+Vault. Without a machine of your own, the machine is
 a container on this one that mvn-devops starts. The image is built once and goes through the environments in order;
 `dev`, `test` and `staging` follow each other on every run, and `prod` waits until you approve it. The settings live
 in [ci/nexusphere.conf](../ci/nexusphere.conf), and `setup` copies them into `devops.conf` in the root.
@@ -74,7 +75,7 @@ mvn-devops/devops.sh doctor
 
 ## Set Up the Pipeline
 
-Step 1. Set up the pipeline from its file; it starts the registry, the machine and the ci database:
+Step 1. Set up the pipeline from its file; it starts the registry, the machine, the ci database and Vault:
 
 ```shell
 mvn-devops/devops.sh setup --pipeline ci/nexusphere.conf
@@ -86,7 +87,8 @@ mvn-devops/devops.sh setup --pipeline ci/nexusphere.conf
 | GitHub token       | the token from step 1 of Before You Start     |
 | Any other question | Enter, to keep the default                    |
 
-Setup ends with `Setup finished` and the machine's lines `dev: root@localhost can run Docker compose` up to `prod`.
+Setup ends with `Setup finished`, the machine's lines `dev: root@localhost can run Docker compose` up to `prod`, and
+`Vault runs; the pipeline reads secret/nexusphere-ledger/<environment>`.
 
 Step 2. Show the stages; they must be the ones in [Pipeline](#pipeline), with the approval before `deploy-prod`:
 
@@ -105,33 +107,21 @@ git commit -m "Set up the pipeline"
 
 <p style="text-align: justify;">
 
-The ledger refuses to start without its own API key and signing key outside the `dev` profile. Each environment keeps
-them in `app.env` on the machine, in `~/mvn-devops/nexusphere-ledger-<environment>/`, which deployments read and never
-overwrite. The database settings come from the pipeline.
+Outside the `dev` profile the ledger refuses to start without an API key and a signing key of its own. The pipeline's
+Vault keeps them, one secret per environment at `secret/nexusphere-ledger/<environment>`, and every deployment gives
+the ledger the secret of its environment. `dev` and `test` get the fixed development values, `staging` and `prod` keys
+generated for them; the database settings come from the pipeline.
 
 </p>
 
-Step 1. Write `app.env` with a new API key and Ed25519 signing key for each environment on the machine:
+Step 1. Put the keys of the four environments in Vault with steps 2 to 5 of
+[Keys of the Four Environments](keys-and-secrets.md#keys-of-the-four-environments).
+
+Step 2. Check the four secrets; `dev` and `test` must hold `LEDGER_PROFILES` and the three keys, `staging` and `prod`
+the three keys:
 
 ```shell
-for env in dev test staging prod; do
-  openssl genpkey -algorithm ed25519 -outform DER -out ledger-$env.der
-  printf 'LEDGER_API_KEY=%s\nLEDGER_SIGNING_PRIVATE_KEY=%s\nLEDGER_SIGNING_PUBLIC_KEY=%s\n' "$(openssl rand -hex 32)" "$(base64 -w0 ledger-$env.der)" "$(openssl pkey -inform DER -in ledger-$env.der -pubout -outform DER | base64 -w0)" | ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o LogLevel=ERROR -i .devops/keys/deploy -p 2222 root@localhost "mkdir -p ~/mvn-devops/nexusphere-ledger-$env && umask 077 && cat > ~/mvn-devops/nexusphere-ledger-$env/app.env"
-  rm ledger-$env.der
-done
-```
-
-Step 2. Check the files; each must hold the three settings:
-
-```shell
-ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o LogLevel=ERROR -i .devops/keys/deploy -p 2222 root@localhost 'for f in ~/mvn-devops/*/app.env; do echo "$f $(cut -d= -f1 $f | tr "\n" " ")"; done'
-```
-
-```text
-/root/mvn-devops/nexusphere-ledger-dev/app.env LEDGER_API_KEY LEDGER_SIGNING_PRIVATE_KEY LEDGER_SIGNING_PUBLIC_KEY
-/root/mvn-devops/nexusphere-ledger-prod/app.env LEDGER_API_KEY LEDGER_SIGNING_PRIVATE_KEY LEDGER_SIGNING_PUBLIC_KEY
-/root/mvn-devops/nexusphere-ledger-staging/app.env LEDGER_API_KEY LEDGER_SIGNING_PRIVATE_KEY LEDGER_SIGNING_PUBLIC_KEY
-/root/mvn-devops/nexusphere-ledger-test/app.env LEDGER_API_KEY LEDGER_SIGNING_PRIVATE_KEY LEDGER_SIGNING_PUBLIC_KEY
+for env in dev test staging prod; do echo "$env $(vault kv get -format=json secret/nexusphere-ledger/$env | jq -c '.data.data | keys')"; done
 ```
 
 ## Run the Pipeline
@@ -154,10 +144,10 @@ Step 3. Check the four environments; each must answer `UP`:
 for port in 8301 8302 8303 8304; do echo "$port $(curl -s http://localhost:$port/actuator/health | jq -r .status)"; done
 ```
 
-Step 4. Call the `prod` ledger with its API key; the answer must be its head:
+Step 4. Call the `prod` ledger with its API key from Vault; the answer must be its head:
 
 ```shell
-KEY=$(ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o LogLevel=ERROR -i .devops/keys/deploy -p 2222 root@localhost 'grep ^LEDGER_API_KEY= ~/mvn-devops/nexusphere-ledger-prod/app.env | cut -d= -f2')
+KEY=$(vault kv get -field=LEDGER_API_KEY secret/nexusphere-ledger/prod)
 curl -s http://localhost:8304/api/v1/ledger/head -H "Authorization: Bearer $KEY" | jq -c 'keys'
 ```
 
@@ -212,16 +202,18 @@ with `REGISTRY_SERVER_URL`. The ssh commands above then use the machine's user, 
 
 ## Every Day
 
-| Command                                       | Does                                                     |
-|-----------------------------------------------|----------------------------------------------------------|
-| `mvn-devops/devops.sh run`                    | Builds, tests and deploys to `dev`, `test` and `staging` |
-| `mvn-devops/devops.sh run --phase prod`       | Approves `prod` and deploys the image `staging` runs     |
-| `mvn-devops/devops.sh run --from deploy-test` | Runs again from one stage                                |
-| `mvn-devops/devops.sh rollback staging`       | Puts the previous image back in an environment           |
-| `mvn-devops/devops.sh rollback prod --to TAG` | Deploys the image of an earlier commit tag               |
-| `mvn-devops/devops.sh stages`                 | Prints the stages and the exact commands they run        |
-| `mvn-devops/devops.sh status`                 | Shows the registry, the machine and the ci database      |
-| `mvn-devops/devops.sh urls`                   | Prints the URLs of the registry and the environments     |
+| Command                                       | Does                                                       |
+|-----------------------------------------------|------------------------------------------------------------|
+| `mvn-devops/devops.sh run`                    | Builds, tests and deploys to `dev`, `test` and `staging`   |
+| `mvn-devops/devops.sh run --phase prod`       | Approves `prod` and deploys the image `staging` runs       |
+| `mvn-devops/devops.sh run --from deploy-test` | Runs again from one stage                                  |
+| `mvn-devops/devops.sh rollback staging`       | Puts the previous image back in an environment             |
+| `mvn-devops/devops.sh rollback prod --to TAG` | Deploys the image of an earlier commit tag                 |
+| `mvn-devops/devops.sh stages`                 | Prints the stages and the exact commands they run          |
+| `mvn-devops/devops.sh status`                 | Shows the registry, the machine, the ci database and Vault |
+| `mvn-devops/devops.sh urls`                   | Prints the URLs of the registry and the environments       |
+| `mvn-devops/devops.sh get VAULT_ROOT_TOKEN`   | Prints the token for the Vault web console                 |
+| `mvn-devops/devops.sh configure`              | Unseals Vault after a restart of Docker or the machine     |
 
 ## Stop and Clean Up
 
@@ -237,7 +229,7 @@ Step 2. To remove everything, delete the four databases too:
 ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -o LogLevel=ERROR -i .devops/keys/deploy -p 2222 root@localhost 'for env in dev test staging prod; do docker volume rm nexusphere-ledger-${env}_db-data; done'
 ```
 
-Step 3. Stop the registry, the machine and the ci database; their data is kept:
+Step 3. Stop the registry, the machine, the ci database and Vault; their data is kept:
 
 ```shell
 mvn-devops/devops.sh down

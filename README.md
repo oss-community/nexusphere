@@ -30,17 +30,18 @@ rest are references to open when they are needed. All of them are also in one bo
 | 3    | [Ledger Guide](docs/ledger-guide.md)                         | Install, register agents, grant, call tools and verify step by step |
 | 4    | [Nexusphere Ledger](ledger/README.md)                        | Every setting, format and endpoint, and one README per module       |
 | 5    | [Nexusphere Frontend](frontend/README.md)                    | The web UI for operators and principals                             |
-| 6    | [Operations](docs/operations.md)                             | Secrets, signing keys, backup, monitoring, alerts and rate limits   |
-| 7    | [Local Environment Setup](docs/local-setup.md)               | Prepare a developer machine step by step: tools, shells, the IDE    |
-| 8    | [DevOps Step by Step](docs/devops-guide.md)                  | Build, test and deploy to dev, test, staging and prod               |
-| 9    | [Ledger End-to-End Tests](ledger/ledger-e2e-tests/README.md) | What the end-to-end tests cover                                     |
-| 10   | [Conformance Vectors](ledger/conformance/README.md)          | Test data for another implementation of the formats                 |
-| 11   | [Python SDK](ledger/sdk/python/README.md)                    | Record evidence from Python and verify packages and mandates        |
-| 12   | [TypeScript SDK](ledger/sdk/typescript/README.md)            | The same for Node and browsers                                      |
-| 13   | [OpenTelemetry Exporter](ledger/otel-exporter/README.md)     | Evidence from the agent spans an OpenTelemetry Collector receives   |
-| 14   | [Adapters](ledger/adapters/README.md)                        | LangGraph, OpenAI Agents SDK, AgentCore and agentgateway            |
-| 15   | [Auditor Portal](ledger/verifier-web/README.md)              | Verify and investigate a package in a browser, with no network      |
-| 16   | [Changelog](ledger/CHANGELOG.md)                             | What each release contains                                          |
+| 6    | [Keys and Secrets](docs/keys-and-secrets.md)                 | Each key's development value, and generating and handing it over |
+| 7    | [Operations](docs/operations.md)                             | Backup, monitoring, alerts, capacity and rate limits                |
+| 8    | [Local Environment Setup](docs/local-setup.md)               | Prepare a developer machine step by step: tools, shells, the IDE    |
+| 9    | [DevOps Step by Step](docs/devops-guide.md)                  | Build, test and deploy to dev, test, staging and prod               |
+| 10   | [Ledger End-to-End Tests](ledger/ledger-e2e-tests/README.md) | What the end-to-end tests cover                                     |
+| 11   | [Conformance Vectors](ledger/conformance/README.md)          | Test data for another implementation of the formats                 |
+| 12   | [Python SDK](ledger/sdk/python/README.md)                    | Record evidence from Python and verify packages and mandates        |
+| 13   | [TypeScript SDK](ledger/sdk/typescript/README.md)            | The same for Node and browsers                                      |
+| 14   | [OpenTelemetry Exporter](ledger/otel-exporter/README.md)     | Evidence from the agent spans an OpenTelemetry Collector receives   |
+| 15   | [Adapters](ledger/adapters/README.md)                        | LangGraph, OpenAI Agents SDK, AgentCore and agentgateway            |
+| 16   | [Auditor Portal](ledger/verifier-web/README.md)              | Verify and investigate a package in a browser, with no network      |
+| 17   | [Changelog](ledger/CHANGELOG.md)                             | What each release contains                                          |
 
 ## Nexusphere Ledger
 
@@ -184,9 +185,10 @@ OpenTelemetry Collector in the `dev` namespace. The steps are in [Nexusphere Led
 The project ships [mvn-devops](https://github.com/oss-community/mvn-devops) 1.0.0 in the `mvn-devops` folder, and
 its pipeline in [ci/nexusphere.conf](ci/nexusphere.conf): Maven builds and tests the project on this machine, the
 ledger becomes an image in a Docker registry, and Docker Compose runs it with its own PostgreSQL in `dev`, `test`,
-`staging` and `prod` on one machine, `prod` only after an approval. Every step, from setup to clean up, is in
-[DevOps Step by Step](docs/devops-guide.md); the guide of mvn-devops itself is
-[mvn-devops/README.md](mvn-devops/README.md). Passwords and keys stay in `.devops/`, which is never committed.
+`staging` and `prod` on one machine, with each environment's keys from a Vault, `prod` only after an approval. Every
+step, from setup to clean up, is in [DevOps Step by Step](docs/devops-guide.md); the guide of mvn-devops itself is
+[mvn-devops/README.md](mvn-devops/README.md). Passwords stay in `.devops/`, which is never committed, and the keys of
+the environments in the pipeline's Vault, as in [Keys and Secrets](docs/keys-and-secrets.md).
 
 </p>
 
@@ -196,7 +198,7 @@ Step 1. Set up the pipeline; it must end with `Setup finished`:
 mvn-devops/devops.sh setup --pipeline ci/nexusphere.conf
 ```
 
-Step 2. Write each environment's keys to the machine as in
+Step 2. Put each environment's keys in the pipeline's Vault as in
 [Settings of Each Environment](docs/devops-guide.md#settings-of-each-environment), then run the pipeline; it must end
 with `prod waits for approval`:
 

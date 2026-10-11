@@ -143,6 +143,8 @@ agent platforms and gateways.
   tracing configuration with an end-to-end check
 * High availability: several instances share one PostgreSQL and one chain, and the scheduled work runs only on
   the leader, the instance holding a PostgreSQL advisory lock, which another instance takes over when it stops
+* The published development API key and signing key are refused outside the `dev` profile before the database is
+  opened, so a refused start leaves no key behind
 * Secrets and signing keys from files written by a secret manager, Prometheus metrics with alert rules, and a tested
   backup and restore procedure
 * Rate limit per caller with 429 and `Retry-After`, and alert delivery by email, Slack, Telegram or webhook, each
