@@ -26,6 +26,13 @@ function fakeLedger() {
     if (path === "/api/v1/agents/invoice-agent/track-record") {
       return Response.json({ credential: "token~", id: "00000000-0000-4000-8000-0000000000dd", checkpoint: 3 });
     }
+    if (path === "/api/v1/a2a/statements") {
+      return Response.json({ statement: "a.b.c", issuer: "https://ledger.example", peer: "https://supplier.example",
+        exchanges: 2 });
+    }
+    if (path === "/api/v1/a2a/reconciliations") {
+      return Response.json({ reconciled: true, statement: "d.e.f", evidenceSequence: 9 });
+    }
     if (path === "/api/v1/reports") {
       return Response.json([{ id: "dispute", title: "Dispute package", profiles: ["baseline"] }]);
     }
@@ -151,5 +158,19 @@ describe("LedgerClient track records", () => {
       body: {} });
     await client.issueTrackRecord("invoice-agent", "https://supplier.example", "P7D");
     expect(ledger.calls[1].body).toEqual({ audience: "https://supplier.example", validFor: "P7D" });
+  });
+});
+
+describe("LedgerClient A2A reconciliation", () => {
+  it("asks for a signed statement and reconciles the peer's", async () => {
+    const ledger = fakeLedger();
+    const client = new LedgerClient(URL, { apiKey: "operator", fetch: ledger.fetcher });
+    expect(await client.a2aStatement("supplier", "2026-10-01T08:00:00Z", new Date("2026-10-02T08:00:00Z")))
+      .toMatchObject({ statement: "a.b.c", exchanges: 2 });
+    expect(ledger.calls[0]).toMatchObject({ method: "POST", url: URL + "/api/v1/a2a/statements", body: {
+      peer: "supplier", from: "2026-10-01T08:00:00.000000Z", to: "2026-10-02T08:00:00.000000Z" } });
+    expect(await client.reconcileA2a("x.y.z")).toEqual({ reconciled: true, statement: "d.e.f", evidenceSequence: 9 });
+    expect(ledger.calls[1]).toMatchObject({ method: "POST", url: URL + "/api/v1/a2a/reconciliations",
+      body: { statement: "x.y.z" } });
   });
 });

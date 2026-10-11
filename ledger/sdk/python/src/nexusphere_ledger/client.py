@@ -222,6 +222,13 @@ class LedgerClient:
         return self._post("/api/v1/agents/%s/track-record" % _segment(agent_id),
                           _compact({"audience": audience, "validFor": valid_for}))
 
+    def a2a_statement(self, peer: str, start, end) -> dict:
+        return self._post("/api/v1/a2a/statements", {"peer": peer, "from": format_instant(start),
+                                                     "to": format_instant(end)})
+
+    def reconcile_a2a(self, statement: str) -> dict:
+        return self._post("/api/v1/a2a/reconciliations", {"statement": statement})
+
     def jwks(self) -> dict:
         return self._get("/public/v1/keys")
 

@@ -247,6 +247,40 @@ class Cli(unittest.TestCase):
             self.assertEqual(USAGE, self.run_cli(*common, "--index-proof", os.path.join(directory, "missing.json"),
                                                  v["token"])[0])
 
+    def test_reconcile(self):
+        v = vector("a2a-reconciliation.json")
+        with tempfile.TemporaryDirectory() as directory:
+            theirs = self.write(directory, "theirs.jwt", v["theirs"])
+            pinned = ("reconcile", "--public-key", v["oursPublicKey"], "--peer-public-key", v["theirsPublicKey"])
+            code, out, _ = self.run_cli(*pinned, v["ours"], theirs)
+            self.assertEqual(INVALID, code, out)
+            self.assertEqual("Nexusphere Ledger A2A reconciliation\n"
+                             "  Ours        : https://ledger.example, 2 exchanges\n"
+                             "  Theirs      : https://supplier.example, 2 exchanges\n"
+                             "  Window      : 2026-10-01T08:00:00Z to 2026-10-02T08:00:00Z\n"
+                             "  Matched     : 1\n"
+                             "  Undelivered : 1\n"
+                             "Result: NOT RECONCILED\n"
+                             "  - NOT_SENT 00000000-0000-4000-8000-000000000103 at 2026-10-01T08:00:30Z: received as "
+                             "from https://ledger.example, which never sent it\n", out)
+            code, out, _ = self.run_cli(*pinned, "--json", v["ours"], theirs)
+            self.assertEqual(INVALID, code)
+            report = json.loads(out)
+            self.assertEqual([], report["problems"])
+            self.assertEqual(v["reconciliation"], report["reconciliation"])
+            key_file = self.write(directory, "ours.pem", v["theirsPublicKey"])
+            code, out, _ = self.run_cli("reconcile", "--public-key-file", key_file, "--peer-public-key",
+                                        v["theirsPublicKey"], v["ours"], theirs)
+            self.assertEqual(INVALID, code)
+            self.assertIn("  - The ours statement cannot be trusted: The token is signed with an unknown key", out)
+            self.assertNotIn("Window", out)
+            code, out, _ = self.run_cli(*pinned, theirs, v["ours"])
+            self.assertEqual(INVALID, code)
+            self.assertIn("The ours statement cannot be trusted", out)
+            self.assertEqual(USAGE, self.run_cli("reconcile", v["ours"])[0])
+            self.assertEqual(USAGE, self.run_cli("reconcile", "--unknown", v["ours"], theirs)[0])
+            self.assertEqual(USAGE, self.run_cli("reconcile", "--public-key")[0])
+
 
 if __name__ == "__main__":
     unittest.main()

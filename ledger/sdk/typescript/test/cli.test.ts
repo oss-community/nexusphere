@@ -177,6 +177,40 @@ describe("nexusphere-ledger-verify", () => {
     expect((await cli(...common, "--index-proof", join(directory, "missing.json"), v.token)).code).toBe(USAGE);
   });
 
+  it("reconciles two A2A statements", async () => {
+    const v = vector("a2a-reconciliation.json");
+    const theirs = join(directory, "theirs.jwt");
+    writeFileSync(theirs, v.theirs);
+    const pinned = ["reconcile", "--public-key", v.oursPublicKey, "--peer-public-key", v.theirsPublicKey];
+    const text = await cli(...pinned, v.ours, theirs);
+    expect(text.code).toBe(INVALID);
+    expect(text.out).toBe(
+      "Nexusphere Ledger A2A reconciliation\n" +
+        "  Ours        : https://ledger.example, 2 exchanges\n" +
+        "  Theirs      : https://supplier.example, 2 exchanges\n" +
+        "  Window      : 2026-10-01T08:00:00Z to 2026-10-02T08:00:00Z\n" +
+        "  Matched     : 1\n" +
+        "  Undelivered : 1\n" +
+        "Result: NOT RECONCILED\n" +
+        "  - NOT_SENT 00000000-0000-4000-8000-000000000103 at 2026-10-01T08:00:30Z: received as from " +
+        "https://ledger.example, which never sent it\n",
+    );
+    const json = await cli(...pinned, "--json", v.ours, theirs);
+    expect(json.code).toBe(INVALID);
+    expect(JSON.parse(json.out).problems).toEqual([]);
+    expect(JSON.parse(json.out).reconciliation).toEqual(v.reconciliation);
+    const keyFile = join(directory, "wrong-key.pem");
+    writeFileSync(keyFile, v.theirsPublicKey);
+    const wrong = await cli("reconcile", "--public-key-file", keyFile, "--peer-public-key", v.theirsPublicKey, v.ours,
+      theirs);
+    expect(wrong.code).toBe(INVALID);
+    expect(wrong.out).toContain("  - The ours statement cannot be trusted: The token is signed with an unknown key");
+    expect(wrong.out).not.toContain("Window");
+    expect((await cli("reconcile", v.ours)).code).toBe(USAGE);
+    expect((await cli("reconcile", "--unknown", v.ours, theirs)).code).toBe(USAGE);
+    expect((await cli("reconcile", "--public-key")).code).toBe(USAGE);
+  });
+
   it("verifies a report against its package", async () => {
     const pkg = await buildPackage(await entries(4), [2], { witness: true });
     const packagePath = join(directory, "report-package.json");

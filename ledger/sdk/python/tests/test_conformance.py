@@ -16,6 +16,7 @@ from nexusphere_ledger.mandate import (KEY_BINDING_INVALID, KEY_BINDING_MISSING,
 from nexusphere_ledger.note import COSIGNATURE, ED25519, LogCheckpoint, Note, NoteKey, cosign
 
 from nexusphere_ledger.package import verify_package
+from nexusphere_ledger.reconcile import reconcile, verify_statement
 from nexusphere_ledger.rekor import rekor_request, verify_rekor_entry
 from nexusphere_ledger.report import entries_digest, report_signed_bytes
 from nexusphere_ledger.timestamp import TimestampToken, read_certificates
@@ -442,6 +443,28 @@ class TrackRecordVector(unittest.TestCase):
         self.assertEqual(full.claims.outcomes, presented.claims.outcomes)
         self.assertEqual([], index.problems)
         self.assertEqual([], match_track_record(full.claims, v["indexProof"], index))
+
+
+class A2aReconciliationVector(unittest.TestCase):
+
+    def test_reconciliation(self):
+        v = vector("a2a-reconciliation.json")
+        ours_key = PublicKey.from_base64(v["oursPublicKey"])
+        theirs_key = PublicKey.from_base64(v["theirsPublicKey"])
+        ours = verify_statement(v["ours"], StaticKeys.fixed("https://ledger.example", ours_key))
+        theirs = verify_statement(v["theirs"], StaticKeys.fixed("https://supplier.example", theirs_key))
+        r = reconcile(ours, theirs)
+        expected = v["reconciliation"]
+        self.assertEqual(expected["ours"], r.to_dict()["ours"])
+        self.assertEqual(expected["theirs"], r.to_dict()["theirs"])
+        self.assertEqual(expected["from"], r.to_dict()["from"])
+        self.assertEqual(expected["to"], r.to_dict()["to"])
+        self.assertEqual(expected["matched"], r.matched)
+        self.assertEqual(expected["undelivered"], r.undelivered)
+        self.assertEqual(expected["discrepancies"], [d.to_dict() for d in r.discrepancies])
+        self.assertEqual(expected, r.to_dict())
+        with self.assertRaises(ValueError):
+            verify_statement(v["ours"], StaticKeys.fixed("https://ledger.example", theirs_key))
 
 
 class KeyHistoryVector(unittest.TestCase):

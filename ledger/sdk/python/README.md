@@ -15,6 +15,7 @@
 * [Verify a Mandate](#verify-a-mandate)
 * [Present a Key-Bound Mandate](#present-a-key-bound-mandate)
 * [Verify an Agent Track Record](#verify-an-agent-track-record)
+* [Reconcile Two Ledgers](#reconcile-two-ledgers)
 * [Check a Signed Request](#check-a-signed-request)
 * [Command Line](#command-line)
 * [Reference](#reference)
@@ -362,6 +363,60 @@ print(check.claims.actions)
 print(match_track_record(check.claims, proof, verify_index_proof(proof, public_key)))
 ```
 
+## Reconcile Two Ledgers
+
+<p style="text-align: justify;">
+
+Two ledgers that exchange A2A messages can [reconcile](../../README.md#reconciling-two-ledgers) what each recorded.
+`a2a_statement` asks a ledger, as the operator, for its signed statement of the exchanges with a peer in a window of
+at most 31 days, and `reconcile_a2a` has the peer's ledger compare it with its own and record the result.
+`verify_statement` checks a statement against the issuer's key, and `reconcile` compares two statements offline with
+the same rules: an exchange is `NOT_RECEIVED`, `NOT_SENT` or a `MISMATCH` with the fields that differ.
+
+</p>
+
+Step 1. Run the two ledgers of [Reconciling Two Ledgers](../../README.md#reconciling-two-ledgers) through its Step 4,
+so that the ledger on port 8090 has sent two orders to its peer `supplier` on port 8092, and connect to both as the
+operator:
+
+```python
+from nexusphere_ledger import LedgerClient
+
+buyer = LedgerClient("http://localhost:8090", "nexusphere-ledger-development-key-change-me")
+supplier = LedgerClient("http://localhost:8092", "nexusphere-ledger-development-key-change-me")
+```
+
+Step 2. Let the buyer's ledger sign its statement of the exchanges with the supplier from an hour ago to an hour from
+now; it must print `2`:
+
+```python
+from datetime import datetime, timedelta, timezone
+
+now = datetime.now(timezone.utc).replace(microsecond=0)
+signed = buyer.a2a_statement("supplier", now - timedelta(hours=1), now + timedelta(hours=1))
+print(signed["exchanges"])
+```
+
+Step 3. Let the supplier's ledger reconcile it with its own; it must print `True 2 []`:
+
+```python
+done = supplier.reconcile_a2a(signed["statement"])
+print(done["reconciled"], done["matched"], done["discrepancies"])
+```
+
+Step 4. Verify both statements pinned to each ledger's key and reconcile them offline; it must print `True 2 0 []`:
+
+```python
+from nexusphere_ledger import PublicKey, StaticKeys, reconcile, verify_statement
+
+ours = verify_statement(signed["statement"], StaticKeys.fixed("http://localhost:8090",
+                                                              PublicKey.from_base64(buyer.active_public_key())))
+theirs = verify_statement(done["statement"], StaticKeys.fixed("http://localhost:8092",
+                                                              PublicKey.from_base64(supplier.active_public_key())))
+r = reconcile(ours, theirs)
+print(r.reconciled, r.matched, r.undelivered, r.discrepancies)
+```
+
 ## Check a Signed Request
 
 <p style="text-align: justify;">
@@ -461,6 +516,14 @@ Step 10. Save the track record of [Verify an Agent Track Record](#verify-an-agen
 nexusphere-ledger-verify track-record --issuer http://localhost:8090 --public-key "$LEDGER_PUBLIC_KEY" --audience https://supplier.example --index-proof proof.json track-record.jwt
 ```
 
+Step 11. Save both statements of [Reconcile Two Ledgers](#reconcile-two-ledgers) with
+`open("buyer.jwt", "w").write(signed["statement"])` and `open("supplier.jwt", "w").write(done["statement"])`, and
+compare them pinned to both keys; the output must show `Matched     : 2` and `Result: RECONCILED`:
+
+```shell
+nexusphere-ledger-verify reconcile --public-key "$(curl -s http://localhost:8090/api/v1/keys -H 'Authorization: Bearer nexusphere-ledger-development-key-change-me' | jq -r '.[] | select(.status == "ACTIVE") | .publicKey')" --peer-public-key "$(curl -s http://localhost:8092/api/v1/keys -H 'Authorization: Bearer nexusphere-ledger-development-key-change-me' | jq -r '.[] | select(.status == "ACTIVE") | .publicKey')" buyer.jwt supplier.jwt
+```
+
 ## Reference
 
 | Module        | Contents                                                                                          |
@@ -477,6 +540,7 @@ nexusphere-ledger-verify track-record --issuer http://localhost:8090 --public-ke
 | `cose`        | `CoseSign1`, SCITT `EvidenceStatement` and RFC 9942 `LogReceipt`                                  |
 | `mandate`     | SD-JWT VC mandates, `MandateVerifier`, status lists and JWKs                                      |
 | `trackrecord` | SD-JWT VC agent track records, `TrackRecordVerifier` and `match_track_record`                     |
+| `reconcile`   | Signed A2A statements: `ExchangeStatement`, `verify_statement`, `reconcile` and `Reconciliation`  |
 | `httpsig`     | RFC 9421 HTTP message signatures: `sign_request`, `verify_request`, `content_digest`              |
 | `keys`        | Ed25519 keys, key IDs, key rotations and trusted keys from a pinned key                           |
 | `canonical`   | Canonical JSON                                                                                    |

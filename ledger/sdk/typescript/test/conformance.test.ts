@@ -53,6 +53,8 @@ import {
   matchTrackRecord,
   trackRecordClaims,
   trackRecordPayload,
+  reconcile,
+  verifyStatement,
 } from "../src/index.js";
 import { ISSUER, LEDGER_KEY, ORIGIN, WITNESS, WITNESS_KEY, buildPackage, vector } from "./support.js";
 
@@ -539,5 +541,26 @@ describe("agent-track-record.json", () => {
     expect(presented.claims!.outcomes).toEqual(full.claims!.outcomes);
     expect(index.problems).toEqual([]);
     expect(matchTrackRecord(full.claims!, v.indexProof, index)).toEqual([]);
+  });
+});
+
+describe("a2a-reconciliation.json", () => {
+  it("verifies both statements and reconciles them as stored", async () => {
+    const v = vector("a2a-reconciliation.json");
+    const oursKey = await PublicKey.fromBase64(v.oursPublicKey);
+    const theirsKey = await PublicKey.fromBase64(v.theirsPublicKey);
+    const ours = await verifyStatement(v.ours, StaticKeys.fixed("https://ledger.example", oursKey));
+    const theirs = await verifyStatement(v.theirs, StaticKeys.fixed("https://supplier.example", theirsKey));
+    const r = reconcile(ours, theirs);
+    const json = JSON.parse(JSON.stringify(r));
+    expect(json.ours).toBe(v.reconciliation.ours);
+    expect(json.theirs).toBe(v.reconciliation.theirs);
+    expect(json.from).toBe(v.reconciliation.from);
+    expect(json.to).toBe(v.reconciliation.to);
+    expect(r.matched).toBe(v.reconciliation.matched);
+    expect(r.undelivered).toBe(v.reconciliation.undelivered);
+    expect(json.discrepancies).toEqual(v.reconciliation.discrepancies);
+    expect(json).toEqual(v.reconciliation);
+    await expect(verifyStatement(v.ours, StaticKeys.fixed("https://ledger.example", theirsKey))).rejects.toThrow();
   });
 });

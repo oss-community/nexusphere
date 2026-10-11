@@ -9,9 +9,10 @@ from dataclasses import asdict
 from .cose import EvidenceStatement, LogReceipt
 from .index import verify_index_proof
 from .keys import PublicKey
-from .mandate import MandateVerifier, StaticKeys
+from .mandate import JwksKeys, Jws, MandateVerifier, StaticKeys, http_fetcher
 from .note import NoteKey
 from .package import verify_package
+from .reconcile import NOT_RECEIVED, NOT_SENT, reconcile, verify_statement
 from .report import verify_report
 from .timestamp import read_certificates
 from .timestamps import epoch_text
@@ -40,6 +41,8 @@ def run(args, out, err, stdin=None) -> int:
         return _track_record(args[1:], out, err, stdin or sys.stdin)
     if args and args[0] == "dispute":
         return _dispute(args[1:], out, err)
+    if args and args[0] == "reconcile":
+        return _reconcile(args[1:], out, err, stdin or sys.stdin)
     return _package(args[1:] if args and args[0] == "package" else args, out, err)
 
 
@@ -555,6 +558,99 @@ def _print_track_record(c, index, valid, problems, out):
         out.write("Result: INVALID\n")
         for problem in problems:
             out.write("  - %s\n" % problem)
+
+
+def _reconcile(args, out, err, stdin) -> int:
+    parser = _Parser(prog="nexusphere-ledger-verify reconcile", add_help=False)
+    parser.add_argument("--public-key")
+    parser.add_argument("--public-key-file")
+    parser.add_argument("--peer-public-key")
+    parser.add_argument("--peer-public-key-file")
+    parser.add_argument("--json", action="store_true")
+    parser.add_argument("ours")
+    parser.add_argument("theirs")
+    options = _parse(parser, args, err)
+    if options is None:
+        return USAGE
+    try:
+        our_key = _public_key(options)
+        if options.peer_public_key_file:
+            with open(options.peer_public_key_file, encoding="utf-8") as file:
+                peer_key = file.read().strip()
+        else:
+            peer_key = options.peer_public_key.strip() if options.peer_public_key else None
+    except OSError as e:
+        err.write(parser.format_usage() + str(e) + "\n")
+        return USAGE
+    tokens = []
+    for source in (options.ours, options.theirs):
+        try:
+            tokens.append(_read_token(source, stdin))
+        except OSError as e:
+            err.write("Cannot read %s: %s\n" % (source, e))
+            return USAGE
+    jwks = JwksKeys(http_fetcher(10), 0)
+    problems = []
+    ours = _verified_statement(tokens[0], our_key, jwks, "ours", problems)
+    theirs = _verified_statement(tokens[1], peer_key, jwks, "theirs", problems)
+    reconciliation = None
+    if ours is not None and theirs is not None:
+        try:
+            reconciliation = reconcile(ours, theirs)
+        except ValueError as e:
+            problems.append(str(e))
+    valid = not problems and reconciliation is not None and reconciliation.reconciled
+    if options.json:
+        out.write(json.dumps({"valid": valid, "problems": problems,
+                              "reconciliation": None if reconciliation is None else reconciliation.to_dict()},
+                             indent=2) + "\n")
+    else:
+        _print_reconciliation(ours, theirs, reconciliation, problems, our_key is None or peer_key is None, valid,
+                              out)
+    return VALID if valid else INVALID
+
+
+def _verified_statement(token, pinned, jwks, name, problems):
+    try:
+        payload = Jws.parse(token).payload
+        issuer = payload.get("iss") if isinstance(payload.get("iss"), str) else ""
+        keys = jwks
+        if pinned is not None:
+            key = PublicKey.from_base64(pinned)
+            keys = StaticKeys({issuer: {key.key_id: key}})
+        return verify_statement(token, keys, issuer)
+    except Exception as e:
+        problems.append("The %s statement cannot be trusted: %s" % (name, e))
+        return None
+
+
+def _print_reconciliation(ours, theirs, r, problems, fetched, valid, out):
+    out.write("Nexusphere Ledger A2A reconciliation\n")
+    if ours is not None:
+        out.write("  Ours        : %s, %d exchanges\n" % (ours.issuer, len(ours.exchanges)))
+    if theirs is not None:
+        out.write("  Theirs      : %s, %d exchanges\n" % (theirs.issuer, len(theirs.exchanges)))
+    if fetched:
+        out.write("  Keys        : fetched from the issuers; pass --public-key and --peer-public-key to pin them\n")
+    if r is not None:
+        out.write("  Window      : %s to %s\n" % (epoch_text(r.start), epoch_text(r.end)))
+        out.write("  Matched     : %d\n" % r.matched)
+        out.write("  Undelivered : %d\n" % r.undelivered)
+    if valid:
+        out.write("Result: RECONCILED\n")
+        return
+    out.write("Result: NOT RECONCILED\n")
+    for problem in problems:
+        out.write("  - %s\n" % problem)
+    if r is not None:
+        for d in r.discrepancies:
+            if d.kind == NOT_SENT:
+                detail = "received as from %s, which never sent it" % d.sender
+            elif d.kind == NOT_RECEIVED:
+                detail = "sent by %s, never recorded as received" % d.sender
+            else:
+                detail = "sent by %s, differs in %s" % (d.sender, ", ".join(d.fields))
+            out.write("  - %s %s at %s: %s\n" % (d.kind, d.request_id, epoch_text(d.requested_at), detail))
 
 
 if __name__ == "__main__":

@@ -16,6 +16,7 @@
 * [Verify a Mandate](#verify-a-mandate)
 * [Present a Key-Bound Mandate](#present-a-key-bound-mandate)
 * [Verify an Agent Track Record](#verify-an-agent-track-record)
+* [Reconcile Two Ledgers](#reconcile-two-ledgers)
 * [Check a Signed Request](#check-a-signed-request)
 * [Command Line](#command-line)
 * [Reference](#reference)
@@ -387,6 +388,60 @@ const index = await verifyIndexProof(proof, { pinnedPublicKey: publicKey });
 console.log(check.claims?.actions, matchTrackRecord(check.claims!, proof, index));
 ```
 
+## Reconcile Two Ledgers
+
+<p style="text-align: justify;">
+
+Two ledgers that exchange A2A messages can [reconcile](../../README.md#reconciling-two-ledgers) what each recorded.
+`client.a2aStatement(peer, from, to)` asks a ledger, as the operator, for its signed statement of the exchanges with a
+peer in a window of at most 31 days, and `client.reconcileA2a(statement)` has the peer's ledger compare it with its
+own and record the result. `verifyStatement` checks a statement against the issuer's key, and `reconcile` compares two
+statements offline with the same rules: an exchange is `NOT_RECEIVED`, `NOT_SENT` or a `MISMATCH` with the fields
+that differ.
+
+</p>
+
+Step 1. Run the two ledgers of [Reconciling Two Ledgers](../../README.md#reconciling-two-ledgers) through its Step 4,
+so that the ledger on port 8090 has sent two orders to its peer `supplier` on port 8092, and connect to both as the
+operator:
+
+```typescript
+import { LedgerClient } from "@nexusphere/ledger";
+
+const apiKey = "nexusphere-ledger-development-key-change-me";
+const buyer = new LedgerClient("http://localhost:8090", { apiKey });
+const supplier = new LedgerClient("http://localhost:8092", { apiKey });
+```
+
+Step 2. Let the buyer's ledger sign its statement of the exchanges with the supplier from an hour ago to an hour from
+now; it must print `2`:
+
+```typescript
+const now = Math.floor(Date.now() / 1000) * 1000;
+const signed = await buyer.a2aStatement("supplier", new Date(now - 3_600_000), new Date(now + 3_600_000));
+console.log(signed.exchanges);
+```
+
+Step 3. Let the supplier's ledger reconcile it with its own; it must print `true 2 []`:
+
+```typescript
+const done = await supplier.reconcileA2a(signed.statement as string);
+console.log(done.reconciled, done.matched, done.discrepancies);
+```
+
+Step 4. Verify both statements pinned to each ledger's key and reconcile them offline; it must print `true 2 0 []`:
+
+```typescript
+import { PublicKey, StaticKeys, reconcile, verifyStatement } from "@nexusphere/ledger";
+
+const ours = await verifyStatement(signed.statement as string,
+  StaticKeys.fixed("http://localhost:8090", await PublicKey.fromBase64(await buyer.activePublicKey())));
+const theirs = await verifyStatement(done.statement as string,
+  StaticKeys.fixed("http://localhost:8092", await PublicKey.fromBase64(await supplier.activePublicKey())));
+const r = reconcile(ours, theirs);
+console.log(r.reconciled, r.matched, r.undelivered, r.discrepancies);
+```
+
 ## Check a Signed Request
 
 <p style="text-align: justify;">
@@ -465,6 +520,14 @@ its index proof as `proof.json`, and verify them together; the output must show
 npx nexusphere-ledger-verify track-record --issuer http://localhost:8090 --public-key "$LEDGER_PUBLIC_KEY" --audience https://supplier.example --index-proof proof.json track-record.jwt
 ```
 
+Step 8. Save both statements of [Reconcile Two Ledgers](#reconcile-two-ledgers) as `buyer.jwt` and `supplier.jwt`
+with `writeFileSync`, and compare them pinned to both keys; the output must show `Matched     : 2` and
+`Result: RECONCILED`:
+
+```shell
+npx nexusphere-ledger-verify reconcile --public-key "$(curl -s http://localhost:8090/api/v1/keys -H 'Authorization: Bearer nexusphere-ledger-development-key-change-me' | jq -r '.[] | select(.status == "ACTIVE") | .publicKey')" --peer-public-key "$(curl -s http://localhost:8092/api/v1/keys -H 'Authorization: Bearer nexusphere-ledger-development-key-change-me' | jq -r '.[] | select(.status == "ACTIVE") | .publicKey')" buyer.jwt supplier.jwt
+```
+
 <p style="text-align: justify;">
 
 `dispute` takes `keys.json`, the timestamp authority chain, the Rekor log key and the witness keys from the archive
@@ -489,6 +552,7 @@ requires no witness cosignature unless `--witness` or `--witnesses-required` is 
 | `cose`        | `CoseSign1`, SCITT `EvidenceStatement` and RFC 9942 `LogReceipt`                                 |
 | `mandate`     | SD-JWT VC mandates, `MandateVerifier`, status lists and JWKs                                     |
 | `trackrecord` | SD-JWT VC agent track records, `TrackRecordVerifier` and `matchTrackRecord`                      |
+| `reconcile`   | Signed A2A statements: `ExchangeStatement`, `verifyStatement`, `reconcile` and `Reconciliation`  |
 | `httpsig`     | RFC 9421 HTTP message signatures: `signRequest`, `verifyRequest`, `contentDigest`                |
 | `keys`        | Ed25519 keys, key IDs, key rotations and trusted keys from a pinned key                          |
 | `canonical`   | Canonical JSON and SHA-256                                                                       |
