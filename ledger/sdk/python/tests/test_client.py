@@ -177,6 +177,32 @@ class Client(unittest.TestCase):
         self.assertEqual(409, error.exception.status)
         self.assertEqual("APPROVAL_RESOLVED", error.exception.code)
 
+    def test_anomalies(self):
+        anomaly = {"id": "00000000-0000-4000-8000-0000000000cc", "agentId": "invoice-agent", "kind": "DENIALS",
+                   "status": "OPEN", "observed": 0.5, "expected": 0.05, "score": 4.2,
+                   "windowStart": "2026-10-01T07:00:00Z", "windowEnd": "2026-10-01T08:00:00Z",
+                   "detectedAt": "2026-10-01T08:00:01Z", "resolvedAt": None, "evidenceId": None,
+                   "resolvedEvidenceId": None}
+        client, opener = self.client((200, {"items": [anomaly]}), (200, {"items": []}), (200, anomaly),
+                                     (200, {"items": [anomaly]}),
+                                     (404, {"code": "NOT_FOUND", "message": "The anomaly does not exist."}))
+        self.assertEqual([anomaly], client.anomalies())
+        self.assertEqual("GET", opener.requests[0].get_method())
+        self.assertEqual("https://ledger.example/api/v1/anomalies?limit=100", opener.requests[0].full_url)
+        self.assertEqual([], client.anomalies("RESOLVED", "invoice-agent", 5))
+        self.assertEqual("https://ledger.example/api/v1/anomalies?status=RESOLVED&agentId=invoice-agent&limit=5",
+                         opener.requests[1].full_url)
+        self.assertEqual(anomaly, client.anomaly(anomaly["id"]))
+        self.assertEqual("https://ledger.example/api/v1/anomalies/" + anomaly["id"], opener.requests[2].full_url)
+        self.assertEqual([anomaly], client.detect_anomalies())
+        self.assertEqual("POST", opener.requests[3].get_method())
+        self.assertEqual("https://ledger.example/api/v1/anomalies/detect", opener.requests[3].full_url)
+        self.assertEqual({}, opener.body())
+        with self.assertRaises(LedgerError) as error:
+            client.anomaly("missing")
+        self.assertEqual(404, error.exception.status)
+        self.assertEqual("NOT_FOUND", error.exception.code)
+
     def test_act_raises_denied_with_the_approval(self):
         decision = {"decisionId": "00000000-0000-4000-8000-0000000000bb", "decision": "DENY",
                     "reasonCode": "APPROVAL_PENDING", "reason": "The operator must approve.",

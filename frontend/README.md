@@ -25,7 +25,8 @@ same origin, so it needs no CORS on the ledger.
 * Operator pages: the ledger head, checkpoints and signing keys, full verification, evidence with filters and entry
   details (including the model name, version, prompt hash and config hash when recorded), erased entries marked with their commitments, agents, grants with their mandates, evidence package export
   and verification, an Approvals page that lists the approval requests of `@approval` policies by status and approves
-  or denies them with an optional reason, a Reports page that creates the signed reports of the active compliance
+  or denies them with an optional reason, an Anomalies page that lists the unusual volume, denial and failure rates
+  the ledger detected per agent by status and checks for new ones, a Reports page that creates the signed reports of the active compliance
   profiles and dispute packages, A2A exchanges, and a Privacy page to erase principals, place and release legal holds
   and run the retention pass
 * Principal pages: sign-in with the ledger's OpenID Connect provider (authorization code with PKCE), the grants

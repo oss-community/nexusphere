@@ -18,6 +18,7 @@
 * [Key Revocation](#key-revocation)
 * [Agents, Grants and Decisions](#agents-grants-and-decisions)
 * [Policies](#policies)
+* [Anomaly Alerts](#anomaly-alerts)
 * [Principal Login and Consent](#principal-login-and-consent)
 * [MCP Gateway](#mcp-gateway)
 * [Mandates](#mandates)
@@ -346,6 +347,13 @@ LEDGER_APPROVAL_CIBA_TOKEN_ENDPOINT:
 LEDGER_APPROVAL_CIBA_CLIENT_ID:
 LEDGER_APPROVAL_CIBA_CLIENT_SECRET:
 LEDGER_APPROVAL_CIBA_SCOPE: openid
+LEDGER_ANOMALY_ENABLED: true
+LEDGER_ANOMALY_INTERVAL: 5m
+LEDGER_ANOMALY_WINDOW: 1h
+LEDGER_ANOMALY_BASELINE: 7d
+LEDGER_ANOMALY_MIN_HISTORY: 1d
+LEDGER_ANOMALY_THRESHOLD: 3
+LEDGER_ANOMALY_MIN_EVENTS: 10
 ```
 
 <p style="text-align: justify;">
@@ -960,6 +968,76 @@ Step 6. Ask twice more; the answers must show `ALLOWED_BY_APPROVAL`, then `APPRO
 
 ```shell
 for i in 1 2; do curl -s -X POST http://localhost:8090/api/v1/decisions -H "Authorization: Bearer $LEDGER_API_KEY" -H "Content-Type: application/json" -d "$WIRE" | jq -r .reasonCode; done
+```
+
+## Anomaly Alerts
+
+<p style="text-align: justify;">
+
+Every `LEDGER_ANOMALY_INTERVAL` the ledger compares each agent's last `LEDGER_ANOMALY_WINDOW` with its own
+`LEDGER_ANOMALY_BASELINE` before it, using simple statistics over the evidence it already holds. `VOLUME` fires when
+the number of entries is at least `LEDGER_ANOMALY_THRESHOLD` standard deviations above the mean of the baseline
+windows (with at least one as the deviation). `DENIALS` and `FAILURES` fire when the share of denied decisions or of
+failed outcomes is that many binomial standard errors above the agent's baseline share (at least 1%). Each check needs
+at least `LEDGER_ANOMALY_MIN_EVENTS` events in the window, and an agent is judged only once its first entry is
+`LEDGER_ANOMALY_MIN_HISTORY` old. No personal field is read.
+
+</p>
+
+<p style="text-align: justify;">
+
+A new anomaly is recorded as `anomaly/detect` evidence under the agent, with the kind, the observed and expected
+values, the score and the window as `anomaly.*` attributes, and `anomaly/resolve` follows once the agent is back
+within its baseline. While an anomaly is open, the metric `ledger_anomaly_score{agent, kind}` carries its score, and
+the rule `LedgerAgentAnomaly` in `ledger/prometheus/alerts.yml` sends it through Alertmanager on the channels of
+[Alert Channels](../docs/operations.md#alert-channels). `GET /api/v1/anomalies` lists anomalies by `status` and
+`agentId`, and `POST /api/v1/anomalies/detect` runs the check at once.
+
+</p>
+
+Step 1. Start the ledger as in [Run](#run) with short windows so that one minute of traffic counts:
+
+```shell
+LEDGER_ANOMALY_WINDOW=1m LEDGER_ANOMALY_BASELINE=1h LEDGER_ANOMALY_MIN_HISTORY=0s LEDGER_ANOMALY_MIN_EVENTS=5 LEDGER_ANOMALY_INTERVAL=15s \
+  LEDGER_PROFILES=postgresql,dev LEDGER_DATABASE_PORT=5433 mvn -pl ledger/server spring-boot:start
+```
+
+Step 2. Start Alertmanager and a Prometheus that scrapes this ledger with its alert rules; both must answer ready:
+
+```shell
+sed -e 's/alertmanager:9093/localhost:9093/' -e 's/ledger:8090/localhost:8090/' ledger/prometheus/prometheus.yml > prometheus-local.yml
+docker run -d --name alertmanager --network host -v "$PWD/ledger/alertmanager:/etc/alertmanager:ro" --entrypoint /bin/sh prom/alertmanager:v0.28.1 /etc/alertmanager/entrypoint.sh
+docker run -d --name prometheus --network host -v "$PWD/prometheus-local.yml:/etc/prometheus/prometheus.yml:ro" -v "$PWD/ledger/prometheus/alerts.yml:/etc/prometheus/alerts.yml:ro" prom/prometheus:v3.5.0
+curl -s localhost:9090/-/ready; curl -s localhost:9093/-/ready
+```
+
+Step 3. Register an agent and let it ask six times for an action nobody granted; every answer must be
+`NO_ACTIVE_GRANT`:
+
+```shell
+curl -s -o /dev/null -X POST http://localhost:8090/api/v1/agents -H "Authorization: Bearer $LEDGER_API_KEY" -H "Content-Type: application/json" -d '{"agentId":"payments-agent","name":"Payments agent","ownerId":"acme"}'
+for i in 1 2 3 4 5 6; do curl -s -X POST http://localhost:8090/api/v1/decisions -H "Authorization: Bearer $LEDGER_API_KEY" -H "Content-Type: application/json" -d '{"agentId":"payments-agent","principalId":"alice","action":"tools/call","target":"bank/wire_transfer"}' | jq -r .reasonCode; done
+```
+
+Step 4. After 20 seconds the ledger must list a `DENIALS` and a `VOLUME` anomaly for `payments-agent`:
+
+```shell
+sleep 20
+curl -s "http://localhost:8090/api/v1/anomalies?status=OPEN" -H "Authorization: Bearer $LEDGER_API_KEY" | jq -c '.items[] | {agentId, kind, score}'
+```
+
+Step 5. After another 35 seconds Alertmanager must hold `LedgerAgentAnomaly` for both:
+
+```shell
+sleep 35
+curl -s http://localhost:9093/api/v2/alerts | jq -r '.[].labels | "\(.alertname) \(.agent) \(.kind)"'
+```
+
+Step 6. Stop Prometheus, Alertmanager and the ledger:
+
+```shell
+docker rm -f prometheus alertmanager
+mvn -pl ledger/server spring-boot:stop
 ```
 
 ## Principal Login and Consent
@@ -2037,6 +2115,9 @@ API key, except `/api/v1/principal/**`, which requires a principal token from th
 | GET    | `/api/v1/principal/approvals`              | The signed-in principal's approvals by `status` and `limit`                                             |
 | POST   | `/api/v1/principal/approvals/{id}/approve` | Approve as the signed-in principal, with consent evidence                                               |
 | POST   | `/api/v1/principal/approvals/{id}/deny`    | Deny as the signed-in principal, with consent evidence                                                  |
+| GET    | `/api/v1/anomalies`                        | Anomalies by `status` (`OPEN`, `RESOLVED`), `agentId` and `limit` (operator)                            |
+| GET    | `/api/v1/anomalies/{id}`                   | An anomaly with its score and evidence (operator)                                                       |
+| POST   | `/api/v1/anomalies/detect`                 | Run the anomaly check now and answer the new anomalies (operator)                                       |
 | PUT    | `/api/v1/prompts`                          | Store a prompt or configuration `text` and answer its `hash`; `201` when new (agent or operator)        |
 | GET    | `/api/v1/prompts/{hash}`                   | A stored prompt text with when and by whom it was stored (operator)                                     |
 | POST   | `/api/v1/index/proofs`                     | A signed proof that a `term` occurs, with its count, or never does, up to a checkpoint (operator)       |

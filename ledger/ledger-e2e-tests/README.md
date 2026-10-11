@@ -188,6 +188,8 @@ other, which watches it, to cosign its log checkpoints over the C2SP witness pro
 |                           | A default deny ledger allows only what a policy permits                       |
 | `ApprovalE2ETest`         | The operator approves or denies once and silence denies                       |
 |                           | The principal answers in the ledger or on their device through CIBA           |
+| `AnomalyE2ETest`          | A burst of denials is detected, recorded, exported and resolved               |
+|                           | A new agent is not judged before it has a history                             |
 
 ##
 

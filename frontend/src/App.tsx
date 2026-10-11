@@ -1,6 +1,7 @@
 import { BrowserRouter, Navigate, NavLink, Outlet, Route, Routes } from 'react-router'
 import { SessionProvider, useSession } from './auth/session'
 import { AgentsPage } from './pages/AgentsPage'
+import { AnomaliesPage } from './pages/AnomaliesPage'
 import { ApprovalsPage } from './pages/ApprovalsPage'
 import { Callback } from './pages/Callback'
 import { EvidencePage } from './pages/EvidencePage'
@@ -20,6 +21,7 @@ const OPERATOR_LINKS = [
   { to: '/agents', label: 'Agents' },
   { to: '/grants', label: 'Grants' },
   { to: '/approvals', label: 'Approvals' },
+  { to: '/anomalies', label: 'Anomalies' },
   { to: '/packages', label: 'Packages' },
   { to: '/reports', label: 'Reports' },
   { to: '/exchanges', label: 'A2A exchanges' },
@@ -91,6 +93,7 @@ export function AppRoutes() {
           <Route path="/agents" element={<AgentsPage />} />
           <Route path="/grants" element={<GrantsPage />} />
           <Route path="/approvals" element={<ApprovalsPage />} />
+          <Route path="/anomalies" element={<AnomaliesPage />} />
           <Route path="/packages" element={<PackagesPage />} />
           <Route path="/reports" element={<ReportsPage />} />
           <Route path="/exchanges" element={<ExchangesPage />} />

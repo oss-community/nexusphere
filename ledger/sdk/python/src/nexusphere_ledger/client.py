@@ -232,6 +232,15 @@ class LedgerClient:
     def deny_approval(self, approval_id: str, reason: Optional[str] = None) -> dict:
         return self._post("/api/v1/approvals/%s/deny" % _segment(approval_id), _compact({"reason": reason}))
 
+    def anomalies(self, status: Optional[str] = None, agent_id: Optional[str] = None, limit: int = 100) -> List[dict]:
+        return self._get("/api/v1/anomalies", status=status, agentId=agent_id, limit=limit)["items"]
+
+    def anomaly(self, anomaly_id: str) -> dict:
+        return self._get("/api/v1/anomalies/" + _segment(anomaly_id))
+
+    def detect_anomalies(self) -> List[dict]:
+        return self._post("/api/v1/anomalies/detect", {})["items"]
+
     def issue_mandate(self, grant_id: str, audience: Optional[str] = None, expires_at=None) -> dict:
         return self._post("/api/v1/mandates", _compact({
             "grantId": grant_id, "audience": audience,

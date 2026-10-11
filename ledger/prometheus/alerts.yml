@@ -22,3 +22,9 @@ groups:
           severity: warning
         annotations:
           summary: The ledger answers more than one 5xx every ten seconds
+      - alert: LedgerAgentAnomaly
+        expr: ledger_anomaly_score > 0
+        labels:
+          severity: warning
+        annotations:
+          summary: Agent {{ $labels.agent }} shows unusual {{ $labels.kind }}, {{ $value | printf "%.1f" }} standard deviations above its baseline
