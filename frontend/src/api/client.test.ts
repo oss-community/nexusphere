@@ -26,4 +26,50 @@ describe('LedgerApi', () => {
     expect((failure as ApiError).code).toBe('GRANT_NOT_PENDING')
     expect((failure as ApiError).message).toBe('Grant g-1 is ACTIVE.')
   })
+
+  it('reads the activity of the signed-in principal for the asked period', async () => {
+    const calls = mockLedger({
+      'GET /api/v1/principal/activity': () => ({
+        body: { since: '2026-10-05T00:00:00Z', total: 0, allowed: 0, denied: 0, failed: 0, days: [], agents: [] },
+      }),
+    })
+
+    const activity = await new LedgerApi('alice-token').myActivity(7)
+
+    expect(calls[0].path).toBe('/api/v1/principal/activity?days=7')
+    expect(calls[0].authorization).toBe('Bearer alice-token')
+    expect(activity.since).toBe('2026-10-05T00:00:00Z')
+  })
+
+  it('exports the evidence package of the signed-in principal with an optional scope', async () => {
+    const calls = mockLedger({
+      'POST /api/v1/principal/packages': () => ({ body: { scope: { principalId: 'alice' }, checkpoint: { sequence: 9 } } }),
+    })
+    const api = new LedgerApi('alice-token')
+
+    const pkg = await api.exportMyPackage({ agentId: 'invoice-agent', toSequence: 9 })
+    await api.exportMyPackage()
+
+    expect(pkg.scope?.principalId).toBe('alice')
+    expect(calls.map((c) => [c.method, c.path, c.body])).toEqual([
+      ['POST', '/api/v1/principal/packages', { agentId: 'invoice-agent', toSequence: 9 }],
+      ['POST', '/api/v1/principal/packages', {}],
+    ])
+  })
+
+  it('pages the evidence about the principal from the newest entry backwards', async () => {
+    const calls = mockLedger({
+      'GET /api/v1/principal/evidence/recent': () => ({ body: { items: [], nextBefore: 7 } }),
+    })
+    const api = new LedgerApi('alice-token')
+
+    const first = await api.myRecentEvidence()
+    await api.myRecentEvidence(7, 20)
+
+    expect(first.nextBefore).toBe(7)
+    expect(calls.map((c) => c.path)).toEqual([
+      '/api/v1/principal/evidence/recent?limit=50',
+      '/api/v1/principal/evidence/recent?before=7&limit=20',
+    ])
+  })
 })

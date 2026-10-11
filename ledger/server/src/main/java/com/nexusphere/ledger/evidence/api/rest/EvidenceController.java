@@ -4,6 +4,7 @@ import com.nexusphere.ledger.chain.AgentModel;
 import com.nexusphere.ledger.chain.EvidenceEntry;
 import com.nexusphere.ledger.chain.Hashes;
 import com.nexusphere.ledger.evidence.application.EvidenceService;
+import com.nexusphere.ledger.evidence.domain.model.Activity;
 import com.nexusphere.ledger.evidence.domain.model.Decision;
 import com.nexusphere.ledger.evidence.domain.model.EvidenceQuery;
 import com.nexusphere.ledger.evidence.domain.model.EvidenceSubmission;
@@ -24,6 +25,8 @@ import org.springframework.web.bind.annotation.RestController;
 
 import java.net.URI;
 import java.time.Instant;
+import java.time.LocalDate;
+import java.time.ZoneOffset;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -97,6 +100,9 @@ class EvidenceController {
     }
 
     record EvidencePage(List<EvidenceResponse> items, Long nextAfter) {
+    }
+
+    record RecentPage(List<EvidenceResponse> items, Long nextBefore) {
     }
 
     record EvidenceBatch(List<EvidenceRequest> items) {
@@ -173,6 +179,27 @@ class EvidenceController {
         List<EvidenceEntry> entries = evidence.find(new EvidenceQuery(null, principalId, after, limit));
         Long nextAfter = entries.size() == limit ? entries.getLast().sequence() : null;
         return new EvidencePage(entries.stream().map(EvidenceResponse::of).toList(), nextAfter);
+    }
+
+    @GetMapping("/principal/evidence/recent")
+    RecentPage recentForPrincipal(Caller caller,
+                                  @RequestParam(defaultValue = "" + Long.MAX_VALUE) long before,
+                                  @RequestParam(defaultValue = "100") int limit) {
+        String principalId = caller.requirePrincipal().principalId();
+        List<EvidenceEntry> entries = evidence.recent(principalId, before, limit);
+        Long nextBefore = entries.size() == limit ? entries.getLast().sequence() : null;
+        return new RecentPage(entries.stream().map(EvidenceResponse::of).toList(), nextBefore);
+    }
+
+    @GetMapping("/principal/activity")
+    Activity activity(Caller caller, @RequestParam(defaultValue = "30") int days) {
+        String principalId = caller.requirePrincipal().principalId();
+        if (days < 1 || days > 366) {
+            throw LedgerException.invalid("The activity request has invalid fields.",
+                    Map.of("days", "must be between 1 and 366"));
+        }
+        Instant since = LocalDate.now(ZoneOffset.UTC).minusDays(days - 1L).atStartOfDay(ZoneOffset.UTC).toInstant();
+        return evidence.activity(principalId, since);
     }
 
     @GetMapping("/ledger/head")
