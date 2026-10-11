@@ -272,11 +272,12 @@ The ledger compose file runs Prometheus on http://localhost:9090. It scrapes the
 
 ### Alerts
 
-| Alert                   | Fires when                                                    |
-|-------------------------|---------------------------------------------------------------|
-| `LedgerDown`            | The ledger has not answered for 1 minute                      |
-| `LedgerCheckpointStale` | New evidence has waited more than 10 minutes for a checkpoint |
-| `LedgerHighErrorRate`   | The ledger answers more than one 5xx every ten seconds        |
+| Alert                   | Fires when                                                                                                                    |
+|-------------------------|-------------------------------------------------------------------------------------------------------------------------------|
+| `LedgerDown`            | The ledger has not answered for 1 minute                                                                                      |
+| `LedgerCheckpointStale` | New evidence has waited more than 10 minutes for a checkpoint                                                                 |
+| `LedgerHighErrorRate`   | The ledger answers more than one 5xx every ten seconds                                                                        |
+| `LedgerAgentAnomaly`    | An agent's volume, denials or failures are far above its baseline, as in [Anomaly Alerts](../ledger/README.md#anomaly-alerts) |
 
 <p style="text-align: justify;">
 

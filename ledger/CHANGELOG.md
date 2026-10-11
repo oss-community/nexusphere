@@ -105,6 +105,9 @@ agent platforms and gateways.
 * Human approval: a forbid policy annotated `@approval` turns its denial into a request that the principal or the
   operator answers in the ledger, the principal also on their device through OpenID Connect CIBA, announced by a
   signed webhook; an approved request is allowed once, and a request nobody answers in time is denied
+* Anomaly alerts: each agent's volume, denial share and failure share are compared with its own baseline, new
+  anomalies are recorded as evidence and exported as `ledger_anomaly_score`, and Alertmanager delivers
+  `LedgerAgentAnomaly`
 * Browser verifier: one self-contained HTML page in React and TypeScript that verifies a package with the
   TypeScript SDK, pinned to the ledger key and optional witnesses, with a Content Security Policy that blocks every
   connection

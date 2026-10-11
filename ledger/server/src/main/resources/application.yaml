@@ -67,6 +67,14 @@ ledger:
       client-id: ${LEDGER_APPROVAL_CIBA_CLIENT_ID:}
       client-secret: ${LEDGER_APPROVAL_CIBA_CLIENT_SECRET:}
       scope: ${LEDGER_APPROVAL_CIBA_SCOPE:openid}
+  anomaly:
+    enabled: ${LEDGER_ANOMALY_ENABLED:true}
+    interval: ${LEDGER_ANOMALY_INTERVAL:5m}
+    window: ${LEDGER_ANOMALY_WINDOW:1h}
+    baseline: ${LEDGER_ANOMALY_BASELINE:7d}
+    min-history: ${LEDGER_ANOMALY_MIN_HISTORY:1d}
+    threshold: ${LEDGER_ANOMALY_THRESHOLD:3}
+    min-events: ${LEDGER_ANOMALY_MIN_EVENTS:10}
   mandate:
     issuer: ${LEDGER_MANDATE_ISSUER:http://localhost:${LEDGER_PORT:8090}}
     status-list-ttl: ${LEDGER_MANDATE_STATUS_LIST_TTL:5m}
