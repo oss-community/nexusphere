@@ -9,6 +9,8 @@
 * [Dependencies](#dependencies)
 * [Getting Started](#getting-started)
 * [Sign-in](#sign-in)
+* [Principal Dashboard](#principal-dashboard)
+* [Browser Tests](#browser-tests)
 
 ## Purpose
 
@@ -29,6 +31,9 @@ same origin, so it needs no CORS on the ledger.
   the ledger detected per agent by status and checks for new ones, a Reports page that creates the signed reports of the active compliance
   profiles and dispute packages, A2A exchanges, and a Privacy page to erase principals, place and release legal holds
   and run the retention pass
+* Principal dashboard: the landing page of a signed-in principal with the activity of their agents over 7, 30 or 90
+  days, the approvals waiting for them, the grants that expire soon, a timeline of the recent actions and the export
+  of their own evidence package
 * Principal pages: sign-in with the ledger's OpenID Connect provider (authorization code with PKCE), the grants
   waiting for approval, approve, deny, revoke and create grants, the approval requests of the principal's agents to
   approve or deny, and the evidence about the principal
@@ -82,6 +87,8 @@ it is set.
 npm test
 ```
 
+The browser tests are described in [Browser Tests](#browser-tests).
+
 ### Build
 
 ```shell
@@ -113,6 +120,82 @@ public client that allows `http://localhost:5173/*` as redirect URI. The Keycloa
 one, `nexusphere-ledger`, with the principals `alice` and `bob`.
 
 </p>
+
+## Principal Dashboard
+
+<p style="text-align: justify;">
+
+A principal lands on `/my`, the Dashboard, after sign-in. It shows what agents did on the principal's behalf and what
+waits for the principal, from the principal endpoints of the ledger, all called with the principal's OpenID Connect
+token. Days are UTC days, the same as the ledger counts them.
+
+</p>
+
+| Card               | Shows                                                                                                | Endpoint                                |
+|--------------------|------------------------------------------------------------------------------------------------------|-----------------------------------------|
+| Activity           | totals (actions, allowed, denied, failed), one bar per day of 7, 30 or 90 days and a per-agent table | `GET /api/v1/principal/activity?days=N` |
+| Waiting for you    | the pending approvals the principal can answer, with Approve and Deny                                | `GET /api/v1/principal/approvals`       |
+| Grants             | the number of active grants and the ones expiring within 7 days                                      | `GET /api/v1/principal/grants`          |
+| Export my evidence | an evidence package of the principal, optionally for one agent and a sequence range                  | `POST /api/v1/principal/packages`       |
+| Recent actions     | the newest evidence about the principal grouped by day; Load more fetches the older page before it   | `GET /api/v1/principal/evidence/recent` |
+
+<p style="text-align: justify;">
+
+The bar chart is plain HTML and CSS: every day of the period has a bar, days without evidence included, scaled to the
+busiest day, and each bar names its day and counts in its title and accessible label. The export downloads
+`evidence-package-<checkpoint sequence>.json`; the package is scoped to the signed-in principal by the ledger and can
+be verified offline in the Auditor Portal (`ledger/verifier-web`) with the ledger's public key.
+
+</p>
+
+<p style="text-align: justify;">
+
+The timeline reads the evidence newest first: the first page holds the latest 50 entries, and Load more asks for the
+page before the oldest one shown with `before=<nextBefore>` until the ledger answers no `nextBefore`.
+
+</p>
+
+## Browser Tests
+
+<p style="text-align: justify;">
+
+The Playwright tests in `e2e` build the application, serve it with `vite preview` on port 4174 and drive Chromium
+against it. They need no ledger and no OpenID Connect provider: every `/api` and `/public` request is answered by
+`page.route`, and the principal is signed in by placing an oidc-client-ts user in session storage under
+`oidc.user:<issuer>:<client ID>`, the issuer and client ID that the mocked `/public/v1/oidc` returns. The operator
+test signs in with the API key on the sign-in page.
+
+</p>
+
+| Test                | Checks                                                                                                                                                                                |
+|---------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `dashboard.spec.ts` | totals and one bar per day, approving sends the POST and empties the queue, the export downloads a package whose scope names the principal, the newest timeline entries and Load more |
+| `operator.spec.ts`  | operator sign-in with the API key and the Overview page                                                                                                                               |
+
+Step 1. Install the dependencies:
+
+```shell
+cd frontend
+npm ci
+```
+
+The command must end without errors.
+
+Step 2. Point Playwright at a Chromium binary, or install its own once with `npx playwright install chromium`:
+
+```shell
+export CHROMIUM_PATH=/path/to/chrome
+```
+
+`"$CHROMIUM_PATH" --version` must print a Chromium version.
+
+Step 3. Run the browser tests:
+
+```shell
+npm run e2e
+```
+
+Playwright must report `5 passed`.
 
 ##
 

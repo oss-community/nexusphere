@@ -17,6 +17,7 @@ test('verifies a package from the built file without any network request', async
   await browser.getByLabel('Ledger public key').fill(LEDGER_KEY.publicKey.encoded)
   await browser.getByRole('button', { name: 'Verify' }).click()
   await expect(browser.getByTestId('verdict')).toHaveText('VALID')
+  await browser.getByRole('tab', { name: 'Entries' }).click()
   await expect(browser.getByRole('row')).toHaveCount(3)
   const blocked = await browser.evaluate(() =>
     fetch('https://example.com/').then(
@@ -43,6 +44,7 @@ test('shows the prompt texts and the models of the disclosed entries', async ({ 
   await browser.getByRole('button', { name: 'Verify' }).click()
   await expect(browser.getByTestId('verdict')).toHaveText('VALID')
   await expect(browser.getByText('1 prompt texts match the hashes their entries name')).toBeVisible()
+  await browser.getByRole('tab', { name: 'Entries' }).click()
   await expect(browser.getByRole('cell', { name: 'model-a 1' })).toBeVisible()
 })
 

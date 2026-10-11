@@ -14,7 +14,7 @@ export function Callback() {
       return
     }
     started.current = true
-    completePrincipalSignIn().then(() => navigate('/my/grants', { replace: true })).catch(setError)
+    completePrincipalSignIn().then(() => navigate('/my', { replace: true })).catch(setError)
   }, [completePrincipalSignIn, navigate])
 
   return (

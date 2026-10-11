@@ -4,6 +4,7 @@ import { AgentsPage } from './pages/AgentsPage'
 import { AnomaliesPage } from './pages/AnomaliesPage'
 import { ApprovalsPage } from './pages/ApprovalsPage'
 import { Callback } from './pages/Callback'
+import { DashboardPage } from './pages/DashboardPage'
 import { EvidencePage } from './pages/EvidencePage'
 import { ExchangesPage } from './pages/ExchangesPage'
 import { GrantsPage } from './pages/GrantsPage'
@@ -29,6 +30,7 @@ const OPERATOR_LINKS = [
 ]
 
 const PRINCIPAL_LINKS = [
+  { to: '/my', label: 'Dashboard' },
   { to: '/my/grants', label: 'My grants' },
   { to: '/my/approvals', label: 'My approvals' },
   { to: '/my/evidence', label: 'Evidence about me' },
@@ -65,7 +67,7 @@ function Guard({ kind }: { kind: 'operator' | 'principal' }) {
     return <Navigate to="/sign-in" replace />
   }
   if (session.kind !== kind) {
-    return <Navigate to={session.kind === 'principal' ? '/my/grants' : '/'} replace />
+    return <Navigate to={session.kind === 'principal' ? '/my' : '/'} replace />
   }
   return <Outlet />
 }
@@ -76,7 +78,7 @@ function SignInRoute() {
     return <p className="muted center">Loading…</p>
   }
   if (session) {
-    return <Navigate to={session.kind === 'principal' ? '/my/grants' : '/'} replace />
+    return <Navigate to={session.kind === 'principal' ? '/my' : '/'} replace />
   }
   return <SignIn />
 }
@@ -100,6 +102,7 @@ export function AppRoutes() {
           <Route path="/privacy" element={<PrivacyPage />} />
         </Route>
         <Route element={<Guard kind="principal" />}>
+          <Route path="/my" element={<DashboardPage />} />
           <Route path="/my/grants" element={<MyGrantsPage />} />
           <Route path="/my/approvals" element={<MyApprovalsPage />} />
           <Route path="/my/evidence" element={<EvidencePage mine />} />
