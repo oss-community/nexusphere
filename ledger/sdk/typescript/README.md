@@ -168,6 +168,8 @@ try {
 When a policy annotated `@approval` stops the action, `act` throws `Denied` with reason code `APPROVAL_PENDING` and the
 request in `e.approvalId`; `approvals`, `approval`, `approve` and `denyApproval` list, read and resolve approval
 requests, and once approved the identical action is allowed once with reason code `ALLOWED_BY_APPROVAL`.
+`anomalies`, `anomaly` and `detectAnomalies` list, read and trigger the operator's anomaly checks on agent volume, denials
+and failures.
 
 </p>
 

@@ -18,6 +18,20 @@ const APPROVAL = {
   used: false,
 };
 
+const ANOMALY = {
+  id: "00000000-0000-4000-8000-0000000000cc",
+  agentId: "invoice-agent",
+  kind: "DENIALS",
+  status: "OPEN",
+  observed: 0.5,
+  expected: 0.05,
+  score: 4.2,
+  windowStart: "2026-10-01T07:00:00Z",
+  windowEnd: "2026-10-01T08:00:00Z",
+  detectedAt: "2026-10-01T08:00:01Z",
+  resolvedAt: null,
+};
+
 function fakeLedger() {
   const calls: { method: string; url: string; headers: Record<string, string>; body: unknown }[] = [];
   const fetcher = async (url: string | URL | Request, init: RequestInit = {}) => {
@@ -51,6 +65,12 @@ function fakeLedger() {
     }
     if (path === `/api/v1/approvals/${APPROVAL.id}/deny`) {
       return Response.json({ code: "APPROVAL_RESOLVED", message: "The approval is resolved." }, { status: 409 });
+    }
+    if (path.startsWith("/api/v1/anomalies?") || path === "/api/v1/anomalies/detect") {
+      return Response.json({ items: [ANOMALY] });
+    }
+    if (path === "/api/v1/anomalies/" + ANOMALY.id) {
+      return Response.json(ANOMALY);
     }
     if (path === "/api/v1/evidence" || path === "/api/v1/decisions" || path === "/api/v1/packages") {
       return Response.json({ ok: true });
@@ -265,5 +285,20 @@ describe("LedgerClient approvals", () => {
       .catch((e) => e);
     expect(other).toBeInstanceOf(Denied);
     expect(other.approvalId).toBeNull();
+  });
+});
+
+describe("LedgerClient anomalies", () => {
+  it("lists, reads and detects anomalies", async () => {
+    const ledger = fakeLedger();
+    const client = new LedgerClient(URL, { apiKey: "operator", fetch: ledger.fetcher });
+    expect(await client.anomalies()).toEqual([ANOMALY]);
+    expect(ledger.calls[0]).toMatchObject({ method: "GET", url: URL + "/api/v1/anomalies?limit=100", body: undefined });
+    await client.anomalies({ status: "RESOLVED", agentId: "invoice-agent", limit: 5 });
+    expect(ledger.calls[1].url).toBe(URL + "/api/v1/anomalies?status=RESOLVED&agentId=invoice-agent&limit=5");
+    expect(await client.anomaly(ANOMALY.id)).toEqual(ANOMALY);
+    expect(ledger.calls[2]).toMatchObject({ method: "GET", url: URL + "/api/v1/anomalies/" + ANOMALY.id });
+    expect(await client.detectAnomalies()).toEqual([ANOMALY]);
+    expect(ledger.calls[3]).toMatchObject({ method: "POST", url: URL + "/api/v1/anomalies/detect", body: {} });
   });
 });

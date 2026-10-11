@@ -114,3 +114,21 @@ export function approval(id: string, status: string, method: string | null = nul
     used: false,
   }
 }
+
+export function anomaly(id: string, kind: string, status: string) {
+  return {
+    id,
+    agentId: `${id}-agent`,
+    kind,
+    status,
+    observed: kind === 'VOLUME' ? 240 : 0.425,
+    expected: kind === 'VOLUME' ? 31.5 : 0.05,
+    score: kind === 'VOLUME' ? 12.34 : 4.06,
+    windowStart: '2026-10-08T09:00:00Z',
+    windowEnd: '2026-10-08T10:00:00Z',
+    detectedAt: '2026-10-08T10:00:05Z',
+    resolvedAt: status === 'RESOLVED' ? '2026-10-08T12:00:00Z' : null,
+    evidenceId: null,
+    resolvedEvidenceId: null,
+  }
+}

@@ -139,6 +139,26 @@ export interface Approval {
   used: boolean
 }
 
+export type AnomalyKind = 'VOLUME' | 'DENIALS' | 'FAILURES'
+
+export type AnomalyStatus = 'OPEN' | 'RESOLVED'
+
+export interface Anomaly {
+  id: string
+  agentId: string
+  kind: AnomalyKind
+  status: AnomalyStatus
+  observed: number
+  expected: number
+  score: number
+  windowStart: string
+  windowEnd: string
+  detectedAt: string
+  resolvedAt: string | null
+  evidenceId: string | null
+  resolvedEvidenceId: string | null
+}
+
 export interface GrantDraft {
   principalId?: string
   agentId: string

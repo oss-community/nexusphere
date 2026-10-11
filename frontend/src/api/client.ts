@@ -1,5 +1,5 @@
 import type {
-  Agent, Approval, Checkpoint, OfferedReport, ReportScope, SignedReport, Erasure, Evidence, Exchange, Grant, GrantDraft, Head, IssuedAgent, LegalHold, Mandate, OidcInfo,
+  Agent, Anomaly, Approval, Checkpoint, OfferedReport, ReportScope, SignedReport, Erasure, Evidence, Exchange, Grant, GrantDraft, Head, IssuedAgent, LegalHold, Mandate, OidcInfo,
   PackageReport, Page, Principal, RetentionSweep, SigningKey, VerificationReport,
 } from './types'
 
@@ -136,6 +136,18 @@ export class LedgerApi {
 
   denyApproval(id: string, reason?: string) {
     return this.request<Approval>('POST', `/api/v1/approvals/${id}/deny`, { reason })
+  }
+
+  anomalies(query: { status?: string; agentId?: string }) {
+    return this.request<{ items: Anomaly[] }>('GET', '/api/v1/anomalies', undefined, { ...query, limit: 100 })
+  }
+
+  anomaly(id: string) {
+    return this.request<Anomaly>('GET', `/api/v1/anomalies/${id}`)
+  }
+
+  detectAnomalies() {
+    return this.request<{ items: Anomaly[] }>('POST', '/api/v1/anomalies/detect')
   }
 
   exchange(id: string) {

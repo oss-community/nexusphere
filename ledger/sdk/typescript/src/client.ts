@@ -365,6 +365,18 @@ export class LedgerClient {
     return this.post(`/api/v1/approvals/${encodeURIComponent(id)}/deny`, compact({ reason }));
   }
 
+  async anomalies(query: { status?: string; agentId?: string; limit?: number } = {}): Promise<Json[]> {
+    return ((await this.get("/api/v1/anomalies", { ...query, limit: query.limit ?? 100 })) as { items: Json[] }).items;
+  }
+
+  anomaly(id: string): Promise<Json> {
+    return this.get("/api/v1/anomalies/" + encodeURIComponent(id));
+  }
+
+  async detectAnomalies(): Promise<Json[]> {
+    return ((await this.post("/api/v1/anomalies/detect", {})) as { items: Json[] }).items;
+  }
+
   issueMandate(grantId: string, audience?: string, expiresAt?: string | Date): Promise<Json> {
     return this.post("/api/v1/mandates", compact({
       grantId,
