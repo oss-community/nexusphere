@@ -39,6 +39,8 @@ record.
 * A2A gateway that sends and receives requests between two ledgers with evidence and signed receipts on both sides
 * Principal sign-in with an OpenID Connect provider and principal consent on grants, their activity per day and agent, and
   a package of their own evidence
+* Questions in plain language answered from verified evidence with citations, by a built-in or an
+  OpenAI-compatible model
 * Health probes and Prometheus metrics for the chain head, checkpoints and recorded evidence
 
 ## Dependencies

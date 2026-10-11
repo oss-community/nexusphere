@@ -3,6 +3,7 @@ package com.nexusphere.ledger.evidence.domain.repository;
 import com.nexusphere.ledger.chain.EvidenceEntry;
 import com.nexusphere.ledger.evidence.domain.model.Activity;
 import com.nexusphere.ledger.evidence.domain.model.EvidenceQuery;
+import com.nexusphere.ledger.evidence.domain.model.EvidenceSearch;
 import com.nexusphere.ledger.evidence.domain.model.LedgerHead;
 import com.nexusphere.ledger.evidence.domain.model.Selection;
 
@@ -26,6 +27,12 @@ public interface EvidenceRepository {
     Optional<EvidenceEntry> latestByAction(String action);
 
     List<EvidenceEntry> find(EvidenceQuery query);
+
+    List<EvidenceEntry> search(EvidenceSearch search);
+
+    List<String> agentIds(int limit);
+
+    List<String> actions(int limit);
 
     List<EvidenceEntry> recent(String principalId, long beforeSequence, int limit);
 

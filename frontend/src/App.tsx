@@ -3,6 +3,7 @@ import { SessionProvider, useSession } from './auth/session'
 import { AgentsPage } from './pages/AgentsPage'
 import { AnomaliesPage } from './pages/AnomaliesPage'
 import { ApprovalsPage } from './pages/ApprovalsPage'
+import { AskPage, OPERATOR_ASK, PRINCIPAL_ASK } from './pages/AskPage'
 import { Callback } from './pages/Callback'
 import { DashboardPage } from './pages/DashboardPage'
 import { EvidencePage } from './pages/EvidencePage'
@@ -19,6 +20,7 @@ import { SignIn } from './pages/SignIn'
 const OPERATOR_LINKS = [
   { to: '/', label: 'Overview' },
   { to: '/evidence', label: 'Evidence' },
+  { to: '/ask', label: 'Ask' },
   { to: '/agents', label: 'Agents' },
   { to: '/grants', label: 'Grants' },
   { to: '/approvals', label: 'Approvals' },
@@ -34,6 +36,7 @@ const PRINCIPAL_LINKS = [
   { to: '/my/grants', label: 'My grants' },
   { to: '/my/approvals', label: 'My approvals' },
   { to: '/my/evidence', label: 'Evidence about me' },
+  { to: '/my/ask', label: 'Ask' },
 ]
 
 function Layout() {
@@ -92,6 +95,7 @@ export function AppRoutes() {
         <Route element={<Guard kind="operator" />}>
           <Route index element={<Overview />} />
           <Route path="/evidence" element={<EvidencePage />} />
+          <Route path="/ask" element={<AskPage endpoint={OPERATOR_ASK} />} />
           <Route path="/agents" element={<AgentsPage />} />
           <Route path="/grants" element={<GrantsPage />} />
           <Route path="/approvals" element={<ApprovalsPage />} />
@@ -106,6 +110,7 @@ export function AppRoutes() {
           <Route path="/my/grants" element={<MyGrantsPage />} />
           <Route path="/my/approvals" element={<MyApprovalsPage />} />
           <Route path="/my/evidence" element={<EvidencePage mine />} />
+          <Route path="/my/ask" element={<AskPage endpoint={PRINCIPAL_ASK} />} />
         </Route>
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />

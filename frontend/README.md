@@ -10,6 +10,7 @@
 * [Getting Started](#getting-started)
 * [Sign-in](#sign-in)
 * [Principal Dashboard](#principal-dashboard)
+* [Ask](#ask)
 * [Browser Tests](#browser-tests)
 
 ## Purpose
@@ -29,14 +30,16 @@ same origin, so it needs no CORS on the ledger.
   and verification, an Approvals page that lists the approval requests of `@approval` policies by status and approves
   or denies them with an optional reason, an Anomalies page that lists the unusual volume, denial and failure rates
   the ledger detected per agent by status and checks for new ones, a Reports page that creates the signed reports of the active compliance
-  profiles and dispute packages, A2A exchanges, and a Privacy page to erase principals, place and release legal holds
-  and run the retention pass
+  profiles and dispute packages, A2A exchanges, a Privacy page to erase principals, place and release legal holds
+  and run the retention pass, and an Ask page that answers a plain-language question about the evidence with cited
+  entries
 * Principal dashboard: the landing page of a signed-in principal with the activity of their agents over 7, 30 or 90
   days, the approvals waiting for them, the grants that expire soon, a timeline of the recent actions and the export
   of their own evidence package
 * Principal pages: sign-in with the ledger's OpenID Connect provider (authorization code with PKCE), the grants
   waiting for approval, approve, deny, revoke and create grants, the approval requests of the principal's agents to
-  approve or deny, and the evidence about the principal
+  approve or deny, the evidence about the principal, and an Ask page that answers questions about the principal's
+  own evidence
 
 ## Dependencies
 
@@ -141,6 +144,12 @@ token. Days are UTC days, the same as the ledger counts them.
 
 <p style="text-align: justify;">
 
+The Recent actions card links to `/my/ask`, the principal's [Ask](#ask) page.
+
+</p>
+
+<p style="text-align: justify;">
+
 The bar chart is plain HTML and CSS: every day of the period has a bar, days without evidence included, scaled to the
 busiest day, and each bar names its day and counts in its title and accessible label. The export downloads
 `evidence-package-<checkpoint sequence>.json`; the package is scoped to the signed-in principal by the ledger and can
@@ -152,6 +161,34 @@ be verified offline in the Auditor Portal (`ledger/verifier-web`) with the ledge
 
 The timeline reads the evidence newest first: the first page holds the latest 50 entries, and Load more asks for the
 page before the oldest one shown with `before=<nextBefore>` until the ledger answers no `nextBefore`.
+
+</p>
+
+## Ask
+
+<p style="text-align: justify;">
+
+The Ask page answers a question in plain language from the evidence. The operator opens it at `/ask` and the question
+covers the whole ledger; a principal opens it at `/my/ask`, from the navigation or the Recent actions card of the
+Dashboard, and the ledger answers only from the principal's own evidence. Both routes share one page that is given its
+endpoint.
+
+</p>
+
+| Route     | Signed in as | Endpoint                     |
+|-----------|--------------|------------------------------|
+| `/ask`    | operator     | `POST /api/v1/ask`           |
+| `/my/ask` | principal    | `POST /api/v1/principal/ask` |
+
+<p style="text-align: justify;">
+
+The question has at most 500 characters, with a counter under the text box and example questions to pick. The answer
+is shown sentence by sentence, each followed by `#<sequence>` chips for the entries it cites; a chip highlights and
+scrolls to its row in the Cited evidence table, which shows the entry with its content, link and inclusion checks, or
+`Verified` when all three passed. The search plan the ledger used is shown as labeled chips, and a footer names the
+model, the number of entries considered, the checkpoint size, the sequence the question was recorded as and how many
+sentences without valid citations were removed. Entries that failed verification are listed in a warning and were not
+used. A rejected question (400) or an unavailable model (502) shows the ledger's message.
 
 </p>
 
@@ -171,6 +208,7 @@ test signs in with the API key on the sign-in page.
 |---------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | `dashboard.spec.ts` | totals and one bar per day, approving sends the POST and empties the queue, the export downloads a package whose scope names the principal, the newest timeline entries and Load more |
 | `operator.spec.ts`  | operator sign-in with the API key and the Overview page                                                                                                                               |
+| `ask.spec.ts`       | the operator asks a question, sees the model error and then the cited answer, plan, warning and footer, and a citation chip highlights its row; the principal asks from the Dashboard |
 
 Step 1. Install the dependencies:
 
@@ -195,7 +233,7 @@ Step 3. Run the browser tests:
 npm run e2e
 ```
 
-Playwright must report `5 passed`.
+Playwright must report `7 passed`.
 
 ##
 
