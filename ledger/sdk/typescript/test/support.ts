@@ -76,6 +76,7 @@ export async function entries(
   agents = ["invoice-agent", "sales-agent"],
   principals = ["acme", "globex"],
   models: Record<number, Json> = {},
+  attributes: Record<number, Record<string, string>> = {},
 ) {
   const chain: Json[] = [];
   let previous = GENESIS;
@@ -104,7 +105,9 @@ export async function entries(
     if (models[sequence]) {
       entry.model = models[sequence];
     }
-    entry.salts = await salts(sequence, ["principalId", "target", "reason", "correlationId", "attributes.tool"]);
+    Object.assign(entry.attributes as Json, attributes[sequence] ?? {});
+    entry.salts = await salts(sequence, ["principalId", "target", "reason", "correlationId",
+      ...Object.keys(entry.attributes as Json).map((name) => "attributes." + name)]);
     entry.hash = await linkHash(sequence, previous, await contentHash(entry));
     previous = entry.hash as string;
     chain.push(entry);

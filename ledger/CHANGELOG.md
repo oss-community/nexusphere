@@ -99,6 +99,9 @@ agent platforms and gateways.
   requests one side never received, never sent or recorded differently, and records the result as evidence; the
   `reconcile` command and the Python and TypeScript SDKs compare two statements offline, and an
   `a2a-reconciliation.json` conformance vector holds a pair
+* Cedar policies: the operator activates a policy set that every decision must also pass, with a default effect of
+  permit or deny; a denial is `POLICY_DENIED`, each decision records the policy set hash and the deciding policies,
+  and packages carry the policy texts that the verifier and SDKs check against their hashes
 * Browser verifier: one self-contained HTML page in React and TypeScript that verifies a package with the
   TypeScript SDK, pinned to the ledger key and optional witnesses, with a Content Security Policy that blocks every
   connection

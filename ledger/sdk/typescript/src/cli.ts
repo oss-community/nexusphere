@@ -487,6 +487,9 @@ function printPackage(r: PackageReport, timestampPinned: boolean, rekorPinned: b
   if (r.disclosedPrompts > 0) {
     lines.push(`  Prompts     : ${r.disclosedPrompts} prompt texts match the hashes their entries name`);
   }
+  if (r.disclosedPolicies > 0) {
+    lines.push(`  Policies    : ${r.disclosedPolicies} policy set texts match the hashes their entries name`);
+  }
   if (r.logTreeSize !== null) {
     lines.push(`  Log         : ${r.logOrigin}, ${r.logTreeSize} entries, ${r.provenEntries} disclosed entries proven`);
     lines.push(`  Receipts    : ${r.receiptedEntries} SCITT statements with receipts`);

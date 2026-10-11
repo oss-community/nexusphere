@@ -28,5 +28,6 @@ public record PackageReport(
         Long rekorLogIndex,
         String rekorOrigin,
         long disclosedPrompts,
+        long disclosedPolicies,
         List<String> problems) {
 }

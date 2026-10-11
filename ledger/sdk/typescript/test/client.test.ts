@@ -17,6 +17,11 @@ function fakeLedger() {
     if (path === "/api/v1/prompts/" + "ab".repeat(32)) {
       return Response.json({ hash: "ab".repeat(32), text: "new", createdAt: "2026-10-01T08:00:00Z", createdBy: "operator" });
     }
+    if (path === "/api/v1/policies" || path === "/api/v1/policies/" + "ab".repeat(32)) {
+      const activatedAt = path === "/api/v1/policies" ? "2026-10-01T08:00:00Z" : null;
+      return Response.json({ hash: "ab".repeat(32), text: "permit(principal, action, resource);", policies: ["policy0"],
+        defaultEffect: "deny", createdAt: "2026-10-01T08:00:00Z", activatedAt });
+    }
     if (path === "/api/v1/evidence" || path === "/api/v1/decisions" || path === "/api/v1/packages") {
       return Response.json({ ok: true });
     }
@@ -134,6 +139,24 @@ describe("LedgerClient models and prompts", () => {
     expect(ledger.calls[1].body).toEqual({ includePrompts: true });
     await client.createDispute({ title: "Invoice 4711 paid twice", includePrompts: true });
     expect(ledger.calls[2].body).toEqual({ title: "Invoice 4711 paid twice", includePrompts: true });
+  });
+});
+
+describe("LedgerClient policy sets", () => {
+  const policyHash = "ab".repeat(32);
+
+  it("activates and reads a policy set", async () => {
+    const ledger = fakeLedger();
+    const client = new LedgerClient(URL, { fetch: ledger.fetcher });
+    const active = await client.activatePolicies("permit(principal, action, resource);");
+    expect(active).toEqual({ hash: policyHash, text: "permit(principal, action, resource);", policies: ["policy0"],
+      defaultEffect: "deny", createdAt: "2026-10-01T08:00:00Z", activatedAt: "2026-10-01T08:00:00Z" });
+    expect(ledger.calls[0]).toMatchObject({ method: "PUT", url: URL + "/api/v1/policies",
+      body: { text: "permit(principal, action, resource);" } });
+    expect(await client.activePolicies()).toEqual(active);
+    expect(ledger.calls[1]).toMatchObject({ method: "GET", url: URL + "/api/v1/policies", body: undefined });
+    expect(await client.policySet(policyHash)).toEqual({ ...active, activatedAt: null });
+    expect(ledger.calls[2]).toMatchObject({ method: "GET", url: URL + "/api/v1/policies/" + policyHash });
   });
 });
 

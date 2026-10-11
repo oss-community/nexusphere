@@ -82,6 +82,56 @@ describe("verifyPackage", async () => {
     expect((await verifyPackage(await buildPackage(chain, [2]), PINNED)).disclosedPrompts).toBe(0);
   });
 
+  it("checks the policy set texts against the hashes their entries name", async () => {
+    const policies = "permit(principal, action, resource);";
+    const policyHash = await sha256Hex(policies);
+    const governed = await entries(3, undefined, undefined, {}, { 2: { "policy.hash": policyHash } });
+    const pkg = (await buildPackage(governed, [2])) as any;
+    pkg.policies = [{ hash: policyHash, text: policies }];
+    const report = await verifyPackage(pkg, PINNED);
+    expect(report.problems).toEqual([]);
+    expect(report.disclosedPolicies).toBe(1);
+    expect(report.disclosedPrompts).toBe(0);
+  });
+
+  it("finds policy set texts that do not match or are not named", async () => {
+    const policyHash = await sha256Hex("permit(principal, action, resource);");
+    const other = await sha256Hex("forbid(principal, action, resource);");
+    const governed = await entries(3, undefined, undefined, {}, { 2: { "policy.hash": policyHash } });
+    const pkg = (await buildPackage(governed, [2])) as any;
+    pkg.policies = [
+      { hash: policyHash, text: "forbid(principal, action, resource);" },
+      { hash: other, text: "forbid(principal, action, resource);" },
+      { text: "No hash." },
+    ];
+    const report = await verifyPackage(pkg, PINNED);
+    expect(report.problems).toEqual([
+      `policy set ${policyHash} does not match its text`,
+      `policy set ${other} is not named by a disclosed entry`,
+      "policy set null does not match its text",
+    ]);
+    expect(report.disclosedPolicies).toBe(0);
+    const undisclosed = (await buildPackage(governed, [1, 3])) as any;
+    undisclosed.policies = [{ hash: policyHash, text: "permit(principal, action, resource);" }];
+    expect((await verifyPackage(undisclosed, PINNED)).problems).toEqual([
+      `policy set ${policyHash} is not named by a disclosed entry`,
+    ]);
+  });
+
+  it("reports policy set problems after prompt problems", async () => {
+    const prompt = "Pay approved invoices only.";
+    const promptHash = await sha256Hex(prompt);
+    const policyHash = await sha256Hex("permit(principal, action, resource);");
+    const governed = await entries(3, undefined, undefined, {}, { 2: { "policy.hash": policyHash } });
+    const pkg = (await buildPackage(governed, [2])) as any;
+    pkg.policies = [{ hash: policyHash, text: "forbid(principal, action, resource);" }];
+    pkg.prompts = [{ hash: promptHash, text: prompt }];
+    expect((await verifyPackage(pkg, PINNED)).problems).toEqual([
+      `prompt ${promptHash} is not named by a disclosed entry`,
+      `policy set ${policyHash} does not match its text`,
+    ]);
+  });
+
   it("reads a disclosed entry with a malformed model as unreadable", async () => {
     const modelled = await entries(3, undefined, undefined, { 2: { name: "model-a" } });
     const pkg = (await buildPackage(modelled, [2])) as any;
@@ -207,7 +257,7 @@ describe("verifyPackage", async () => {
       requiredWitnesses: 0 });
     expect(report.problems).toEqual([]);
     expect(report).toMatchObject({ timestampedAt: v.genTime, timestampAuthority: v.authority });
-    expect(Object.keys(report).slice(-6, -3)).toEqual(["timestampedAt", "timestampAuthority", "rekorLogIndex"]);
+    expect(Object.keys(report).slice(-7, -4)).toEqual(["timestampedAt", "timestampAuthority", "rekorLogIndex"]);
     expect((await verifyPackage(pkg, PINNED, { timestampCertificates: chain.slice(2) })).problems).toContain(
       "the timestamp of checkpoint 3: the timestamp authority is not trusted",
     );
@@ -227,8 +277,9 @@ describe("verifyPackage", async () => {
       requiredWitnesses: 0 });
     expect(report.problems).toEqual([]);
     expect(report).toMatchObject({ valid: true, rekorLogIndex: Number(v.entry.logIndex), rekorOrigin: "rekor.local" });
-    expect(Object.keys(report).slice(-6)).toEqual([
-      "timestampedAt", "timestampAuthority", "rekorLogIndex", "rekorOrigin", "disclosedPrompts", "problems",
+    expect(Object.keys(report).slice(-7)).toEqual([
+      "timestampedAt", "timestampAuthority", "rekorLogIndex", "rekorOrigin", "disclosedPrompts", "disclosedPolicies",
+      "problems",
     ]);
     expect((await verifyPackage(pkg, PINNED, { requiredWitnesses: 0 })).rekorOrigin).toBe("rekor.local");
     const other = await NoteKey.of("rekor.local", ED25519, LEDGER_KEY.publicKey);

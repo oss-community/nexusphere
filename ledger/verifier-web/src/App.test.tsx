@@ -152,11 +152,39 @@ describe('App', async () => {
     expect(screen.getByText('model-a 2026-09-01')).toBeInTheDocument()
   })
 
+  it('shows the policy set texts the disclosed entries name', async () => {
+    const policies = 'permit(principal, action, resource);'
+    const policyHash = await sha256Hex(policies)
+    const governed = await entries(4, undefined, undefined, {}, { 2: { 'policy.hash': policyHash } })
+    const pkg = (await buildPackage(governed, [2, 3])) as any
+    pkg.policies = [{ hash: policyHash, text: policies }]
+    const user = await upload(pkg)
+    await user.type(screen.getByLabelText('Ledger public key'), PINNED)
+    await user.click(screen.getByRole('button', { name: 'Verify' }))
+    expect(await screen.findByTestId('verdict')).toHaveTextContent('VALID')
+    expect(screen.getByText('Policies')).toBeInTheDocument()
+    expect(screen.getByText('1 policy set texts match the hashes their entries name')).toBeInTheDocument()
+    expect(screen.queryByText('Prompts')).not.toBeInTheDocument()
+  })
+
+  it('shows a policy set that does not match its text as a problem', async () => {
+    const policyHash = await sha256Hex('permit(principal, action, resource);')
+    const governed = await entries(4, undefined, undefined, {}, { 2: { 'policy.hash': policyHash } })
+    const pkg = (await buildPackage(governed, [2, 3])) as any
+    pkg.policies = [{ hash: policyHash, text: 'forbid(principal, action, resource);' }]
+    const user = await upload(pkg)
+    await user.click(screen.getByRole('button', { name: 'Verify' }))
+    expect(await screen.findByTestId('verdict')).toHaveTextContent('INVALID')
+    expect(screen.getByText(`policy set ${policyHash} does not match its text`)).toBeInTheDocument()
+    expect(screen.queryByText('Policies')).not.toBeInTheDocument()
+  })
+
   it('shows no prompts line and no model column without them', async () => {
     const user = await upload(await buildPackage(chain, [2]))
     await user.click(screen.getByRole('button', { name: 'Verify' }))
     expect(await screen.findByTestId('verdict')).toHaveTextContent('VALID')
     expect(screen.queryByText('Prompts')).not.toBeInTheDocument()
+    expect(screen.queryByText('Policies')).not.toBeInTheDocument()
     expect(screen.queryByRole('columnheader', { name: 'Model' })).not.toBeInTheDocument()
   })
 

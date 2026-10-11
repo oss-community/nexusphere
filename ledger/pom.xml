@@ -25,6 +25,7 @@
 
     <properties>
         <spring-boot.version>4.1.1</spring-boot.version>
+        <cedar-java.version>4.10.0</cedar-java.version>
     </properties>
 
     <dependencyManagement>
@@ -41,6 +42,7 @@
             <dependency><groupId>com.nexusphere.ledger</groupId><artifactId>mandate</artifactId><version>${project.version}</version></dependency>
             <dependency><groupId>com.nexusphere.ledger</groupId><artifactId>server</artifactId><version>${project.version}</version></dependency>
             <dependency><groupId>com.nexusphere.ledger</groupId><artifactId>verifier</artifactId><version>${project.version}</version></dependency>
+            <dependency><groupId>com.cedarpolicy</groupId><artifactId>cedar-java</artifactId><version>${cedar-java.version}</version><classifier>uber</classifier></dependency>
         </dependencies>
     </dependencyManagement>
 

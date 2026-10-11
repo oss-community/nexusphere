@@ -6,5 +6,6 @@ public enum ReasonCode {
     NO_ACTIVE_GRANT,
     NOT_COVERED,
     NOT_YET_VALID,
-    USES_EXHAUSTED
+    USES_EXHAUSTED,
+    POLICY_DENIED
 }

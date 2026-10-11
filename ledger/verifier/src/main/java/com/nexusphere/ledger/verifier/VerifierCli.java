@@ -373,6 +373,10 @@ public final class VerifierCli {
         if (r.disclosedPrompts() > 0) {
             out.println("  Prompts     : " + r.disclosedPrompts() + " prompt texts match the hashes their entries name");
         }
+        if (r.disclosedPolicies() > 0) {
+            out.println("  Policies    : " + r.disclosedPolicies()
+                    + " policy set texts match the hashes their entries name");
+        }
         if (r.logTreeSize() != null) {
             out.println("  Log         : " + r.logOrigin() + ", " + r.logTreeSize() + " entries, "
                     + r.provenEntries() + " disclosed entries proven");

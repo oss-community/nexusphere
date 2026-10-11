@@ -17,6 +17,7 @@
 * [Key Rotation](#key-rotation)
 * [Key Revocation](#key-revocation)
 * [Agents, Grants and Decisions](#agents-grants-and-decisions)
+* [Policies](#policies)
 * [Principal Login and Consent](#principal-login-and-consent)
 * [MCP Gateway](#mcp-gateway)
 * [Mandates](#mandates)
@@ -336,6 +337,7 @@ LEDGER_SECRETS_DIR: /run/secrets/
 LEDGER_MANAGEMENT_PORT:
 LEDGER_RATE_LIMIT_PER_MINUTE: 1200
 LEDGER_RATE_LIMIT_BURST: 200
+LEDGER_POLICY_DEFAULT_EFFECT: permit
 ```
 
 <p style="text-align: justify;">
@@ -782,6 +784,7 @@ or the peer ledger refused the A2A request without a receipt. The outcome entry 
 | `NOT_COVERED`      | DENY     | Active grants exist, but none covers the action and target |
 | `NOT_YET_VALID`    | DENY     | The covering grant starts later                            |
 | `USES_EXHAUSTED`   | DENY     | The covering grant has used all its uses                   |
+| `POLICY_DENIED`    | DENY     | A grant covers the action, but the active policies deny it |
 
 Agent, grant and decision changes are evidence too: `agent/register`, `agent/disable`, `agent/rotate-key`,
 `agent/signing-key`, `grant/create`, `grant/approve`, `grant/deny` and `grant/revoke`, with the owner or the granting
@@ -792,6 +795,85 @@ curl -X POST http://localhost:8090/api/v1/agents -H "Authorization: Bearer nexus
 curl -X POST http://localhost:8090/api/v1/grants -H "Authorization: Bearer nexusphere-ledger-development-key-change-me" -H "Content-Type: application/json" -d '{"principalId":"alice","agentId":"invoice-agent","actions":["tools/call"],"targets":["send_email","read_*"],"expiresAt":"2026-12-31T00:00:00Z","maxUses":100}'
 curl -X POST http://localhost:8090/api/v1/decisions -H "Authorization: Bearer {agentApiKey}" -H "Content-Type: application/json" -d '{"principalId":"alice","action":"tools/call","target":"send_email"}'
 curl -X POST http://localhost:8090/api/v1/decisions/{decisionId}/outcome -H "Authorization: Bearer {agentApiKey}" -H "Content-Type: application/json" -d '{"outcome":"SUCCEEDED"}'
+```
+
+## Policies
+
+<p style="text-align: justify;">
+
+A grant says what a principal lets an agent do; policies say what the operator lets any agent do. The operator
+activates a [Cedar](https://www.cedarpolicy.com/) policy set with `PUT /api/v1/policies`, and from then on every
+decision, including those of the [MCP gateway](#mcp-gateway) and the [A2A gateway](#a2a-gateway), must be allowed by
+both a grant and the policies. When a grant allows an action the policies deny, the decision is `DENY` with
+`POLICY_DENIED`, the grant keeps its use, and the reason names the policies that forbid it. A policy that fails to
+evaluate denies too. Each policy is named by its `@id` annotation, and two policies with the same name are refused.
+
+</p>
+
+<p style="text-align: justify;">
+
+The principal is `Agent::"<agentId>"`, the action is `Action::"<action>"` and the resource is `Target::"<target>"`.
+The context carries `principalId`, `target`, `inputHash` when present, `attributes` as a record of strings, `model`
+with its `name` and `version` when present, and the UTC `hour` (0 to 23) and `weekday` (1 for Monday to 7). With
+`LEDGER_POLICY_DEFAULT_EFFECT=permit` the ledger adds the policy `ledger-default-permit`, so whatever no policy
+forbids is allowed; with `deny` only what a policy permits is allowed. Before a policy set is activated, grants alone
+decide.
+
+</p>
+
+<p style="text-align: justify;">
+
+A policy set is addressed by the SHA-256 of its UTF-8 text, at most 1 MiB, and is never changed or deleted;
+activating it records `policy/activate` evidence with that hash. Every decision records the attributes `policy.hash`,
+`policy.ids` (the policies that decided it) and `policy.defaultEffect`, so a client cannot send attributes starting
+with `policy.`. A package, report or dispute carries `policies`, the texts of the policy sets its disclosed entries
+name, and the verifier checks that each text matches its hash and is named by a disclosed entry.
+
+</p>
+
+Step 1. Start the ledger as in [Run](#run), then register an agent with a grant for every bank tool; the answers must
+show `201`:
+
+```shell
+curl -s -o /dev/null -w '%{http_code}\n' -X POST http://localhost:8090/api/v1/agents -H "Authorization: Bearer $LEDGER_API_KEY" -H "Content-Type: application/json" -d '{"agentId":"payments-agent","name":"Payments agent","ownerId":"acme"}'
+curl -s -o /dev/null -w '%{http_code}\n' -X POST http://localhost:8090/api/v1/grants -H "Authorization: Bearer $LEDGER_API_KEY" -H "Content-Type: application/json" -d "{\"principalId\":\"alice\",\"agentId\":\"payments-agent\",\"actions\":[\"tools/call\"],\"targets\":[\"bank/*\"],\"expiresAt\":\"$(date -u -d '+30 days' +%Y-%m-%dT%H:%M:%SZ)\"}"
+```
+
+Step 2. Write a policy set that forbids wire transfers and invoices other than 100:
+
+```shell
+cat > policies.cedar <<'CEDAR'
+@id("no-wire-transfers")
+forbid(principal, action == Action::"tools/call", resource == Target::"bank/wire_transfer");
+
+@id("small-payments")
+forbid(principal, action, resource == Target::"bank/pay_invoice")
+  unless { context.attributes has amount && context.attributes.amount == "100" };
+CEDAR
+```
+
+Step 3. Activate it; the answer must show the same hash as `sha256sum` and both policy names:
+
+```shell
+jq -Rs '{text: .}' policies.cedar | curl -s -X PUT http://localhost:8090/api/v1/policies -H "Authorization: Bearer $LEDGER_API_KEY" -H "Content-Type: application/json" -d @- | jq -c '{hash, policies, defaultEffect}'
+sha256sum policies.cedar
+```
+
+Step 4. Ask for three decisions; the answers must show `POLICY_DENIED`, `POLICY_DENIED` and `ALLOWED_BY_GRANT`:
+
+```shell
+for request in '"target":"bank/wire_transfer"' '"target":"bank/pay_invoice","attributes":{"amount":"900"}' '"target":"bank/pay_invoice","attributes":{"amount":"100"}'; do
+  curl -s -X POST http://localhost:8090/api/v1/decisions -H "Authorization: Bearer $LEDGER_API_KEY" -H "Content-Type: application/json" -d "{\"agentId\":\"payments-agent\",\"principalId\":\"alice\",\"action\":\"tools/call\",$request}" | jq -r '.reasonCode'
+done
+```
+
+Step 5. Export a package and verify it; the output must show
+`Policies    : 1 policy set texts match the hashes their entries name` and `Result: VALID`:
+
+```shell
+curl -s -X POST http://localhost:8090/api/v1/checkpoints -H "Authorization: Bearer $LEDGER_API_KEY" > /dev/null
+curl -s -X POST http://localhost:8090/api/v1/packages -H "Authorization: Bearer $LEDGER_API_KEY" -H "Content-Type: application/json" -d '{"agentId":"payments-agent"}' > package.json
+java -jar verifier/target/verifier-1.0.0-SNAPSHOT-exec.jar package.json
 ```
 
 ## Principal Login and Consent
@@ -1859,6 +1941,9 @@ API key, except `/api/v1/principal/**`, which requires a principal token from th
 | GET    | `/api/v1/reports`                          | The report templates of the active compliance profiles (operator)                                       |
 | POST   | `/api/v1/reports/{id}`                     | A signed report over the package for the scope in the body; HTML with `format=html` (operator)          |
 | POST   | `/api/v1/disputes`                         | A ZIP dispute package for the scope, `title` and `description` in the body (operator)                   |
+| PUT    | `/api/v1/policies`                         | Activate a Cedar policy set `text` and answer its `hash`, policy names and default effect (operator)    |
+| GET    | `/api/v1/policies`                         | The active policy set (operator)                                                                        |
+| GET    | `/api/v1/policies/{hash}`                  | A stored policy set by its hash (operator)                                                              |
 | PUT    | `/api/v1/prompts`                          | Store a prompt or configuration `text` and answer its `hash`; `201` when new (agent or operator)        |
 | GET    | `/api/v1/prompts/{hash}`                   | A stored prompt text with when and by whom it was stored (operator)                                     |
 | POST   | `/api/v1/index/proofs`                     | A signed proof that a `term` occurs, with its count, or never does, up to a checkpoint (operator)       |

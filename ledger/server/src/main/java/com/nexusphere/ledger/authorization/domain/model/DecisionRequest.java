@@ -18,4 +18,8 @@ public record DecisionRequest(
                            String correlationId, Map<String, String> attributes) {
         this(agentId, principalId, action, target, inputHash, correlationId, attributes, null);
     }
+
+    public DecisionRequest withAttributes(Map<String, String> replaced) {
+        return new DecisionRequest(agentId, principalId, action, target, inputHash, correlationId, replaced, model);
+    }
 }

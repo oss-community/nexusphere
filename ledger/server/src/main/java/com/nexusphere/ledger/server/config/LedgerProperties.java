@@ -10,13 +10,16 @@ import java.util.Map;
 @ConfigurationProperties("ledger")
 public record LedgerProperties(Security security, Signing signing, Checkpoint checkpoint, Mcp mcp,
                                Mandate mandate, A2a a2a, Oidc oidc, Log log,
-                               Compliance compliance, Timestamp timestamp, Rekor rekor) {
+                               Compliance compliance, Timestamp timestamp, Rekor rekor, Policy policy) {
 
     public boolean consentRequired() {
         return oidc != null && oidc.enabled();
     }
 
     public record Security(String apiKey) {
+    }
+
+    public record Policy(String defaultEffect) {
     }
 
     public record Signing(String provider, String privateKey, String publicKey, String previousPrivateKey,

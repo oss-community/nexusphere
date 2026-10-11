@@ -55,6 +55,8 @@ ledger:
     witness-timeout: ${LEDGER_LOG_WITNESS_TIMEOUT:10s}
   mcp:
     timeout: ${LEDGER_MCP_TIMEOUT:60s}
+  policy:
+    default-effect: ${LEDGER_POLICY_DEFAULT_EFFECT:permit}
   mandate:
     issuer: ${LEDGER_MANDATE_ISSUER:http://localhost:${LEDGER_PORT:8090}}
     status-list-ttl: ${LEDGER_MANDATE_STATUS_LIST_TTL:5m}
