@@ -11,6 +11,7 @@ import com.nexusphere.ledger.chain.NoteKey;
 import com.nexusphere.ledger.chain.SignedCheckpoint;
 import com.nexusphere.ledger.chain.Signer;
 import com.nexusphere.ledger.chain.SigningKeys;
+import com.nexusphere.ledger.mandate.ExchangeStatement;
 import com.nexusphere.ledger.mandate.HttpSignatures;
 import com.nexusphere.ledger.mandate.Jws;
 import com.nexusphere.ledger.mandate.MandateClaims;
@@ -123,6 +124,10 @@ public class LedgerSigner {
 
     public String signTrackRecord(TrackRecordClaims claims) {
         return TrackRecords.issue(claims, publicKey.keyId(), signer);
+    }
+
+    public String signExchangeStatement(ExchangeStatement statement) {
+        return statement.sign(publicKey.keyId(), signer);
     }
 
     public String signStatusList(StatusList statusList) {

@@ -2,7 +2,7 @@ import io
 import json
 import unittest
 import urllib.error
-from datetime import timedelta
+from datetime import datetime, timedelta, timezone
 
 from nexusphere_ledger import LedgerClient, LedgerError
 
@@ -106,6 +106,23 @@ class Client(unittest.TestCase):
         self.assertEqual({}, opener.body())
         client.issue_track_record("invoice-agent", "https://buyer.example", timedelta(days=7))
         self.assertEqual({"audience": "https://buyer.example", "validFor": "PT604800S"}, opener.body())
+
+    def test_a2a_reconciliation(self):
+        signed = {"statement": "a.b.c", "issuer": "https://ledger.example", "peer": "https://supplier.example",
+                  "from": "2026-10-01T08:00:00Z", "to": "2026-10-02T08:00:00Z", "exchanges": 2}
+        reconciled = {"reconciled": True, "ours": "https://ledger.example", "theirs": "https://supplier.example",
+                      "matched": 2, "undelivered": 0, "discrepancies": [], "statement": "d.e.f",
+                      "evidenceSequence": 9}
+        client, opener = self.client((200, signed), (200, reconciled))
+        self.assertEqual(signed, client.a2a_statement("supplier", "2026-10-01T08:00:00Z",
+                                                      datetime(2026, 10, 2, 8, tzinfo=timezone.utc)))
+        self.assertEqual("https://ledger.example/api/v1/a2a/statements", opener.requests[0].full_url)
+        self.assertEqual({"peer": "supplier", "from": "2026-10-01T08:00:00.000000Z",
+                          "to": "2026-10-02T08:00:00.000000Z"}, opener.body())
+        self.assertEqual(reconciled, client.reconcile_a2a("x.y.z"))
+        self.assertEqual("POST", opener.requests[1].get_method())
+        self.assertEqual("https://ledger.example/api/v1/a2a/reconciliations", opener.requests[1].full_url)
+        self.assertEqual({"statement": "x.y.z"}, opener.body())
 
 
 if __name__ == "__main__":

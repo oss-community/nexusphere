@@ -6,9 +6,14 @@ import { EvidenceStatement, LogReceipt } from "./cose.js";
 import { Json } from "./evidence.js";
 import { IndexCheck, verifyIndexProof } from "./indexproof.js";
 import { PublicKey } from "./keys.js";
-import { MandateCheck, MandateVerifier, StaticKeys, jwkPublicKey, mandatePayload } from "./mandate.js";
+import {
+  Jws, JwksKeys, KeyResolver, MandateCheck, MandateVerifier, StaticKeys, httpFetcher, jwkPublicKey, mandatePayload,
+} from "./mandate.js";
 import { NoteKey } from "./note.js";
 import { PackageReport, verifyPackage } from "./package.js";
+import {
+  ExchangeStatement, NOT_RECEIVED, NOT_SENT, Reconciliation, reconcile as reconcileStatements, verifyStatement,
+} from "./reconcile.js";
 import { ReportCheck, verifyReport } from "./report.js";
 import { X509Certificate, readCertificates } from "./timestamp.js";
 import { epochText } from "./timestamps.js";
@@ -24,7 +29,8 @@ export const USAGE_TEXT = `Usage: nexusphere-ledger-verify [--public-key <base64
        nexusphere-ledger-verify report [package options] --package <package.json> <report.json>
        nexusphere-ledger-verify dispute [package options] <dispute.zip>
        nexusphere-ledger-verify index [--public-key <key> | --public-key-file <file>] [--keys <keys.json>] [--package <package.json>] [--json] <proof.json>
-       nexusphere-ledger-verify track-record --issuer <url> [--issuer <url>] [--audience <aud>] [--public-key <key> | --public-key-file <file>] [--nonce <nonce>] [--require-key-binding] [--index-proof <proof.json>] [--json] <token | token file | ->`;
+       nexusphere-ledger-verify track-record --issuer <url> [--issuer <url>] [--audience <aud>] [--public-key <key> | --public-key-file <file>] [--nonce <nonce>] [--require-key-binding] [--index-proof <proof.json>] [--json] <token | token file | ->
+       nexusphere-ledger-verify reconcile [--public-key <key> | --public-key-file <file>] [--peer-public-key <key> | --peer-public-key-file <file>] [--json] <our statement | file> <their statement | file>`;
 
 export interface Io {
   out: (text: string) => void;
@@ -93,6 +99,9 @@ export async function run(args: string[], io: Io): Promise<number> {
     }
     if (args[0] === "dispute") {
       return await dispute(args.slice(1), io);
+    }
+    if (args[0] === "reconcile") {
+      return await reconcile(args.slice(1), io);
     }
     return await pkg(args[0] === "package" ? args.slice(1) : args, io);
   } catch (e) {
@@ -723,6 +732,114 @@ async function printTrackRecord(c: TrackRecordClaims | null, index: IndexCheck |
   lines.push(valid ? "Result: VALID" : "Result: INVALID");
   if (!valid) {
     problems.forEach((p) => lines.push("  - " + p));
+  }
+  io.out(lines.join("\n") + "\n");
+}
+
+async function reconcile(args: string[], io: Io): Promise<number> {
+  let ourKey: string | null = null;
+  let peerKey: string | null = null;
+  let json = false;
+  const files: string[] = [];
+  try {
+    for (let i = 0; i < args.length; i++) {
+      const arg = args[i];
+      if (arg === "--json") {
+        json = true;
+      } else if (["--public-key", "--public-key-file", "--peer-public-key", "--peer-public-key-file"].includes(arg)) {
+        if (i + 1 >= args.length) {
+          throw new UsageError();
+        }
+        const value = args[++i];
+        const key = arg.endsWith("-file") ? readFileSync(value, "utf8").trim() : value.trim();
+        if (arg.startsWith("--peer")) {
+          peerKey = key;
+        } else {
+          ourKey = key;
+        }
+      } else if (arg.startsWith("--")) {
+        throw new UsageError();
+      } else {
+        files.push(arg);
+      }
+    }
+  } catch {
+    throw new UsageError();
+  }
+  if (files.length !== 2) {
+    throw new UsageError();
+  }
+  const tokens: string[] = [];
+  for (const file of files) {
+    try {
+      tokens.push(readToken(file, io));
+    } catch (e) {
+      io.err(`Cannot read ${file}: ${(e as Error).message}\n`);
+      return USAGE;
+    }
+  }
+  const jwks = new JwksKeys(httpFetcher(10_000), 0);
+  const problems: string[] = [];
+  const ours = await verifiedStatement(tokens[0], ourKey, jwks, "ours", problems);
+  const theirs = await verifiedStatement(tokens[1], peerKey, jwks, "theirs", problems);
+  let reconciliation: Reconciliation | null = null;
+  if (ours !== null && theirs !== null) {
+    try {
+      reconciliation = reconcileStatements(ours, theirs);
+    } catch (e) {
+      problems.push((e as Error).message);
+    }
+  }
+  const valid = problems.length === 0 && reconciliation !== null && reconciliation.reconciled;
+  if (json) {
+    io.out(JSON.stringify({ valid, problems, reconciliation }, null, 2) + "\n");
+  } else {
+    printReconciliation(ours, theirs, reconciliation, problems, ourKey === null || peerKey === null, valid, io);
+  }
+  return valid ? VALID : INVALID;
+}
+
+async function verifiedStatement(token: string, pinned: string | null, jwks: KeyResolver, name: string,
+  problems: string[]): Promise<ExchangeStatement | null> {
+  try {
+    const iss = Jws.parse(token).payload.iss;
+    const issuer = typeof iss === "string" ? iss : "";
+    let keys = jwks;
+    if (pinned !== null) {
+      const key = await PublicKey.fromBase64(pinned);
+      keys = new StaticKeys({ [issuer]: { [key.keyId]: key } });
+    }
+    return await verifyStatement(token, keys, issuer);
+  } catch (e) {
+    problems.push(`The ${name} statement cannot be trusted: ${(e as Error).message}`);
+    return null;
+  }
+}
+
+function printReconciliation(ours: ExchangeStatement | null, theirs: ExchangeStatement | null,
+  r: Reconciliation | null, problems: string[], fetched: boolean, valid: boolean, io: Io) {
+  const lines = ["Nexusphere Ledger A2A reconciliation"];
+  if (ours !== null) {
+    lines.push(`  Ours        : ${ours.issuer}, ${ours.exchanges.length} exchanges`);
+  }
+  if (theirs !== null) {
+    lines.push(`  Theirs      : ${theirs.issuer}, ${theirs.exchanges.length} exchanges`);
+  }
+  if (fetched) {
+    lines.push("  Keys        : fetched from the issuers; pass --public-key and --peer-public-key to pin them");
+  }
+  if (r !== null) {
+    lines.push(`  Window      : ${epochText(r.from)} to ${epochText(r.to)}`);
+    lines.push(`  Matched     : ${r.matched}`);
+    lines.push(`  Undelivered : ${r.undelivered}`);
+  }
+  lines.push(valid ? "Result: RECONCILED" : "Result: NOT RECONCILED");
+  if (!valid) {
+    problems.forEach((p) => lines.push("  - " + p));
+    r?.discrepancies.forEach((d) => lines.push(`  - ${d.kind} ${d.requestId} at ${epochText(d.requestedAt)}: ${
+      d.kind === NOT_SENT ? `received as from ${d.sender}, which never sent it`
+        : d.kind === NOT_RECEIVED ? `sent by ${d.sender}, never recorded as received`
+          : `sent by ${d.sender}, differs in ${d.fields.join(", ")}`}`));
   }
   io.out(lines.join("\n") + "\n");
 }

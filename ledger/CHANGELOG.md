@@ -94,6 +94,11 @@ agent platforms and gateways.
   and tied to the signed index root; `TrackRecordVerifier`, the verifiers in Python and TypeScript and the
   `track-record` command check it and cross-check it with an index proof, and an `agent-track-record.json`
   conformance vector holds one
+* A2A reconciliation: each ledger signs a statement of its exchanges with a peer over a window, and
+  `POST /api/v1/a2a/reconciliations` compares the peer's statement with its own request by request, reporting
+  requests one side never received, never sent or recorded differently, and records the result as evidence; the
+  `reconcile` command and the Python and TypeScript SDKs compare two statements offline, and an
+  `a2a-reconciliation.json` conformance vector holds a pair
 * Browser verifier: one self-contained HTML page in React and TypeScript that verifies a package with the
   TypeScript SDK, pinned to the ledger key and optional witnesses, with a Content Security Policy that blocks every
   connection

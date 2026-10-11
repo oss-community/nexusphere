@@ -1,5 +1,7 @@
 package com.nexusphere.ledger.a2a;
 
+import com.nexusphere.ledger.mandate.ExchangeStatement;
+import com.nexusphere.ledger.mandate.Reconciliation;
 import com.nexusphere.ledger.server.security.Caller;
 import com.nexusphere.ledger.server.web.LedgerException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -17,6 +19,7 @@ import org.springframework.web.servlet.mvc.method.annotation.StreamingResponseBo
 
 import java.net.URI;
 import java.time.Instant;
+import java.util.List;
 import java.util.UUID;
 
 @RestController
@@ -36,14 +39,50 @@ class A2aController {
         }
     }
 
+    record StatementRequest(String peer, Instant from, Instant to) {
+    }
+
+    record StatementResponse(String statement, String issuer, String peer, Instant from, Instant to, int exchanges) {
+
+        static StatementResponse of(A2aStatements.Signed signed) {
+            ExchangeStatement s = signed.statement();
+            return new StatementResponse(signed.token(), s.issuer(), s.peer(), s.from(), s.to(), s.exchanges().size());
+        }
+    }
+
+    record ReconciliationRequest(String statement) {
+    }
+
+    record ReconciliationResponse(boolean reconciled, String ours, String theirs, Instant from, Instant to,
+                                  int matched, int undelivered, List<Reconciliation.Discrepancy> discrepancies,
+                                  String statement, long evidenceSequence) {
+    }
+
     private final A2aOutbound outbound;
     private final A2aInbound inbound;
     private final A2aExchanges exchanges;
+    private final A2aStatements statements;
 
-    A2aController(A2aOutbound outbound, A2aInbound inbound, A2aExchanges exchanges) {
+    A2aController(A2aOutbound outbound, A2aInbound inbound, A2aExchanges exchanges, A2aStatements statements) {
         this.outbound = outbound;
         this.inbound = inbound;
         this.exchanges = exchanges;
+        this.statements = statements;
+    }
+
+    @PostMapping("/api/v1/a2a/statements")
+    StatementResponse statement(Caller caller, @RequestBody StatementRequest request) {
+        caller.requireOperator();
+        return StatementResponse.of(statements.statement(request.peer(), request.from(), request.to()));
+    }
+
+    @PostMapping("/api/v1/a2a/reconciliations")
+    ReconciliationResponse reconcile(Caller caller, @RequestBody ReconciliationRequest request) {
+        caller.requireOperator();
+        A2aStatements.Reconciled done = statements.reconcile(request.statement());
+        Reconciliation r = done.reconciliation();
+        return new ReconciliationResponse(r.reconciled(), r.ours(), r.theirs(), r.from(), r.to(), r.matched(),
+                r.undelivered(), r.discrepancies(), done.ours().token(), done.evidenceSequence());
     }
 
     @PostMapping("/a2a/out/{peer}")

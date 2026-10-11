@@ -349,6 +349,14 @@ export class LedgerClient {
     return this.post(`/api/v1/agents/${encodeURIComponent(agentId)}/track-record`, compact({ audience, validFor }));
   }
 
+  a2aStatement(peer: string, from: string | Date, to: string | Date): Promise<Json> {
+    return this.post("/api/v1/a2a/statements", { peer, from: formatInstant(from), to: formatInstant(to) });
+  }
+
+  reconcileA2a(statement: string): Promise<Json> {
+    return this.post("/api/v1/a2a/reconciliations", { statement });
+  }
+
   jwks(): Promise<Json> {
     return this.get("/public/v1/keys");
   }
