@@ -129,7 +129,6 @@ public class EvidenceService {
     }
 
     @Transactional(readOnly = true)
-<<<<<<< HEAD
     public List<EvidenceEntry> search(EvidenceSearch search) {
         return evidence.search(search);
     }
@@ -147,7 +146,9 @@ public class EvidenceService {
     @Transactional(readOnly = true)
     public List<String> hashes(long afterSequence, int limit) {
         return evidence.hashes(afterSequence, limit);
-=======
+    }
+
+    @Transactional(readOnly = true)
     public Activity activity(String principalId, Instant since) {
         return evidence.activity(principalId, since);
     }
@@ -156,7 +157,6 @@ public class EvidenceService {
     public List<EvidenceEntry> recent(String principalId, long beforeSequence, int limit) {
         Paging.check(0, limit, MAX_PAGE_SIZE);
         return evidence.recent(principalId, beforeSequence, limit);
->>>>>>> origin/main
     }
 
     @Transactional(readOnly = true)

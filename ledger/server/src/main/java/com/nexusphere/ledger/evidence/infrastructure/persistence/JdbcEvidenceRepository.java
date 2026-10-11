@@ -172,7 +172,9 @@ class JdbcEvidenceRepository implements EvidenceRepository {
     public List<String> actions(int limit) {
         return jdbc.queryForList("select distinct action from ledger.evidence_record order by action limit :limit",
                 Map.of("limit", limit), String.class);
+    }
 
+    @Override
     public List<EvidenceEntry> recent(String principalId, long beforeSequence, int limit) {
         return jdbc.query(SELECT + " where r.principal_ref = " + PRINCIPAL
                         + " and r.sequence < :before order by r.sequence desc limit :limit",
