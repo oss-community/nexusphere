@@ -259,7 +259,7 @@ cmd_run() {
 
 cmd_setup() {
   # Options are passed to init (e.g. --orchestrator jenkins --with sonarqube,nexus,
-  # or --pipeline jenkins-sonarqube-nexus).
+  # or --pipeline jenkins-complete).
   if ! profile_exists || (( $# )); then
     cmd_init "$@"
   fi

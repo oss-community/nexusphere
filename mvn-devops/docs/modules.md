@@ -1,5 +1,11 @@
 # Modules and stages
 
+This page lists every module mvn-devops ships, grouped by category, and the
+stages the modules add to the pipeline. Read it when you choose tools in the
+`init` menu or want to know what a stage runs.
+
+## Modules
+
 | Category | Mode | Modules |
 |---|---|---|
 | Source control | required | `github` |
@@ -17,13 +23,12 @@
 | Monitoring | any | `prometheus` (with Grafana), `loki` (adds `prometheus`) |
 | Load test | one or none | `k6` |
 
-**Artifactory OSS** does not allow creating repositories through its API.
-After `configure`, open Artifactory, choose Quick Setup > Maven and enter the
-repository prefix you gave in `secrets` (`JFROG_ARTIFACTORY_REPOSITORY_PREFIX`),
-so `<prefix>-libs-release-local` and `<prefix>-libs-snapshot-local` exist.
-`configure` creates them itself on the Pro editions.
+Container images and deployments are described in [Container images and deployment](deployment.md).
 
-Default stages with every module selected (plugin coordinates shortened):
+## Stages
+
+The default stages with every module selected (plugin coordinates shortened).
+`mvn-devops/devops.sh stages` prints the exact list for your own selection.
 
 ```
 ORDER  PHASE      STAGE            MAVEN ARGUMENTS
@@ -51,13 +56,29 @@ ORDER  PHASE      STAGE            MAVEN ARGUMENTS
 80     production deploy-production       (shell) sh "$DEVOPS_SCRIPTS/deploy-compose.sh" production
 ```
 
-**The project's pom.xml needs no profiles, no distributionManagement and no
-settings file.** Every plugin is called by its coordinates and configured with
+## Artifactory OSS repositories
+
+Artifactory OSS does not allow creating repositories through its API, so you
+create them once by hand after `configure`. On the Pro editions `configure`
+creates them itself.
+
+Step 1. Open Artifactory and choose Quick Setup > Maven.
+
+Step 2. Enter the repository prefix you gave in `secrets`
+(`JFROG_ARTIFACTORY_REPOSITORY_PREFIX`), so that `<prefix>-libs-release-local`
+and `<prefix>-libs-snapshot-local` exist.
+
+## How it works
+
+The project's pom.xml needs no profiles, no `distributionManagement` and no
+settings file. Every plugin is called by its coordinates and configured with
 `-D` properties, and credentials come from the framework's own
 [settings.xml](../templates/settings.xml), passed as global settings (`-gs`).
 Details and optional knobs (extra profiles, checkstyle rules, plugin versions)
-are in [docs/project-requirements.md](project-requirements.md).
+are in [What your Maven project needs](project-requirements.md).
 
-Container images and deployments are described in [docs/deployment.md](deployment.md).
+## Next
 
-Adding a tool is one directory; see [docs/module-guide.md](module-guide.md).
+- [What your Maven project needs](project-requirements.md): the pom, credentials and optional knobs.
+- [Container images and deployment](deployment.md): container images, environments and deploys.
+- [Writing a module](module-guide.md): add a tool as one directory.

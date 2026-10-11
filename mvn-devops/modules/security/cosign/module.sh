@@ -6,7 +6,12 @@
 
 module_secrets() {
   require_image_module
-  ask_local COSIGN_KEY_FILE "Cosign private key (empty: generate one)" ""
+  # A ready-made pipeline generates the key without asking.
+  if [[ ${DEVOPS_PRESET:-0} == 1 ]] && ! has_value COSIGN_KEY_FILE; then
+    set_value COSIGN_KEY_FILE ""
+  else
+    ask_local COSIGN_KEY_FILE "Cosign private key (empty: generate one)" ""
+  fi
   ask_secret COSIGN_PASSWORD "Password of the Cosign key" "$(random_password)"
 }
 

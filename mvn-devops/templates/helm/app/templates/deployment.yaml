@@ -84,5 +84,13 @@ spec:
               port: http
             periodSeconds: 10
             failureThreshold: 3
+          {{- if .Values.shutdownDelay }}
+          # A pod that is stopped keeps serving while the service stops
+          # sending it new connections, so a release drops no requests.
+          lifecycle:
+            preStop:
+              sleep:
+                seconds: {{ .Values.shutdownDelay }}
+          {{- end }}
           resources:
             {{- toYaml .Values.resources | nindent 12 }}

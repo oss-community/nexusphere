@@ -14,6 +14,9 @@ replicas: 2
 environment: ""
 containerPort: 8080
 healthPath: /actuator/health
+# Seconds a stopped pod keeps serving before it gets SIGTERM, while the
+# service stops sending it new connections (0: none).  Needs Kubernetes 1.30.
+shutdownDelay: 5
 
 service:
   port: 80

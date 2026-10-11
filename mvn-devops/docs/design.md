@@ -1,5 +1,10 @@
 # Design
 
+This page explains how mvn-devops is built: modules, the stages they
+contribute, how orchestrators turn stages into a pipeline, and where values
+and generated files are kept. Read it before you change the framework or
+write a module.
+
 ## The idea
 
 Each tool is a self-contained module with its own scripts. `devops.sh` asks
@@ -9,17 +14,13 @@ pipeline that is ready to run.
 
 ## Categories and modules
 
-| Category | Choice | Modules |
-|---|---|---|
-| Source control | required | github |
-| Build | required | maven (validate, package, test, checkstyle, install) |
-| Pipeline orchestrator | one | maven (on your machine), maven-container, jenkins, concourse |
-| Code quality | any | sonarqube |
-| Artifact repositories | any | jfrog, nexus, github-packages |
-| Project site | any | github-pages |
+The tools are grouped in categories such as source control, build, pipeline
+orchestrator, code quality and artifact repositories. A category is required,
+allows exactly one module, at most one, or any number. The full list is in
+[Modules and stages](modules.md).
 
 A new tool only needs a new directory under `modules/<category>/<tool>/`; the
-menu finds it on its own ([module-guide.md](module-guide.md)).
+menu finds it on its own ([Writing a module](module-guide.md)).
 
 ## A module
 
@@ -129,7 +130,7 @@ has two modes:
   `configure` only checks the credentials and repositories.
 
 Each tool is decided on its own, so any mix works. Details in
-[where-tools-run.md](where-tools-run.md).
+[Where the tools run](where-tools-run.md).
 
 ## Life cycle
 
@@ -138,4 +139,10 @@ init  →  secrets  →  up      →  configure  →  publish          →  run
 menu     questions   Docker      tokens        install pipeline    run it
 ```
 
-`devops.sh setup` runs the first five steps in a row.
+`mvn-devops/devops.sh setup` runs the first five steps in a row.
+
+## Next
+
+- [Modules and stages](modules.md): every module and the stages it adds.
+- [Writing a module](module-guide.md): add a tool of your own.
+- [Where the tools run](where-tools-run.md): Docker or an existing server, per tool.

@@ -31,6 +31,7 @@ eval "node_port=\${KUBERNETES_${key}_NODE_PORT:-}"
 canary=false
 last=${ENVIRONMENTS:-staging production}
 [ "${GITOPS_CANARY:-no}" = yes ] && [ "$environment" = "${last##* }" ] && canary=true
+pause=${GITOPS_CANARY_PAUSE:-30s}
 case $action in
   deploy) [ -n "$tag" ] || tag=$(git rev-parse --short=12 HEAD) ;;
   rollback) ;;
@@ -121,7 +122,7 @@ release() {
   "containerPort": ${DEPLOY_CONTAINER_PORT:-8080},
   "healthPath": $(json "${DEPLOY_HEALTH_PATH:-/actuator/health}"),
   "service": {"nodePort": $(json "$node_port")},
-  "canary": {"enabled": $canary},
+  "canary": {"enabled": $canary, "steps": [{"setWeight": 25}, {"pause": {"duration": $(json "$pause")}}, {"setWeight": 50}, {"pause": {"duration": $(json "$pause")}}]},
   "database": $database$secret_values
 }
 EOF

@@ -38,74 +38,46 @@ Artifact repositories (choose any, comma separated, 0 for none)
 - **Anywhere.** Each tool runs in Docker on your machine or a VM, or is an
   existing server with its own URL.
 
-## Prerequisites
-
-Bash 4+ (Linux, macOS, or Git Bash on Windows), Docker with the compose
-plugin, `curl`, `jq`, `git` and `ssh-keygen`, plus Java and Maven when the
-pipeline runs on your machine. `devops.sh doctor` checks them; install
-commands per system are in [docs/prerequisites.md](docs/prerequisites.md).
-
-## Install
-
-mvn-devops is meant to live inside the project, like the Maven wrapper. From
-the project root:
-
-```bash
-curl -fsSLO https://github.com/oss-community/mvn-devops/releases/download/v1.0.0/mvn-devops-1.0.0.zip
-unzip -q mvn-devops-1.0.0.zip && mv mvn-devops-1.0.0 mvn-devops && rm mvn-devops-1.0.0.zip
-git add mvn-devops && git commit -m "Add mvn-devops 1.0.0"
-```
-
-Later, `mvn-devops/devops.sh upgrade` replaces it with the latest release.
-Windows steps, the deb and rpm packages, and notes on line endings are in
-[docs/installation.md](docs/installation.md).
-
 ## Quick start
 
-Step-by-step guides, one command per step, are in
-[docs/getting-started.md](docs/getting-started.md).
+These steps set up a pipeline from the menu in the root of your Maven project,
+with Docker running. On Windows, use `mvn-devops\devops.bat` instead of
+`mvn-devops/devops.sh`. The full guides, including ready-made pipelines and a
+teammate joining, are in [Getting started](docs/getting-started.md).
 
-Create the GitHub token first ([docs/github-setup.md](docs/github-setup.md)),
-then from the project root:
+Step 1. Install the [prerequisites](docs/prerequisites.md) and create a GitHub token as described in [GitHub setup](docs/github-setup.md).
 
-```bash
-mvn-devops/devops.sh setup      # menu, questions, containers, tokens, pipeline
-mvn-devops/devops.sh run        # run the pipeline
-mvn-devops/devops.sh urls       # web consoles and how to log in
-```
+Step 2. Add mvn-devops to the project as described in [Installation](docs/installation.md#shipping-it-with-the-project-zip).
 
-On Windows use `mvn-devops\devops.bat` instead. Commit the `devops.conf` that
-`setup` writes: a teammate who clones the project runs the same `setup` and is
-only asked for their own passwords, tokens and user names. Passwords, tokens
-and generated files go to `.devops/`, which keeps itself out of git.
-
-`setup` is these five steps; each can also be run on its own:
-
-| Step | Command | What happens |
-|---|---|---|
-| 1 | `init` | Menu per category. Saves the choice in `devops.conf`. |
-| 2 | `secrets` | Each selected module asks for the values it needs. Passwords default to random ones. |
-| 3 | `up` | Modules prepare (config files, keys), then `docker compose up` with the selected tools. |
-| 4 | `configure` | Modules finish their tool: replace default admin passwords, create tokens and repositories. |
-| 5 | `publish` | The orchestrator renders the pipeline and installs it (Jenkins job, Concourse pipeline, local script). |
-
-Or start from a ready-made pipeline, a tested combination of tools, and
-answer only for your GitHub user and token
-([docs/pipelines.md](docs/pipelines.md)):
+Step 3. Check the prerequisites:
 
 ```bash
-mvn-devops/devops.sh pipelines
-mvn-devops/devops.sh setup --pipeline jenkins-sonarqube-nexus
+mvn-devops/devops.sh doctor
 ```
 
-Without questions, for scripts and CI:
+Step 4. Choose the tools from the menu, answer the questions, and start, configure and publish everything:
 
 ```bash
-mvn-devops/devops.sh -y init --orchestrator jenkins --with sonarqube,nexus,github-pages
-mvn-devops/devops.sh -y setup
+mvn-devops/devops.sh setup
 ```
 
-[examples/hello-maven](examples/hello-maven) is a small project to try it on.
+Step 5. Run the pipeline:
+
+```bash
+mvn-devops/devops.sh run
+```
+
+Step 6. Open the web consoles and see how to log in:
+
+```bash
+mvn-devops/devops.sh urls
+```
+
+Step 7. Commit the settings:
+
+```bash
+git add devops.conf mvn-devops && git commit -m "Add mvn-devops"
+```
 
 ## Commands
 
@@ -130,10 +102,48 @@ mvn-devops/devops.sh -y setup
 | `modules`, `doctor [--fix]` | list modules, check prerequisites; `--fix` repairs CRLF line endings |
 | `upgrade [--version X] [--check]` | replace the copy of mvn-devops inside the project with a release |
 
+## How it works
+
+mvn-devops needs Bash 4+ (Linux, macOS, or Git Bash on Windows), Docker with
+the compose plugin, `curl`, `jq`, `git` and `ssh-keygen`, plus Java and Maven
+when the pipeline runs on your machine. It lives inside the project, like the
+Maven wrapper; `mvn-devops/devops.sh upgrade` later replaces it with the latest
+release.
+
+`setup` is these five steps; each can also be run on its own:
+
+| Step | Command | What happens |
+|---|---|---|
+| 1 | `init` | Menu per category. Saves the choice in `devops.conf`. |
+| 2 | `secrets` | Each selected module asks for the values it needs. Passwords default to random ones. |
+| 3 | `up` | Modules prepare (config files, keys), then `docker compose up` with the selected tools. |
+| 4 | `configure` | Modules finish their tool: replace default admin passwords, create tokens and repositories. |
+| 5 | `publish` | The orchestrator renders the pipeline and installs it (Jenkins job, Concourse pipeline, local script). |
+
+`devops.conf` is committed: a teammate who clones the project runs the same
+`setup` and is only asked for their own passwords, tokens and user names.
+Passwords, tokens and generated files go to `.devops/`, which keeps itself out
+of git.
+
+Instead of the menu you can start from a ready-made pipeline, a tested
+combination of tools, and answer only for your GitHub user and token
+([docs/pipelines.md](docs/pipelines.md)). Without questions, for scripts and
+CI, `-y` accepts the defaults:
+
+```bash
+mvn-devops/devops.sh pipelines                      # list the ready-made pipelines
+mvn-devops/devops.sh setup --pipeline maven-basic   # set one up
+mvn-devops/devops.sh -y init --orchestrator jenkins --with sonarqube,nexus,github-pages
+mvn-devops/devops.sh -y setup
+```
+
+[examples/hello-maven](examples/hello-maven) is a small project to try it on.
+
 ## Documentation
 
 | | |
 |---|---|
+| [Documentation index](docs/README.md) | every page in reading order |
 | [Getting started](docs/getting-started.md) | step-by-step guides |
 | [Installation](docs/installation.md) | packages, the zip inside a project, upgrades, line endings |
 | [Prerequisites](docs/prerequisites.md) | install commands for Windows, Linux and macOS |
@@ -145,7 +155,7 @@ mvn-devops/devops.sh -y setup
 | [Where the tools run](docs/where-tools-run.md) | existing servers, a VM, the exported compose file |
 | [Project site](docs/github-pages.md) | the Maven site on GitHub Pages |
 | [Deployment](docs/deployment.md) | environments, container images, registries and deploying the application |
-| [Releasing your project](docs/releasing.md) | `devops.sh release` |
+| [Releasing your project](docs/releasing.md) | `mvn-devops/devops.sh release` |
 | [Troubleshooting](docs/troubleshooting.md) | common errors and their fixes |
 | [IDE](docs/ide.md), [ngrok](docs/ngrok.md) | IntelliJ settings, exposing a local Jenkins to GitHub |
 | [Design](docs/design.md) | how the framework is built |

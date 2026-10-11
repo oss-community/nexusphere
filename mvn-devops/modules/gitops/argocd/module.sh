@@ -15,6 +15,9 @@ ROLLOUTS_VERSION=1.10.0
 module_secrets() {
   ask GITOPS_BRANCH "Branch of the repository that holds the desired state" gitops
   ask GITOPS_CANARY "Release ${ENVIRONMENTS##* } as a canary with Argo Rollouts (yes or no)" yes
+  if [[ $(value GITOPS_CANARY yes) == yes ]]; then
+    ask GITOPS_CANARY_PAUSE "Pause of the canary at 25% and at 50% of the pods" 30s
+  fi
   server_external KUBERNETES || ask ARGOCD_HOST_PORT "Argo CD port on the Docker machine" 8443
 }
 
@@ -109,6 +112,7 @@ module_configure() {
 module_env() {
   pipeline_var GITOPS_BRANCH "$(value GITOPS_BRANCH gitops)"
   pipeline_var GITOPS_CANARY "$(value GITOPS_CANARY yes)"
+  pipeline_var GITOPS_CANARY_PAUSE "$(value GITOPS_CANARY_PAUSE 30s)"
 }
 
 module_stages() {
