@@ -48,7 +48,11 @@ a package of evidence and a verifier that runs offline.
 
 ### Start
 
+<p style="text-align: justify;">
+
 Every command runs in the root of the repository.
+
+</p>
 
 Step 1. Build the server, the verifier and the demo MCP server:
 
@@ -68,15 +72,18 @@ Step 3. Check the ledger; the answer must be `{"status":"UP"}`:
 curl http://localhost:8090/actuator/health
 ```
 
-| Service      | URL                       | Sign in                                                |
-|--------------|---------------------------|--------------------------------------------------------|
-| Web UI       | http://localhost:5173     | Operator key, or `alice`/`alice` and `bob`/`bob`       |
-| Ledger API   | http://localhost:8090     | `Authorization: Bearer {key}`                          |
-| Demo MCP     | http://localhost:8091/mcp | None, reached through the ledger at `/mcp/demo`        |
-| Keycloak     | http://localhost:8180     | `admin`/`admin`                                        |
-| Adminer      | http://localhost:8092     | Server `ledger-postgresql`, user and password `ledger` |
-| Prometheus   | http://localhost:9090     | None                                                   |
-| Alertmanager | http://localhost:9093     | None                                                   |
+| Service      | URL                                                 | Sign in                                                |
+|--------------|-----------------------------------------------------|--------------------------------------------------------|
+| Web UI       | http://localhost:5173                               | Operator key, or `alice`/`alice` and `bob`/`bob`       |
+| Ledger API   | http://localhost:8090                               | `Authorization: Bearer {key}`                          |
+| Health       | http://localhost:8090/actuator/health               | None                                                   |
+| Demo MCP     | http://localhost:8091/mcp                           | None, reached through the ledger at `/mcp/demo`        |
+| Keycloak     | http://localhost:8180                               | `admin`/`admin`                                        |
+| Adminer      | http://localhost:8092                               | Server `ledger-postgresql`, user and password `ledger` |
+| Prometheus   | http://localhost:9090                               | None                                                   |
+| Alertmanager | http://localhost:9093                               | None                                                   |
+| Vault        | http://localhost:8200                               | Token `nexusphere-vault-development-token`             |
+| OTLP         | localhost:4317 (gRPC), http://localhost:4318 (HTTP) | None, the Collector sends with the operator key        |
 
 <p style="text-align: justify;">
 
@@ -134,14 +141,15 @@ organizations should also register an Ed25519 key of its own, so a copied API ke
 Step 2. Create a grant for each agent:
 
 ```shell
-curl -s -X POST http://localhost:8090/api/v1/grants -H "$OP" -H "Content-Type: application/json" -d '{"principalId":"alice","agentId":"invoice-agent","actions":["tools/call"],"targets":["demo/read_file","demo/send_email"],"expiresAt":"2026-12-31T00:00:00Z","maxUses":20}'
-curl -s -X POST http://localhost:8090/api/v1/grants -H "$OP" -H "Content-Type: application/json" -d '{"principalId":"alice","agentId":"support-agent","actions":["tools/call"],"targets":["demo/read_file"],"expiresAt":"2026-12-31T00:00:00Z"}'
+curl -s -X POST http://localhost:8090/api/v1/grants -H "$OP" -H "Content-Type: application/json" -d "{\"principalId\":\"alice\",\"agentId\":\"invoice-agent\",\"actions\":[\"tools/call\"],\"targets\":[\"demo/read_file\",\"demo/send_email\"],\"expiresAt\":\"$(date -u -d '+30 days' +%Y-%m-%dT00:00:00Z)\",\"maxUses\":20}"
+curl -s -X POST http://localhost:8090/api/v1/grants -H "$OP" -H "Content-Type: application/json" -d "{\"principalId\":\"alice\",\"agentId\":\"support-agent\",\"actions\":[\"tools/call\"],\"targets\":[\"demo/read_file\"],\"expiresAt\":\"$(date -u -d '+30 days' +%Y-%m-%dT00:00:00Z)\"}"
 ```
 
 <p style="text-align: justify;">
 
 The compose ledger asks principals for consent, so both grants start `PENDING`. Sign in to the web UI as `alice` and
-approve them; both must then show `ACTIVE`. Targets are `{server}/{tool}`; a trailing `*` matches a prefix, such as `demo/*`.
+approve them; both must then show `ACTIVE`. Targets are `{server}/{tool}`; a trailing `*` matches a prefix, such as
+`demo/*`.
 
 </p>
 
@@ -214,9 +222,10 @@ LEDGER_MCP_SERVERS_FILES_AUTHORIZATION: Bearer upstream-secret
 
 <p style="text-align: justify;">
 
-When an agent works with an agent of another organization, both sides run a ledger. The sending ledger decides the
-call and attaches a mandate, or the agent's own key-bound presentation when it has a signing key, the receiving ledger
-checks it and answers with a signed receipt, and both keep matching evidence. The A2A gateway and its settings are in [Nexusphere Ledger](../ledger/README.md#a2a-gateway).
+When an agent works with an agent of another organization, both sides run a ledger. The sending ledger decides the call
+and attaches a mandate, or the agent's own key-bound presentation when it has a signing key, the receiving ledger checks
+it and answers with a signed receipt, and both keep matching evidence. The A2A gateway and its settings are in
+[Nexusphere Ledger](../ledger/README.md#a2a-gateway).
 
 </p>
 

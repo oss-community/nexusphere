@@ -111,9 +111,20 @@ openssl pkey -inform DER -in ledger-signing.der -pubout -outform DER | base64 -w
 ```
 
 Step 3. Put both files in the secret manager as `LEDGER_SIGNING_PRIVATE_KEY` and `LEDGER_SIGNING_PUBLIC_KEY`, as in
-[Secrets](#secrets), keep one copy offline, and delete `ledger-signing.der`.
+[Secrets](#secrets), keep one copy offline, and delete `ledger-signing.der`; the listing must show only
+`ledger-signing-private-key` and `ledger-signing-public-key`:
 
-Step 4. Start the ledger and check that `/api/v1/keys` shows the new key as `ACTIVE`.
+```shell
+rm ledger-signing.der && ls ledger-signing*
+```
+
+Step 4. Start the ledger with the operator key in `LEDGER_API_KEY` and read its active key; the `publicKey` must be the
+content of `ledger-signing-public-key`, with `status` `ACTIVE`:
+
+```shell
+curl -s http://localhost:8090/api/v1/keys -H "Authorization: Bearer $LEDGER_API_KEY" | jq '.[] | select(.status == "ACTIVE") | {keyId, status, publicKey}'
+cat ledger-signing-public-key
+```
 
 | Situation        | What to do                                                                                                                          |
 |------------------|-------------------------------------------------------------------------------------------------------------------------------------|
@@ -157,9 +168,23 @@ POLICY
 
 Step 3. Start the ledger with `LEDGER_SIGNING_PROVIDER=vault`, `LEDGER_SIGNING_VAULT_ADDRESS` and the token in
 `LEDGER_SIGNING_VAULT_TOKEN_FILE`, written by the Vault agent; when the ledger signed with a local key before, add that
-key as `LEDGER_SIGNING_PREVIOUS_PRIVATE_KEY` for this one start.
+key as `LEDGER_SIGNING_PREVIOUS_PRIVATE_KEY` for this one start. The health check must answer `{"status":"UP"}`; the
+ledger refuses to start when Vault signs with a key that does not match the public key of the latest version:
 
-Step 4. Check that `/api/v1/keys` shows the Vault key as `ACTIVE`.
+```shell
+export LEDGER_SIGNING_PROVIDER=vault
+export LEDGER_SIGNING_VAULT_ADDRESS=https://vault.example.com:8200
+export LEDGER_SIGNING_VAULT_TOKEN_FILE=/vault/secrets/token
+java -jar ledger/server/target/server-1.0.0-SNAPSHOT-exec.jar > ledger.log 2>&1 &
+until curl -sf http://localhost:8090/actuator/health; do sleep 1; done
+```
+
+Step 4. Check the keys; the Vault key must be the one `ACTIVE`, and when the ledger signed with a local key before,
+its `previous` must name that key:
+
+```shell
+curl -s http://localhost:8090/api/v1/keys -H "Authorization: Bearer $LEDGER_API_KEY" | jq '.[] | {keyId, status, previous: .rotation.previousKeyId}'
+```
 
 <p style="text-align: justify;">
 
@@ -193,25 +218,28 @@ Step 1. Restore the dump into a new database:
 
 ```shell
 docker exec ledger-postgresql createdb -U ledger ledger_restored
-docker exec -i ledger-postgresql pg_restore -U ledger -d ledger_restored --no-owner < ledger-2026-10-09.dump
+docker exec -i ledger-postgresql pg_restore -U ledger -d ledger_restored --no-owner < "$(ls -t ledger-*.dump | head -1)"
 ```
 
-Step 2. Start the ledger on the restored database (`LEDGER_DATABASE_DB=ledger_restored`) with the same signing key.
-The restore keeps the triggers that make evidence append-only.
-
-Step 3. Check the whole chain:
+Step 2. Start the ledger on the restored database with the same signing key and operator key, from the environment
+or `LEDGER_SECRETS_DIR` as in [Secrets](#secrets); the health check must answer `{"status":"UP"}`:
 
 ```shell
-curl -s http://localhost:8090/api/v1/verification -H "Authorization: Bearer {operator key}"
+LEDGER_DATABASE_PORT=5433 LEDGER_DATABASE_DB=ledger_restored java -jar ledger/server/target/server-1.0.0-SNAPSHOT-exec.jar > ledger.log 2>&1 &
+until curl -sf http://localhost:8090/actuator/health; do sleep 1; done
 ```
 
 <p style="text-align: justify;">
 
-The answer must be `"valid": true` with the `headSequence` of the backup. This was checked end to end: evidence and a
-signed checkpoint were recorded, dumped, restored into a new PostgreSQL, and the restored ledger verified the whole
-chain and checkpoint and still refused changes to evidence.
+The restore keeps the triggers that make evidence append-only.
 
 </p>
+
+Step 3. Check the whole chain; the answer must be `"valid": true` with the `headSequence` of the backup:
+
+```shell
+curl -s http://localhost:8090/api/v1/verification -H "Authorization: Bearer {operator key}"
+```
 
 <p style="text-align: justify;">
 
@@ -248,7 +276,8 @@ Archives](../ledger/README.md#log-archives), also shows which entries a restore 
 
 <p style="text-align: justify;">
 
-By default these share the application port. Set `LEDGER_MANAGEMENT_PORT` to serve them on a separate port that only the cluster can reach, and point probes and Prometheus at it.
+By default these share the application port. Set `LEDGER_MANAGEMENT_PORT` to serve them on a separate port that only the
+cluster can reach, and point probes and Prometheus at it.
 
 </p>
 
@@ -271,7 +300,8 @@ By default these share the application port. Set `LEDGER_MANAGEMENT_PORT` to ser
 <p style="text-align: justify;">
 
 The ledger compose file runs Prometheus on http://localhost:9090. It scrapes the ledger with the configuration in
-`ledger/prometheus/prometheus.yml`. In Kubernetes the ledger pod carries the `prometheus.io/scrape`, `prometheus.io/path` and `prometheus.io/port` annotations.
+`ledger/prometheus/prometheus.yml`. In Kubernetes the ledger pod carries the `prometheus.io/scrape`,
+`prometheus.io/path` and `prometheus.io/port` annotations.
 
 </p>
 
@@ -328,8 +358,7 @@ posts the Alertmanager JSON to any URL, such as a ticketing system or an on-call
 
 <p style="text-align: justify;">
 
-Delivery was checked end to end: with email and webhook on, Prometheus fired an alert, and the message reached a
-test mail server and the webhook. In Kubernetes, give Alertmanager the same entrypoint `ledger/alertmanager/entrypoint.sh`
+In Kubernetes, give Alertmanager the same entrypoint `ledger/alertmanager/entrypoint.sh`
 with these variables, or use the Alertmanager configuration of the cluster's own monitoring stack.
 
 </p>

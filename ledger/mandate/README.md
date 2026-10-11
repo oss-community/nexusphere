@@ -34,9 +34,9 @@ proof, its revocation list and the verifier the receiving side uses.
 
 ## Dependencies
 
-| Depends on | Used by              |
-|------------|----------------------|
-| `chain`    | `server`, `verifier` |
+| Depends on | Used by                                  |
+|------------|------------------------------------------|
+| `chain`    | `server`, `verifier`, `ledger-e2e-tests` |
 
 ##
 

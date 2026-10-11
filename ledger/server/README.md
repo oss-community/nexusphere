@@ -37,33 +37,36 @@ record.
 * Signed mandates, the revocation status list and the public keys as JWKS
 * Signing key history: rotation at startup with a cross-signed rotation record, retired keys kept for verification
 * A2A gateway that sends and receives requests between two ledgers with evidence and signed receipts on both sides
-* Principal sign-in with an OpenID Connect provider and principal consent on grants, their activity per day and agent, and
-  a package of their own evidence
+* Principal sign-in with an OpenID Connect provider and principal consent on grants, their activity per day and
+  agent, and a package of their own evidence
 * Questions in plain language answered from verified evidence with citations, by a built-in or an
   OpenAI-compatible model
 * Health probes and Prometheus metrics for the chain head, checkpoints and recorded evidence
 
 ## Dependencies
 
-| Depends on                     | Used by |
-|--------------------------------|---------|
-| `chain`, `mandate`, `verifier` | none    |
+| Depends on                     | Used by            |
+|--------------------------------|--------------------|
+| `chain`, `mandate`, `verifier` | `ledger-e2e-tests` |
 
 ## API
 
-| Path                                 | Purpose                                                                            |
-|--------------------------------------|------------------------------------------------------------------------------------|
-| `/api/v1/**`                         | Evidence, checkpoints, log proofs, packages, agents, grants, decisions, mandates   |
-| `/mcp/{server}`                      | MCP gateway                                                                        |
-| `/a2a/out/{peer}`, `/a2a/in/{agent}` | A2A gateway                                                                        |
-| `/public/v1/**`                      | Public keys, status list, OIDC settings, log checkpoint and witness endpoint       |
+| Path                                 | Purpose                                                                          |
+|--------------------------------------|----------------------------------------------------------------------------------|
+| `/api/v1/**`                         | Evidence, checkpoints, log proofs, packages, agents, grants, decisions, mandates |
+| `/mcp/{server}`                      | MCP gateway                                                                      |
+| `/a2a/out/{peer}`, `/a2a/in/{agent}` | A2A gateway                                                                      |
+| `/public/v1/**`                      | Public keys, status list, OIDC settings, log checkpoint and witness endpoint     |
 
 ## Storage
 
-Tables live in the `ledger` schema of PostgreSQL, created by the Flyway migrations in
-`src/main/resources/db/migration/ledger`.
+<p style="text-align: justify;">
 
-Configuration, every endpoint and the formats are described in [Nexusphere Ledger](../README.md).
+Tables live in the `ledger` schema of PostgreSQL, created by the Flyway migrations in
+`src/main/resources/db/migration/ledger`. Configuration, every endpoint and the formats are described in
+[Nexusphere Ledger](../README.md).
+
+</p>
 
 ##
 

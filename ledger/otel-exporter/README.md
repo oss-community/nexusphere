@@ -1,6 +1,6 @@
 # <p align="center">Nexusphere Ledger OpenTelemetry Exporter</p>
 
-<p align="center">Turn the GenAI spans agents already emit into ledger evidence, through the OpenTelemetry Collector.</p>
+<p align="center">Turn the GenAI spans agents already emit into ledger evidence with the OpenTelemetry Collector.</p>
 
 ## <p align="center">Table of Content</p>
 
@@ -16,12 +16,12 @@
 
 <p style="text-align: justify;">
 
-Most agent frameworks and gateways already emit OpenTelemetry spans that follow the GenAI and MCP semantic
-conventions. The `nexusphere` exporter is a Collector component that picks the spans of tool calls and agent
-invocations and records each one as evidence through `POST /api/v1/evidence/batch`. An agent needs no code change and
-no SDK: point its OTLP exporter at a Collector that has this exporter in its traces pipeline. The resulting entries get
-the same hash chain, transparency log, witnesses, statements and packages as any other evidence. A ready configuration for
-agentgateway is in [Adapters](../adapters/agentgateway/README.md).
+Most agent frameworks and gateways already emit OpenTelemetry spans that follow the GenAI and MCP semantic conventions.
+The `nexusphere` exporter is a Collector component that picks the spans of tool calls and agent invocations and records
+each one as evidence through `POST /api/v1/evidence/batch`. An agent needs no code change and no SDK: point its OTLP
+exporter at a Collector that has this exporter in its traces pipeline. The resulting entries get the same hash chain,
+transparency log, witnesses, statements and packages as any other evidence. A ready configuration for agentgateway is in
+[Adapters](../adapters/agentgateway/README.md).
 
 </p>
 
@@ -35,25 +35,25 @@ later prove which input and output belonged to the call without holding them.
 
 ## Mapping
 
-| Evidence field     | Taken from                                                                                                |
-|--------------------|-----------------------------------------------------------------------------------------------------------|
-| selected spans     | `gen_ai.operation.name` or `mcp.method.name` listed in `operations` (default `execute_tool`, `invoke_agent`, `tools/call`) |
-| `agentId`          | The first of `agent_attributes` (default `gen_ai.agent.id`, `gen_ai.agent.name`), else `default_agent`    |
-| `principalId`      | The first of `principal_attributes` (default `nexusphere.principal.id`, `user.id`, `enduser.id`), else `default_principal` |
-| `action`           | `mcp.method.name`; `tools/call` for `execute_tool`; `agents/invoke` for `invoke_agent`; else `gen_ai/{operation}` |
-| `target`           | `gen_ai.tool.name`; the invoked `gen_ai.agent.name` for `invoke_agent`; else the span name                |
-| `occurredAt`       | The span start time                                                                                       |
-| `decision`         | `nexusphere.decision` (`ALLOW` or `DENY`) when the gateway sets it                                        |
-| `outcome`          | `DENIED` after a `DENY`, `FAILED` when the span status is an error or `mcp.error.code` is set, else `SUCCEEDED` |
-| `reason`           | `nexusphere.reason`, else `error.type` or the status message of a failed span                             |
-| `delegationId`     | `nexusphere.delegation.id`                                                                                |
-| `inputHash`        | `nexusphere.input.hash`, else the SHA-256 of `gen_ai.tool.call.arguments`                                 |
-| `outputHash`       | `nexusphere.output.hash`, else the SHA-256 of `gen_ai.tool.call.result`                                   |
-| `correlationId`    | `gen_ai.conversation.id`, else the trace ID                                                               |
-| `model.name`       | `gen_ai.response.model`, else `gen_ai.request.model`                                                      |
-| `model.version`    | `nexusphere.model.version`                                                                                |
-| `model.promptHash` | `nexusphere.prompt.hash`, lowercased, only when it is a hex SHA-256                                       |
-| `model.configHash` | `nexusphere.config.hash`, lowercased, only when it is a hex SHA-256                                       |
+| Evidence field     | Taken from                                                                                                                                                                                |
+|--------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| selected spans     | `gen_ai.operation.name` or `mcp.method.name` listed in `operations` (default `execute_tool`, `invoke_agent`, `tools/call`)                                                                |
+| `agentId`          | The first of `agent_attributes` (default `gen_ai.agent.id`, `gen_ai.agent.name`), else `default_agent`                                                                                    |
+| `principalId`      | The first of `principal_attributes` (default `nexusphere.principal.id`, `user.id`, `enduser.id`), else `default_principal`                                                                |
+| `action`           | `mcp.method.name`; `tools/call` for `execute_tool`; `agents/invoke` for `invoke_agent`; else `gen_ai/{operation}`                                                                         |
+| `target`           | `gen_ai.tool.name`; the invoked `gen_ai.agent.name` for `invoke_agent`; else the span name                                                                                                |
+| `occurredAt`       | The span start time                                                                                                                                                                       |
+| `decision`         | `nexusphere.decision` (`ALLOW` or `DENY`) when the gateway sets it                                                                                                                        |
+| `outcome`          | `DENIED` after a `DENY`, `FAILED` when the span status is an error or `mcp.error.code` is set, else `SUCCEEDED`                                                                           |
+| `reason`           | `nexusphere.reason`, else `error.type` or the status message of a failed span                                                                                                             |
+| `delegationId`     | `nexusphere.delegation.id`                                                                                                                                                                |
+| `inputHash`        | `nexusphere.input.hash`, else the SHA-256 of `gen_ai.tool.call.arguments`                                                                                                                 |
+| `outputHash`       | `nexusphere.output.hash`, else the SHA-256 of `gen_ai.tool.call.result`                                                                                                                   |
+| `correlationId`    | `gen_ai.conversation.id`, else the trace ID                                                                                                                                               |
+| `model.name`       | `gen_ai.response.model`, else `gen_ai.request.model`                                                                                                                                      |
+| `model.version`    | `nexusphere.model.version`                                                                                                                                                                |
+| `model.promptHash` | `nexusphere.prompt.hash`, lowercased, only when it is a hex SHA-256                                                                                                                       |
+| `model.configHash` | `nexusphere.config.hash`, lowercased, only when it is a hex SHA-256                                                                                                                       |
 | `attributes`       | `otel.trace_id`, `otel.span_id`, `otel.span_name`, `otel.duration_ms`, the model, provider, tool call ID, `mcp.session.id`, `mcp.target` and `service.name`, and the keys in `attributes` |
 
 <p style="text-align: justify;">

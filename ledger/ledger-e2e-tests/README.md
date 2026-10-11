@@ -1,5 +1,7 @@
 # <p align="center">Nexusphere Ledger End-to-End Tests</p>
 
+<p align="center">The ledger tested from the outside, over HTTP, against real PostgreSQL containers.</p>
+
 ## <p align="center">Table of Content</p>
 
 * [Getting Started](#getting-started)
@@ -10,17 +12,30 @@
 
 ### Prerequisites
 
-* [Java 21](https://www.oracle.com/java/technologies/downloads)
-* [Maven 3](https://maven.apache.org/index.html)
-* [Docker](https://www.docker.com)
+| Tool   | Version | Check                    |
+|--------|---------|--------------------------|
+| Java   | 21      | `java -version`          |
+| Maven  | 3.9     | `mvn -version`           |
+| Docker | any     | `docker compose version` |
+
+<p style="text-align: justify;">
+
+Every command runs in the root of the repository, and Docker must be running for Testcontainers.
+
+</p>
 
 ### Run Only This Module
+
+Step 1. Build the modules it needs and run every end-to-end test; Maven must end with `BUILD SUCCESS`:
 
 ```shell
 mvn -pl ledger/ledger-e2e-tests -am verify
 ```
 
 ### Run One Test Class
+
+Step 1. Run only `VerificationE2ETest`, or any class from [Test Classes](#test-classes) in its place; Maven must end
+with `BUILD SUCCESS`:
 
 ```shell
 mvn -pl ledger/ledger-e2e-tests -am verify -Dit.test=VerificationE2ETest -Dfailsafe.failIfNoSpecifiedTests=false -Dsurefire.failIfNoSpecifiedTests=false
@@ -31,33 +46,32 @@ mvn -pl ledger/ledger-e2e-tests -am verify -Dit.test=VerificationE2ETest -Dfails
 <p style="text-align: justify;">
 
 `LedgerE2ETestBase` starts the ledger on a free port, which is also its mandate issuer address, with the `postgresql`
-and `dev` profiles against a PostgreSQL 18 container. `LedgerClient` talks to it over HTTP with the development API key or a registered agent's key, like any
-outside caller, and rebuilds evidence entries from the JSON so they can be checked with `ledger/chain` without trusting
-the server. `FakeMcpServer` is a small MCP server on a random port, configured as the `files` server of the gateway; it
-answers `initialize`, `tools/list` and `tools/call`, and streams the answer of tools ending in `_sse`.
-`A2aE2ETest`, `AgentKeyBindingE2ETest` and `ReconciliationE2ETest` start a second ledger, `SupplierLedger`, with its
-own PostgreSQL container and signing key, which trusts the first one and forwards to `FakeA2aAgent`, which streams `message/stream` and `tasks/resubscribe`, so mandates,
-request proofs and receipts cross between two ledgers over HTTP.
-`PrincipalConsentE2ETest` starts a `StandaloneLedger` that trusts `FakeOidcProvider`, a small OpenID Connect provider
-on a random port that signs RS256 tokens for any principal.
-`KeyRotationE2ETest` restarts a `StandaloneLedger` against one PostgreSQL container with a new signing key, so the
-rotation happens at startup as it does in production. `VaultSigningE2ETest` adds a HashiCorp Vault container whose
-transit key signs, and `KeyRevocationE2ETest` adds a witness `StandaloneLedger` whose cosignatures prove which
-checkpoints of a revoked key came before its compromise.
-`ComplianceE2ETest` restarts a `StandaloneLedger` with different compliance profiles and regions against one
-PostgreSQL container, so profile changes are recorded once and a disallowed region stops the start.
+and `dev` profiles against a PostgreSQL 18 container. `LedgerClient` talks to it over HTTP with the development API key
+or a registered agent's key, like any outside caller, and rebuilds evidence entries from the JSON so they can be checked
+with `ledger/chain` without trusting the server. `FakeMcpServer` is a small MCP server on a random port, configured as
+the `files` server of the gateway; it answers `initialize`, `tools/list` and `tools/call`, and streams the answer of
+tools ending in `_sse`. `A2aE2ETest`, `AgentKeyBindingE2ETest` and `ReconciliationE2ETest` start a second ledger,
+`SupplierLedger`, with its own PostgreSQL container and signing key, which trusts the first one and forwards to
+`FakeA2aAgent`, which streams `message/stream` and `tasks/resubscribe`, so mandates, request proofs and receipts cross
+between two ledgers over HTTP. `PrincipalConsentE2ETest` starts a `StandaloneLedger` that trusts `FakeOidcProvider`, a
+small OpenID Connect provider on a random port that signs RS256 tokens for any principal. `KeyRotationE2ETest` restarts
+a `StandaloneLedger` against one PostgreSQL container with a new signing key, so the rotation happens at startup as it
+does in production. `VaultSigningE2ETest` adds a HashiCorp Vault container whose transit key signs, and
+`KeyRevocationE2ETest` adds a witness `StandaloneLedger` whose cosignatures prove which checkpoints of a revoked key
+came before its compromise. `ComplianceE2ETest` restarts a `StandaloneLedger` with different compliance profiles and
+regions against one PostgreSQL container, so profile changes are recorded once and a disallowed region stops the start.
 `ErasureE2ETest` erases principals on the shared ledger and on a `StandaloneLedger` with the `us` profile, whose
 retention keeps recent entries. `RetentionE2ETest` starts a `StandaloneLedger` with its own short profile, so entries
 expire and a pending erasure completes within the test. `TimestampE2ETest` starts `StandaloneLedger`s that use
 `FakeTimestampAuthority`, an RFC 3161 authority on a random port that signs real CMS tokens with a test chain in
-`src/test/resources/tsa`, and can be told to fail. `RekorE2ETest` does the same with `FakeRekor`, a Rekor v2 log
-on a random port that returns entries with real inclusion proofs and signed log checkpoints. `ReportE2ETest` starts
-`StandaloneLedger`s with the `eu` and `us` profiles and with a profile of its own.
-`WitnessE2ETest` starts two `StandaloneLedger`s with their own PostgreSQL containers: one is the log and asks the
-other, which watches it, to cosign its log checkpoints over the C2SP witness protocol. `AskE2ETest` starts a
-`StandaloneLedger` with the built-in model and changes one entry in PostgreSQL to show it is never cited, and
-`AskOpenAiCompatibleE2ETest` points one at `FakeLanguageModel`, an OpenAI-compatible chat completions server on a
-random port whose plans and answers each test sets, including citations of entries it was never given.
+`src/test/resources/tsa`, and can be told to fail. `RekorE2ETest` does the same with `FakeRekor`, a Rekor v2 log on a
+random port that returns entries with real inclusion proofs and signed log checkpoints. `ReportE2ETest` starts
+`StandaloneLedger`s with the `eu` and `us` profiles and with a profile of its own. `WitnessE2ETest` starts two
+`StandaloneLedger`s with their own PostgreSQL containers: one is the log and asks the other, which watches it, to cosign
+its log checkpoints over the C2SP witness protocol. `AskE2ETest` starts a `StandaloneLedger` with the built-in model and
+changes one entry in PostgreSQL to show it is never cited, and `AskOpenAiCompatibleE2ETest` points one at
+`FakeLanguageModel`, an OpenAI-compatible chat completions server on a random port whose plans and answers each test
+sets, including citations of entries it was never given.
 
 </p>
 

@@ -72,8 +72,10 @@ and the entry must verify against `rekorVerifierKey`.
 The vectors were also checked with other implementations: the Merkle roots, canonical JSON, content hashes and
 checkpoint signature with Python's `hashlib` and `cryptography`; the signed note with Go's
 `golang.org/x/mod/sumdb/note`; the cosignature, COSE signatures and SD-JWT digests with Python's `cryptography` and
-`cbor2`; the timestamp response with `openssl ts -verify`; the Rekor entry by the Rekor v2 log that accepted it. The [Python SDK](../sdk/python/README.md) and the [TypeScript SDK](../sdk/typescript/README.md) rebuild every
-vector except the mandate in their own test suites and check the mandate.
+`cbor2`; the timestamp response with `openssl ts -verify`; the Rekor entry by the Rekor v2 log that accepted it. The
+[Python SDK](../sdk/python/README.md) and the [TypeScript SDK](../sdk/typescript/README.md) run every vector in their
+own test suites by the same rules as the ledger: they rebuild what is deterministic and check what is not, the
+mandates, the timestamp and the Rekor entry, as described under [Vectors](#vectors).
 
 </p>
 
@@ -84,6 +86,8 @@ vector except the mandate in their own test suites and check the mandate.
 Change a vector only together with a deliberate format change, and record it in the changelog.
 
 </p>
+
+Step 1. Write the vectors again from the current code; Maven must end with `BUILD SUCCESS`:
 
 ```shell
 mvn -pl ledger/verifier -am test -Dtest=ConformanceVectorsTest -Dconformance.write=true -Dsurefire.failIfNoSpecifiedTests=false

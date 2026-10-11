@@ -34,9 +34,9 @@ to verify evidence on their own.
 
 ## Dependencies
 
-| Depends on | Used by                         |
-|------------|---------------------------------|
-| none       | `mandate`, `server`, `verifier` |
+| Depends on | Used by                                             |
+|------------|-----------------------------------------------------|
+| none       | `mandate`, `server`, `verifier`, `ledger-e2e-tests` |
 
 ##
 

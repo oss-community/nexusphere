@@ -31,8 +31,8 @@ rest are references to open when they are needed. All of them are also in one bo
 | 4    | [Nexusphere Ledger](ledger/README.md)                        | Every setting, format and endpoint, and one README per module       |
 | 5    | [Nexusphere Frontend](frontend/README.md)                    | The web UI for operators and principals                             |
 | 6    | [Operations](docs/operations.md)                             | Secrets, signing keys, backup, monitoring, alerts and rate limits   |
-| 7    | [Local Environment Setup](docs/local-setup.md)               | Developer machine settings for Windows, shells and the IDE          |
-| 8    | [DevOps Step by Step](docs/devops-guide.md)                  | The build pipelines with mvn-devops                                 |
+| 7    | [Local Environment Setup](docs/local-setup.md)               | Prepare a developer machine step by step: tools, shells, the IDE    |
+| 8    | [DevOps Step by Step](docs/devops-guide.md)                  | Build, test and deploy to dev, test, staging and prod               |
 | 9    | [Ledger End-to-End Tests](ledger/ledger-e2e-tests/README.md) | What the end-to-end tests cover                                     |
 | 10   | [Conformance Vectors](ledger/conformance/README.md)          | Test data for another implementation of the formats                 |
 | 11   | [Python SDK](ledger/sdk/python/README.md)                    | Record evidence from Python and verify packages and mandates        |
@@ -172,37 +172,43 @@ exporter, the adapters and the auditor portal use their own tools, as described 
 
 <p style="text-align: justify;">
 
-`ledger/kube-dev.yaml` runs the ledger, PostgreSQL, Adminer, Keycloak, the web UI and the demo MCP server in the `dev`
-namespace. The steps are in [Nexusphere Ledger](ledger/README.md#kubernetes).
+`ledger/kube-dev.yaml` runs the ledger, PostgreSQL, Adminer, Keycloak, the web UI, the demo MCP server and the
+OpenTelemetry Collector in the `dev` namespace. The steps are in [Nexusphere Ledger](ledger/README.md#kubernetes).
 
 </p>
 
 ## DevOps
 
-The project ships [mvn-devops](https://github.com/oss-community/mvn-devops) 1.0.0 in the `mvn-devops` folder. It
-starts the chosen tools in Docker, configures them and runs the pipeline stages against this Maven project, either from
-the menu or from one of its 16 ready-made pipelines. Step-by-step use for this project, from `maven-sonarqube-nexus` up
-to `jenkins-complete`, is in [DevOps Step by Step](docs/devops-guide.md); its own guide is
-[mvn-devops/README.md](mvn-devops/README.md). Values and tokens are kept in `.devops/`, which is never committed.
+<p style="text-align: justify;">
+
+The project ships [mvn-devops](https://github.com/oss-community/mvn-devops) 1.0.0 in the `mvn-devops` folder, and
+its pipeline in [ci/nexusphere.conf](ci/nexusphere.conf): Maven builds and tests the project on this machine, the
+ledger becomes an image in a Docker registry, and Docker Compose runs it with its own PostgreSQL in `dev`, `test`,
+`staging` and `prod` on one machine, `prod` only after an approval. Every step, from setup to clean up, is in
+[DevOps Step by Step](docs/devops-guide.md); the guide of mvn-devops itself is
+[mvn-devops/README.md](mvn-devops/README.md). Passwords and keys stay in `.devops/`, which is never committed.
+
+</p>
+
+Step 1. Set up the pipeline; it must end with `Setup finished`:
 
 ```shell
-mvn-devops/devops.sh doctor
-mvn-devops/devops.sh pipelines
-mvn-devops/devops.sh setup --pipeline maven-sonarqube-nexus
-mvn-devops/devops.sh stages
+mvn-devops/devops.sh setup --pipeline ci/nexusphere.conf
+```
+
+Step 2. Write each environment's keys to the machine as in
+[Settings of Each Environment](docs/devops-guide.md#settings-of-each-environment), then run the pipeline; it must end
+with `prod waits for approval`:
+
+```shell
 mvn-devops/devops.sh run
-mvn-devops/devops.sh urls
 ```
 
-Windows:
+Step 3. Approve `prod`; it must end with `Pipeline finished`:
 
 ```shell
-mvn-devops\devops.bat setup
+mvn-devops/devops.sh run --phase prod
 ```
-
-Upgrade with `mvn-devops/devops.sh upgrade`, which replaces the folder with the latest release after checking its
-`SHA256SUMS`, or by deleting the `mvn-devops` folder and extracting the new release zip in its place under the same
-name.
 
 ## Service URLs
 
@@ -227,6 +233,7 @@ name.
 | `frontend`   | The web UI in React and TypeScript                                                         |
 | `docs`       | The documents above and the PDF guide                                                      |
 | `mvn-devops` | The build and delivery toolkit                                                             |
+| `ci`         | The pipeline of this project for mvn-devops, with its four environments                    |
 
 ##
 

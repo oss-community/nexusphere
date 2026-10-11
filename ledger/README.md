@@ -38,9 +38,6 @@
 * [Reports and Dispute Packages](#reports-and-dispute-packages)
 * [Conformance Vectors](#conformance-vectors)
 * [API](#api)
-* [End-to-End Tests](ledger-e2e-tests/README.md)
-* [Ledger Guide](../docs/ledger-guide.md)
-* [Operations](../docs/operations.md)
 
 ## Purpose
 
@@ -62,6 +59,13 @@ outcome to `POST /api/v1/evidence` (or `POST /api/v1/evidence/batch`) with its o
 yet, the ledger's MCP and A2A gateways do it. What the ledger adds is the proof: a transparency log that witnesses
 cosign, SCITT statements and receipts, evidence packages with selective disclosure, mandates other organizations can
 check, and receipts both sides of an exchange hold.
+
+</p>
+
+<p style="text-align: justify;">
+
+See also [End-to-End Tests](ledger-e2e-tests/README.md), the [Ledger Guide](../docs/ledger-guide.md) and
+[Operations](../docs/operations.md).
 
 </p>
 
@@ -87,7 +91,8 @@ check, and receipts both sides of an exchange hold.
 <p style="text-align: justify;">
 
 Every command runs in the root of the repository. Each path below is a list of steps; do them in order and check the
-result of each step before the next one.
+result of each step before the next one. The commands in this document send the operator key as `$LEDGER_API_KEY`;
+each path sets it to the development key of the `dev` profile in one of its first steps.
 
 </p>
 
@@ -114,24 +119,27 @@ Step 2. Start every service:
 docker compose --file ledger/compose.yaml --project-name ledger up -d --build
 ```
 
-Step 3. Check that the ledger is up; the answer must be `{"status":"UP"}`:
+Step 3. Keep the development operator key in `LEDGER_API_KEY` and check that the ledger is up; the answer must be
+`{"status":"UP"}`:
 
 ```shell
+export LEDGER_API_KEY=nexusphere-ledger-development-key-change-me
 curl -X GET http://localhost:8090/actuator/health
 ```
 
-| Service             | URL                       | Description                                      |
-|---------------------|---------------------------|--------------------------------------------------|
-| `ledger`            | http://localhost:8090     | The ledger with the `dev` profile                |
-| `demo-mcp`          | http://localhost:8091/mcp | Demo MCP server, reached through `/mcp/demo`     |
-| `ledger-postgresql` | localhost:5433            | PostgreSQL, user, password and database `ledger` |
-| `ledger-adminer`    | http://localhost:8092     | Adminer for `ledger-postgresql`                  |
-| `keycloak`          | http://localhost:8180     | Keycloak, admin `admin`/`admin`                  |
-| `ledger-ui`         | http://localhost:5173     | The web UI, built from `frontend`                |
-| `vault`             | http://localhost:8200     | Vault in development mode with a transit key     |
-| `otel-collector`    | localhost:4317, 4318      | OpenTelemetry Collector, OTLP gRPC and HTTP      |
-| `prometheus`        | http://localhost:9090     | Prometheus with the ledger alerts                |
-| `alertmanager`      | http://localhost:9093     | Alertmanager, no channel until one is set        |
+| Service             | URL                                   | Description                                                                              |
+|---------------------|---------------------------------------|------------------------------------------------------------------------------------------|
+| `ledger`            | http://localhost:8090                 | The ledger with the `dev` profile, `Authorization: Bearer {key}`                         |
+| `ledger`            | http://localhost:8090/actuator/health | Health of the ledger, no sign-in                                                         |
+| `demo-mcp`          | http://localhost:8091/mcp             | Demo MCP server, no sign-in, reached through the ledger at `/mcp/demo`                   |
+| `ledger-postgresql` | localhost:5433                        | PostgreSQL, user, password and database `ledger`                                         |
+| `ledger-adminer`    | http://localhost:8092                 | Adminer, server `ledger-postgresql`, user and password `ledger`                          |
+| `keycloak`          | http://localhost:8180                 | Keycloak, admin `admin`/`admin`                                                          |
+| `ledger-ui`         | http://localhost:5173                 | The web UI, built from `frontend`; operator key, or `alice`/`alice` and `bob`/`bob`      |
+| `vault`             | http://localhost:8200                 | Vault in development mode with a transit key, token `nexusphere-vault-development-token` |
+| `otel-collector`    | localhost:4317, http://localhost:4318 | OpenTelemetry Collector, OTLP gRPC and HTTP, sends with the operator key                 |
+| `prometheus`        | http://localhost:9090                 | Prometheus with the ledger alerts, no sign-in                                            |
+| `alertmanager`      | http://localhost:9093                 | Alertmanager, no channel until one is set, no sign-in                                    |
 
 <p style="text-align: justify;">
 
@@ -177,9 +185,11 @@ docker volume prune -f
 
 <p style="text-align: justify;">
 
-`ledger/kube-dev.yaml` runs the same services as the compose file in the `dev` namespace. The Keycloak realm comes from
-the `keycloak-realm` ConfigMap. Keycloak and the UI are reached on the same local ports as with compose, so the
-sign-in redirect and the token issuer stay `http://localhost:8180` and `http://localhost:5173`.
+`ledger/kube-dev.yaml` runs `ledger`, `ledger-postgresql`, `ledger-adminer`, `keycloak`, `demo-mcp`, `ledger-ui` and
+`otel-collector` in the `dev` namespace; Vault, Prometheus and Alertmanager run only with the compose file, so the
+ledger signs with its local key. The Keycloak realm comes from the `keycloak-realm` ConfigMap. Keycloak and the UI are
+reached on the same local ports as with compose, so the sign-in redirect and the token issuer stay
+`http://localhost:8180` and `http://localhost:5173`.
 
 </p>
 
@@ -212,9 +222,11 @@ kubectl port-forward service/ledger-adminer 8092:8080 -n dev
 kubectl port-forward service/otel-collector 4318:4318 -n dev
 ```
 
-Step 5. Check the ledger and run the demo as in [Dockerized](#dockerized):
+Step 5. Keep the operator key, check the ledger and run the demo as in [Dockerized](#dockerized); the health answer
+must be `{"status":"UP"}` and the demo must end with `Result: VALID` and `Result: INVALID`:
 
 ```shell
+export LEDGER_API_KEY=nexusphere-ledger-development-key-change-me
 curl -X GET http://localhost:8090/actuator/health
 ledger/demo-mcp/demo.sh
 ```
@@ -239,9 +251,11 @@ Step 1. Start PostgreSQL only:
 docker compose --file ledger/compose.yaml --project-name ledger up -d ledger-postgresql
 ```
 
-Step 2. Build and start the server:
+Step 2. Keep the development operator key in `LEDGER_API_KEY`, then build and start the server; Maven must end with
+`BUILD SUCCESS`:
 
 ```shell
+export LEDGER_API_KEY=nexusphere-ledger-development-key-change-me
 mvn install -DskipTests=true
 LEDGER_PROFILES=postgresql,dev LEDGER_DATABASE_PORT=5433 mvn -pl ledger/server spring-boot:start
 ```
@@ -249,9 +263,9 @@ LEDGER_PROFILES=postgresql,dev LEDGER_DATABASE_PORT=5433 mvn -pl ledger/server s
 Step 3. Record an entry, sign a checkpoint and verify the chain; the last answer must hold `"valid": true`:
 
 ```shell
-curl -X POST http://localhost:8090/api/v1/evidence -H "Authorization: Bearer nexusphere-ledger-development-key-change-me" -H "Content-Type: application/json" -d '{"agentId":"invoice-agent","principalId":"alice","action":"tools/call","target":"send_email","decision":"ALLOW","outcome":"SUCCEEDED","attributes":{"server":"mail"}}'
-curl -X POST http://localhost:8090/api/v1/checkpoints -H "Authorization: Bearer nexusphere-ledger-development-key-change-me"
-curl -X GET http://localhost:8090/api/v1/verification -H "Authorization: Bearer nexusphere-ledger-development-key-change-me"
+curl -X POST http://localhost:8090/api/v1/evidence -H "Authorization: Bearer $LEDGER_API_KEY" -H "Content-Type: application/json" -d '{"agentId":"invoice-agent","principalId":"alice","action":"tools/call","target":"send_email","decision":"ALLOW","outcome":"SUCCEEDED","attributes":{"server":"mail"}}'
+curl -X POST http://localhost:8090/api/v1/checkpoints -H "Authorization: Bearer $LEDGER_API_KEY"
+curl -X GET http://localhost:8090/api/v1/verification -H "Authorization: Bearer $LEDGER_API_KEY"
 ```
 
 Step 4. Stop the server and PostgreSQL:
@@ -275,7 +289,9 @@ mvn -pl ledger/ledger-e2e-tests -am verify
 
 Ledger releases are tagged `ledger-v{version}` and described in the [Changelog](CHANGELOG.md). The release artifacts
 are the server jar (`ledger/server/target/server-*-exec.jar`), the verifier jar
-(`ledger/verifier/target/verifier-*-exec.jar`) and the two Docker images built by the compose file.
+(`ledger/verifier/target/verifier-*-exec.jar`) and the four Docker images built by the compose file:
+`samanalishiri/nexusphere-ledger`, `samanalishiri/nexusphere-ledger-demo-mcp`, `samanalishiri/nexusphere-otelcol` and
+`samanalishiri/nexusphere-frontend`.
 
 </p>
 
@@ -374,8 +390,8 @@ LEDGER_ASK_MAX_EVIDENCE: 50
 the published development secrets unless `dev` is active. The private key is a base64 PKCS#8 Ed25519 key and the public
 key is its base64 X.509 encoding; the ledger refuses to start when they do not match. With
 `LEDGER_SIGNING_PROVIDER=vault` the private key stays in a HashiCorp Vault transit key and the `LEDGER_SIGNING_VAULT_*`
-settings replace both keys, as in [Keys in Vault](#keys-in-vault). The tables live in the `ledger`
-schema, so the ledger can share a database with other applications. Any setting can also come from a file of the same name in
+settings replace both keys, as in [Keys in Vault](#keys-in-vault). The tables live in the `ledger` schema, so the ledger
+can share a database with other applications. Any setting can also come from a file of the same name in
 `LEDGER_SECRETS_DIR`, which is how a secret manager hands over keys; backups, keys and metrics are described in
 [Operations](../docs/operations.md). Each caller, by key or by address when it has none, gets
 `LEDGER_RATE_LIMIT_PER_MINUTE` requests a minute with bursts up to `LEDGER_RATE_LIMIT_BURST`; over it the answer is 429
@@ -405,10 +421,12 @@ heartbeats. Rate limits count per instance.
 
 </p>
 
-Step 1. Start PostgreSQL as in [Run](#run) and build the server jar:
+Step 1. Start PostgreSQL as in [Run](#run), keep the development operator key in `LEDGER_API_KEY` and build the
+server jar; Maven must end with `BUILD SUCCESS`:
 
 ```shell
 docker compose --file ledger/compose.yaml --project-name ledger up -d ledger-postgresql
+export LEDGER_API_KEY=nexusphere-ledger-development-key-change-me
 mvn install -DskipTests=true
 ```
 
@@ -473,19 +491,19 @@ curl -s http://localhost:$OTHER/api/v1/cluster -H "Authorization: Bearer $LEDGER
 
 <p style="text-align: justify;">
 
-The personal fields are `principalId`, `target`, `reason`, `correlationId` and each attribute as
-`attributes.{name}`. The hash never covers their values, only their commitments: the SHA-256 of the canonical JSON of
-`field`, `salt` and `value`, where an absent value is `null`. The content hash is the SHA-256 of the canonical JSON of
-`format`, `id`, `occurredAt`, `recordedAt`, `agentId`, `action`, `decision`, `delegationId`, `inputHash`,
-`outputHash`, `outcome`, `model` when the entry names one, and `commitments`. Whoever holds an entry with its salts recomputes the commitments and
-the hash; once the salts and values are [erased](#erasure), the stored commitments still prove the entry's place in the
-chain. The link (`sequence`, `previousHash`, `contentHash`, `hash`) can be checked without the content, so a
-package can keep entries private and still prove the chain. Canonical JSON has sorted keys, no whitespace and `null`
-for absent fields. Timestamps are UTC with microseconds, for example `2026-10-01T08:00:00.123456Z`. A checkpoint signs
-the canonical JSON of `format` (`nexusphere-ledger/checkpoint/v2`), `sequence`, `headHash`, `createdAt`, `keyId` and
-`profiles`, the `id` and `digest` of each active [compliance profile](#compliance-profiles) sorted by `id`.
-Checkpoints signed before the ledger had profiles keep `nexusphere-ledger/checkpoint/v1` without `profiles`, and still
-verify. The key ID is the first 16 hex characters of the SHA-256 of the X.509 public key.
+The personal fields are `principalId`, `target`, `reason`, `correlationId` and each attribute as `attributes.{name}`.
+The hash never covers their values, only their commitments: the SHA-256 of the canonical JSON of `field`, `salt` and
+`value`, where an absent value is `null`. The content hash is the SHA-256 of the canonical JSON of `format`, `id`,
+`occurredAt`, `recordedAt`, `agentId`, `action`, `decision`, `delegationId`, `inputHash`, `outputHash`, `outcome`,
+`model` when the entry names one, and `commitments`. Whoever holds an entry with its salts recomputes the commitments
+and the hash; once the salts and values are [erased](#erasure), the stored commitments still prove the entry's place in
+the chain. The link (`sequence`, `previousHash`, `contentHash`, `hash`) can be checked without the content, so a package
+can keep entries private and still prove the chain. Canonical JSON has sorted keys, no whitespace and `null` for absent
+fields. Timestamps are UTC with microseconds, for example `2026-10-01T08:00:00.123456Z`. A checkpoint signs the
+canonical JSON of `format` (`nexusphere-ledger/checkpoint/v2`), `sequence`, `headHash`, `createdAt`, `keyId` and
+`profiles`, the `id` and `digest` of each active [compliance profile](#compliance-profiles) sorted by `id`. Checkpoints
+signed before the ledger had profiles keep `nexusphere-ledger/checkpoint/v1` without `profiles`, and still verify. The
+key ID is the first 16 hex characters of the SHA-256 of the X.509 public key.
 
 </p>
 
@@ -502,9 +520,9 @@ evidence does not migrate: recreate it.
 
 <p style="text-align: justify;">
 
-`GET /api/v1/verification` recomputes every hash and link, checks the signature of every checkpoint against the entry
-it names and checks the head. The same checks run outside the server with `ledger/chain`: page through
-`GET /api/v1/evidence`, feed the entries to `ChainVerifier`, and verify each checkpoint with `SignedCheckpoint.verify` and
+`GET /api/v1/verification` recomputes every hash and link, checks the signature of every checkpoint against the entry it
+names and checks the head. The same checks run outside the server with `ledger/chain`: page through `GET
+/api/v1/evidence`, feed the entries to `ChainVerifier`, and verify each checkpoint with `SignedCheckpoint.verify` and
 the key it names from `GET /api/v1/keys`.
 
 </p>
@@ -538,8 +556,8 @@ witness after each checkpoint and keeps each cosignature it gets; a witness that
 curl http://localhost:8090/public/v1/log/key
 curl http://localhost:8090/public/v1/witness/key
 curl http://localhost:8090/public/v1/log/checkpoint
-curl "http://localhost:8090/api/v1/log/proofs/inclusion?sequence=7" -H "Authorization: Bearer nexusphere-ledger-development-key-change-me"
-curl "http://localhost:8090/api/v1/log/proofs/consistency?firstSize=7&secondSize=42" -H "Authorization: Bearer nexusphere-ledger-development-key-change-me"
+curl "http://localhost:8090/api/v1/log/proofs/inclusion?sequence=7" -H "Authorization: Bearer $LEDGER_API_KEY"
+curl "http://localhost:8090/api/v1/log/proofs/consistency?firstSize=7&secondSize=42" -H "Authorization: Bearer $LEDGER_API_KEY"
 ```
 
 ```text
@@ -575,13 +593,12 @@ mirror. Since the leaves are entry hashes, the archive discloses no evidence con
 
 The verifier's `archive` command mirrors the log into a directory. It fetches the checkpoint, then only the tiles it
 does not hold yet, and removes partial tiles a later size replaced, so running it on a schedule keeps an independent
-copy current. The directory has the same layout as the endpoints, so copying it to any static host or object store,
-for example with `aws s3 sync ledger-log s3://bucket/log`, publishes a mirror that `archive` and any C2SP client
-read like the ledger itself. The `tiles` command checks the copy offline: the checkpoint signature against the pinned key, every
-entry against its leaf, every upper tile against the leaves, and the root against the checkpoint. With `--package`,
-it also checks that every link of an evidence package is the entry the archive holds at that sequence, so a ledger
-that later rewrote its history is caught with no access to it. Both exit with `0`, `1` or `2` as the package verifier
-does.
+copy current. The directory has the same layout as the endpoints, so copying it to any static host or object store, for
+example with `aws s3 sync ledger-log s3://bucket/log`, publishes a mirror that `archive` and any C2SP client read like
+the ledger itself. The `tiles` command checks the copy offline: the checkpoint signature against the pinned key, every
+entry against its leaf, every upper tile against the leaves, and the root against the checkpoint. With `--package`, it
+also checks that every link of an evidence package is the entry the archive holds at that sequence, so a ledger that
+later rewrote its history is caught with no access to it. Both exit with `0`, `1` or `2` as the package verifier does.
 
 </p>
 
@@ -682,9 +699,9 @@ any other.
 </p>
 
 ```shell
-curl http://localhost:8090/api/v1/evidence/{id}/statement -H "Authorization: Bearer nexusphere-ledger-development-key-change-me" -o statement.cose
-curl http://localhost:8090/api/v1/evidence/{id}/receipt -H "Authorization: Bearer nexusphere-ledger-development-key-change-me" -o receipt.cose
-java -jar ledger/verifier/target/verifier-1.0.0-SNAPSHOT-exec.jar statement --public-key "$(curl -s http://localhost:8090/api/v1/keys -H 'Authorization: Bearer nexusphere-ledger-development-key-change-me' | jq -r '.[] | select(.status == "ACTIVE") | .publicKey')" --receipt receipt.cose statement.cose
+curl http://localhost:8090/api/v1/evidence/{id}/statement -H "Authorization: Bearer $LEDGER_API_KEY" -o statement.cose
+curl http://localhost:8090/api/v1/evidence/{id}/receipt -H "Authorization: Bearer $LEDGER_API_KEY" -o receipt.cose
+java -jar ledger/verifier/target/verifier-1.0.0-SNAPSHOT-exec.jar statement --public-key "$(curl -s http://localhost:8090/api/v1/keys -H "Authorization: Bearer $LEDGER_API_KEY" | jq -r '.[] | select(.status == "ACTIVE") | .publicKey')" --receipt receipt.cose statement.cose
 ```
 
 ```text
@@ -722,17 +739,18 @@ and exits with `0` for a valid package, `1` for an invalid one and `2` for a usa
 from `GET /api/v1/keys` (or a key published elsewhere) with `--public-key` so the verifier does not trust the key inside
 the package. When the package has a `log`, the verifier also checks that the log checkpoint is signed by the ledger,
 covers the end checkpoint and proves every disclosed entry, and that each statement and receipt is signed by a trusted
-key, describes its entry and proves it in the same log checkpoint. Pass each witness's verifier key with `--witness` and the
-number of cosignatures needed with `--witnesses-required` (all given witnesses by default) to require that independent
-witnesses saw the same log. Pass the ledger's current key list from `GET /api/v1/keys` with `--keys` so the verifier
-also applies key revocations that happened after the package was exported, as in [Key Revocation](#key-revocation).
+key, describes its entry and proves it in the same log checkpoint. Pass each witness's verifier key with `--witness` and
+the number of cosignatures needed with `--witnesses-required` (all given witnesses by default) to require that
+independent witnesses saw the same log. Pass the ledger's current key list from `GET /api/v1/keys` with `--keys` so the
+verifier also applies key revocations that happened after the package was exported, as in [Key
+Revocation](#key-revocation).
 
 </p>
 
 ```shell
-curl -X POST http://localhost:8090/api/v1/packages -H "Authorization: Bearer nexusphere-ledger-development-key-change-me" -H "Content-Type: application/json" -d '{"agentId":"invoice-agent"}' -o package.json
+curl -X POST http://localhost:8090/api/v1/packages -H "Authorization: Bearer $LEDGER_API_KEY" -H "Content-Type: application/json" -d '{"agentId":"invoice-agent"}' -o package.json
 mvn -pl ledger/verifier -am package -DskipTests=true
-java -jar ledger/verifier/target/verifier-1.0.0-SNAPSHOT-exec.jar --public-key "$(curl -s http://localhost:8090/api/v1/keys -H 'Authorization: Bearer nexusphere-ledger-development-key-change-me' | jq -r '.[] | select(.status == "ACTIVE") | .publicKey')" package.json
+java -jar ledger/verifier/target/verifier-1.0.0-SNAPSHOT-exec.jar --public-key "$(curl -s http://localhost:8090/api/v1/keys -H "Authorization: Bearer $LEDGER_API_KEY" | jq -r '.[] | select(.status == "ACTIVE") | .publicKey')" package.json
 ```
 
 ```text
@@ -836,7 +854,7 @@ openssl genpkey -algorithm ed25519 -outform DER -out ledger-signing-2.der
 export LEDGER_SIGNING_PREVIOUS_PRIVATE_KEY=${LEDGER_SIGNING_PRIVATE_KEY}
 export LEDGER_SIGNING_PRIVATE_KEY=$(base64 -w0 ledger-signing-2.der)
 export LEDGER_SIGNING_PUBLIC_KEY=$(openssl pkey -inform DER -in ledger-signing-2.der -pubout -outform DER | base64 -w0)
-curl http://localhost:8090/api/v1/keys -H "Authorization: Bearer nexusphere-ledger-development-key-change-me"
+curl http://localhost:8090/api/v1/keys -H "Authorization: Bearer $LEDGER_API_KEY"
 ```
 
 ### Keys in Vault
@@ -862,7 +880,7 @@ LEDGER_SIGNING_PROVIDER=vault docker compose --file ledger/compose.yaml --projec
 Step 2. Check the keys; the last one must be `ACTIVE` with a rotation endorsed by the development key:
 
 ```shell
-curl -s http://localhost:8090/api/v1/keys -H "Authorization: Bearer nexusphere-ledger-development-key-change-me" | jq '.[] | {keyId, status, previous: .rotation.previousKeyId}'
+curl -s http://localhost:8090/api/v1/keys -H "Authorization: Bearer $LEDGER_API_KEY" | jq '.[] | {keyId, status, previous: .rotation.previousKeyId}'
 ```
 
 Step 3. Rotate the key in Vault and restart the ledger; one more key must appear, endorsed by the one before:
@@ -907,13 +925,13 @@ Step 1. Rotate to a new key, as above, if the leaked key is still active.
 Step 2. Revoke the leaked key; `compromisedAt` is the earliest time the key may have been copied:
 
 ```shell
-curl -s -X POST http://localhost:8090/api/v1/keys/{keyId}/revocation -H "Authorization: Bearer nexusphere-ledger-development-key-change-me" -H "Content-Type: application/json" -d '{"compromisedAt":"2026-10-08T00:00:00Z","reason":"backup copy leaked"}'
+curl -s -X POST http://localhost:8090/api/v1/keys/{keyId}/revocation -H "Authorization: Bearer $LEDGER_API_KEY" -H "Content-Type: application/json" -d '{"compromisedAt":"2026-10-08T00:00:00Z","reason":"backup copy leaked"}'
 ```
 
 Step 3. Check the keys; the leaked key must show `REVOKED` with its revocation:
 
 ```shell
-curl -s http://localhost:8090/api/v1/keys -H "Authorization: Bearer nexusphere-ledger-development-key-change-me" | tee keys.json | jq '.[] | {keyId, status, compromisedAt: .revocation.compromisedAt}'
+curl -s http://localhost:8090/api/v1/keys -H "Authorization: Bearer $LEDGER_API_KEY" | tee keys.json | jq '.[] | {keyId, status, compromisedAt: .revocation.compromisedAt}'
 ```
 
 Step 4. Verify an older package with the new key pinned, the key list and the witnesses; it must end with
@@ -936,9 +954,10 @@ agents, creating and revoking grants, creating checkpoints and running the full 
 <p style="text-align: justify;">
 
 A grant lets one agent act for one principal: a list of actions and a list of targets, each exact or ending with `*`,
-valid until `expiresAt`, optionally from `notBefore` and for at most `maxUses` allowed decisions. Its terms are hashed as
-the canonical JSON of `nexusphere-ledger/grant/v1` (`GrantTerms` in `ledger/chain`), and the hash is the `inputHash` of
-the `grant/create` evidence, so anyone can check that a grant was not changed after it was recorded.
+valid until `expiresAt`, at most 366 days ahead, optionally from `notBefore` and for at most `maxUses` allowed
+decisions. Its terms are hashed as the canonical JSON of `nexusphere-ledger/grant/v1` (`GrantTerms` in `ledger/chain`),
+and the hash is the `inputHash` of the `grant/create` evidence, so anyone can check that a grant was not changed after
+it was recorded.
 
 </p>
 
@@ -946,12 +965,13 @@ the `grant/create` evidence, so anyone can check that a grant was not changed af
 
 Before acting, an agent asks for a decision. The ledger picks the active grant that covers the action and target and
 expires first, counts one use, and records the decision as evidence with outcome `PENDING`, or `DENIED` with the reason.
-The agent then reports `SUCCEEDED` or `FAILED` once; this is a second evidence entry carrying the `decisionId` attribute,
-the grant as `delegationId` and the same `inputHash` and `correlationId`. Concurrent decisions never use a grant more
-than `maxUses` times. A reported `FAILED` keeps the use, because the ledger cannot know whether the action ran. The
-gateways return the use themselves when they see that the call never ran: the MCP or A2A server could not be reached,
-the MCP server rejected the request (HTTP 4xx, or JSON-RPC parse, invalid request, unknown method or invalid params),
-or the peer ledger refused the A2A request without a receipt. The outcome entry then carries `grant.useReturned`.
+The agent then reports `SUCCEEDED` or `FAILED` once; this is a second evidence entry carrying the `decisionId`
+attribute, the grant as `delegationId` and the same `inputHash` and `correlationId`. Concurrent decisions never use a
+grant more than `maxUses` times. A reported `FAILED` keeps the use, because the ledger cannot know whether the action
+ran. The gateways return the use themselves when they see that the call never ran: the MCP or A2A server could not be
+reached, the MCP server rejected the request (HTTP 4xx, or JSON-RPC parse, invalid request, unknown method or invalid
+params), or the peer ledger refused the A2A request without a receipt. The outcome entry then carries
+`grant.useReturned`.
 
 </p>
 
@@ -969,13 +989,17 @@ or the peer ledger refused the A2A request without a receipt. The outcome entry 
 | `APPROVAL_DENIED`     | DENY     | The approver denied the approval                            |
 | `APPROVAL_EXPIRED`    | DENY     | Nobody answered the approval in time                        |
 
+<p style="text-align: justify;">
+
 Agent, grant and decision changes are evidence too: `agent/register`, `agent/disable`, `agent/rotate-key`,
 `agent/signing-key`, `grant/create`, `grant/approve`, `grant/deny` and `grant/revoke`, with the owner or the granting
 principal as `principalId`.
 
+</p>
+
 ```shell
-curl -X POST http://localhost:8090/api/v1/agents -H "Authorization: Bearer nexusphere-ledger-development-key-change-me" -H "Content-Type: application/json" -d '{"agentId":"invoice-agent","name":"Invoice agent","ownerId":"acme"}'
-curl -X POST http://localhost:8090/api/v1/grants -H "Authorization: Bearer nexusphere-ledger-development-key-change-me" -H "Content-Type: application/json" -d '{"principalId":"alice","agentId":"invoice-agent","actions":["tools/call"],"targets":["send_email","read_*"],"expiresAt":"2026-12-31T00:00:00Z","maxUses":100}'
+curl -X POST http://localhost:8090/api/v1/agents -H "Authorization: Bearer $LEDGER_API_KEY" -H "Content-Type: application/json" -d '{"agentId":"invoice-agent","name":"Invoice agent","ownerId":"acme"}'
+curl -X POST http://localhost:8090/api/v1/grants -H "Authorization: Bearer $LEDGER_API_KEY" -H "Content-Type: application/json" -d "{\"principalId\":\"alice\",\"agentId\":\"invoice-agent\",\"actions\":[\"tools/call\"],\"targets\":[\"send_email\",\"read_*\"],\"expiresAt\":\"$(date -u -d '+30 days' +%Y-%m-%dT00:00:00Z)\",\"maxUses\":100}"
 curl -X POST http://localhost:8090/api/v1/decisions -H "Authorization: Bearer {agentApiKey}" -H "Content-Type: application/json" -d '{"principalId":"alice","action":"tools/call","target":"send_email"}'
 curl -X POST http://localhost:8090/api/v1/decisions/{decisionId}/outcome -H "Authorization: Bearer {agentApiKey}" -H "Content-Type: application/json" -d '{"outcome":"SUCCEEDED"}'
 ```
@@ -1663,13 +1687,13 @@ in `LEDGER_A2A_TRUSTED_ISSUERS` (comma separated) and names its own agents with 
 
 <p style="text-align: justify;">
 
-The agent sends its JSON-RPC request to `/a2a/out/{peer}` with its own API key and the `X-Ledger-Principal` header.
-The ledger decides action `a2a/send` on target `{peer}/{method}`, so a grant on `supplier/*` covers it. A denied
-request never leaves and is answered with JSON-RPC error `-32003`. An allowed request carries two headers:
+The agent sends its JSON-RPC request to `/a2a/out/{peer}` with its own API key and the `X-Ledger-Principal` header. The
+ledger decides action `a2a/send` on target `{peer}/{method}`, so a grant on `supplier/*` covers it. A denied request
+never leaves and is answered with JSON-RPC error `-32003`. An allowed request carries two headers:
 `X-Nexusphere-Mandate`, a mandate for the grant with the peer's issuer as audience (reused while it is valid for at
-least another minute), or the agent's own key-bound presentation when the agent has a signing key, and `X-Nexusphere-Request`, a request proof signed by the sending ledger
-(`typ` `nexusphere-a2a-request+jwt`) that binds the mandate, the method, the SHA-256 of the body and the decision ID
-as the request ID.
+least another minute), or the agent's own key-bound presentation when the agent has a signing key, and
+`X-Nexusphere-Request`, a request proof signed by the sending ledger (`typ` `nexusphere-a2a-request+jwt`) that binds the
+mandate, the method, the SHA-256 of the body and the decision ID as the request ID.
 
 </p>
 
@@ -1691,12 +1715,12 @@ and response hashes, the HTTP status, the outcome, and the sequence and hash of 
 
 <p style="text-align: justify;">
 
-The sending ledger verifies the receipt with the peer's published key, records the outcome with
-`a2a.receipt` set to `VERIFIED`, `INVALID` or `MISSING` and the peer's evidence sequence and hash, and returns the
-answer with `X-Ledger-Decision`, `X-Ledger-Exchange`, `X-Ledger-Receipt` and the receipt. Both ledgers keep the
-mandate, the request proof and the receipt of every exchange at `GET /api/v1/a2a/exchanges/{id}`, so either side can
-later show what the other signed. The receiving ledger also counts the uses of every mandate on its own: once the requests it accepted under a
-mandate reach `mandate.maxUses`, it denies the next one with `USES_EXHAUSTED`, so a sender that ignores its own count
+The sending ledger verifies the receipt with the peer's published key, records the outcome with `a2a.receipt` set to
+`VERIFIED`, `INVALID` or `MISSING` and the peer's evidence sequence and hash, and returns the answer with
+`X-Ledger-Decision`, `X-Ledger-Exchange`, `X-Ledger-Receipt` and the receipt. Both ledgers keep the mandate, the request
+proof and the receipt of every exchange at `GET /api/v1/a2a/exchanges/{id}`, so either side can later show what the
+other signed. The receiving ledger also counts the uses of every mandate on its own: once the requests it accepted under
+a mandate reach `mandate.maxUses`, it denies the next one with `USES_EXHAUSTED`, so a sender that ignores its own count
 gets nowhere. A request that could not reach the receiving agent does not count.
 
 </p>
@@ -1786,8 +1810,8 @@ Step 4. Register a buying agent, grant it `supplier/*` for alice and send two or
 and both orders must answer `Order accepted`:
 
 ```shell
-AGENT_KEY=$(curl -s -X POST http://localhost:8090/api/v1/agents -H "Authorization: Bearer nexusphere-ledger-development-key-change-me" -H "Content-Type: application/json" -d '{"agentId":"buyer-agent","name":"Buyer agent","ownerId":"acme"}' | jq -r .apiKey)
-curl -s -X POST http://localhost:8090/api/v1/grants -H "Authorization: Bearer nexusphere-ledger-development-key-change-me" -H "Content-Type: application/json" -d "{\"principalId\":\"alice\",\"agentId\":\"buyer-agent\",\"actions\":[\"a2a/send\"],\"targets\":[\"supplier/*\"],\"expiresAt\":\"$(date -u -d '+30 days' +%Y-%m-%dT00:00:00Z)\"}" | jq -r .status
+AGENT_KEY=$(curl -s -X POST http://localhost:8090/api/v1/agents -H "Authorization: Bearer $LEDGER_API_KEY" -H "Content-Type: application/json" -d '{"agentId":"buyer-agent","name":"Buyer agent","ownerId":"acme"}' | jq -r .apiKey)
+curl -s -X POST http://localhost:8090/api/v1/grants -H "Authorization: Bearer $LEDGER_API_KEY" -H "Content-Type: application/json" -d "{\"principalId\":\"alice\",\"agentId\":\"buyer-agent\",\"actions\":[\"a2a/send\"],\"targets\":[\"supplier/*\"],\"expiresAt\":\"$(date -u -d '+30 days' +%Y-%m-%dT00:00:00Z)\"}" | jq -r .status
 for id in 1 2; do curl -s -X POST http://localhost:8090/a2a/out/supplier -H "Authorization: Bearer $AGENT_KEY" -H "X-Ledger-Principal: alice" -H "Content-Type: application/json" -d "{\"jsonrpc\":\"2.0\",\"id\":\"$id\",\"method\":\"message/send\",\"params\":{\"message\":{\"role\":\"user\",\"messageId\":\"$id\",\"parts\":[{\"kind\":\"text\",\"text\":\"Order 40 pallets\"}]}}}" | jq -r '.result.parts[0].text'; done
 ```
 
@@ -1796,7 +1820,7 @@ from now; it must count `2`:
 
 ```shell
 FROM=$(date -u -d '-1 hour' +%Y-%m-%dT%H:%M:%SZ) TO=$(date -u -d '+1 hour' +%Y-%m-%dT%H:%M:%SZ)
-curl -s -X POST http://localhost:8090/api/v1/a2a/statements -H "Authorization: Bearer nexusphere-ledger-development-key-change-me" -H "Content-Type: application/json" -d "{\"peer\":\"supplier\",\"from\":\"$FROM\",\"to\":\"$TO\"}" > buyer-statement.json
+curl -s -X POST http://localhost:8090/api/v1/a2a/statements -H "Authorization: Bearer $LEDGER_API_KEY" -H "Content-Type: application/json" -d "{\"peer\":\"supplier\",\"from\":\"$FROM\",\"to\":\"$TO\"}" > buyer-statement.json
 jq -r .statement buyer-statement.json > buyer.jwt && jq .exchanges buyer-statement.json
 ```
 
@@ -1804,7 +1828,7 @@ Step 6. Let the supplier's ledger reconcile it with its own; it must show `"reco
 discrepancies:
 
 ```shell
-curl -s -X POST http://localhost:8092/api/v1/a2a/reconciliations -H "Authorization: Bearer nexusphere-ledger-development-key-change-me" -H "Content-Type: application/json" -d "{\"statement\":\"$(cat buyer.jwt)\"}" > reconciliation.json
+curl -s -X POST http://localhost:8092/api/v1/a2a/reconciliations -H "Authorization: Bearer $LEDGER_API_KEY" -H "Content-Type: application/json" -d "{\"statement\":\"$(cat buyer.jwt)\"}" > reconciliation.json
 jq -c '{reconciled, matched, discrepancies}' reconciliation.json && jq -r .statement reconciliation.json > supplier.jwt
 ```
 
@@ -2362,17 +2386,23 @@ java -jar verifier/target/verifier-1.0.0-SNAPSHOT-exec.jar dispute --public-key 
 
 [Conformance Vectors](conformance/README.md) hold fixed inputs and outputs for every format the ledger produces, made
 with the published RFC 8032 test keys: canonical JSON, the evidence chain and checkpoints, Merkle roots and proofs,
-signed notes and cosignatures, SCITT statements and receipts, an SD-JWT VC mandate, a key-bound mandate with its
-KB-JWT, an HTTP message signature, a checkpoint that signs compliance profiles, an RFC 3161 token from a real
-timestamp authority, a Rekor entry from a real Rekor v2 log and a signed dispute report, an entry that names its model and prompt, and index proofs of presence and absence. Another implementation checks itself against them, and `ConformanceVectorsTest` in `ledger/verifier` fails when the ledger's own output changes.
+signed notes and cosignatures, SCITT statements and receipts, an SD-JWT VC mandate, a key-bound mandate with its KB-JWT,
+an HTTP message signature, a checkpoint that signs compliance profiles, an RFC 3161 token from a real timestamp
+authority, a Rekor entry from a real Rekor v2 log and a signed dispute report, an entry that names its model and prompt,
+and index proofs of presence and absence. Another implementation checks itself against them, and
+`ConformanceVectorsTest` in `ledger/verifier` fails when the ledger's own output changes.
 
 </p>
 
 ## API
 
+<p style="text-align: justify;">
+
 All `/api/**`, `/mcp/**` and `/a2a/out/**` endpoints require `Authorization: Bearer {LEDGER_API_KEY}` or an agent
 API key, except `/api/v1/principal/**`, which requires a principal token from the OIDC provider and answers
 `403 FORBIDDEN` to everyone else. Operator-only endpoints answer `403 FORBIDDEN` to agents.
+
+</p>
 
 | Method | Path                                       | Description                                                                                             |
 |--------|--------------------------------------------|---------------------------------------------------------------------------------------------------------|
@@ -2470,6 +2500,13 @@ API key, except `/api/v1/principal/**`, which requires a principal token from th
 | POST   | `/api/v1/a2a/statements`                   | A signed statement of the exchanges with a `peer` in a window `from` to `to` (operator)                 |
 | POST   | `/api/v1/a2a/reconciliations`              | Reconcile a peer's signed `statement` with this ledger's own and record the result (operator)           |
 | GET    | `/actuator/health`                         | Health, open for probes                                                                                 |
+
+<p style="text-align: justify;">
+
+Every error answers with its HTTP status and a JSON body with a `code`, a `message` and, when there is more to say,
+`details`. An evidence entry without a `principalId`, for example, answers `400` with:
+
+</p>
 
 ```json
 {

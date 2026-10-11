@@ -26,13 +26,13 @@ same origin, so it needs no CORS on the ledger.
 ## Responsibilities
 
 * Operator pages: the ledger head, checkpoints and signing keys, full verification, evidence with filters and entry
-  details (including the model name, version, prompt hash and config hash when recorded), erased entries marked with their commitments, agents, grants with their mandates, evidence package export
-  and verification, an Approvals page that lists the approval requests of `@approval` policies by status and approves
-  or denies them with an optional reason, an Anomalies page that lists the unusual volume, denial and failure rates
-  the ledger detected per agent by status and checks for new ones, a Reports page that creates the signed reports of the active compliance
-  profiles and dispute packages, A2A exchanges, a Privacy page to erase principals, place and release legal holds
-  and run the retention pass, and an Ask page that answers a plain-language question about the evidence with cited
-  entries
+  details (including the model name, version, prompt hash and config hash when recorded), erased entries marked with
+  their commitments, agents, grants with their mandates, evidence package export and verification, an Approvals page
+  that lists the approval requests of `@approval` policies by status and approves or denies them with an optional
+  reason, an Anomalies page that lists the unusual volume, denial and failure rates the ledger detected per agent by
+  status and checks for new ones, a Reports page that creates the signed reports of the active compliance profiles and
+  dispute packages, A2A exchanges, a Privacy page to erase principals, place and release legal holds and run the
+  retention pass, and an Ask page that answers a plain-language question about the evidence with cited entries
 * Principal dashboard: the landing page of a signed-in principal with the activity of their agents over 7, 30 or 90
   days, the approvals waiting for them, the grants that expire soon, a timeline of the recent actions and the export
   of their own evidence package
@@ -56,20 +56,20 @@ same origin, so it needs no CORS on the ledger.
 ### Development
 
 Step 1. Start the ledger, for example with the [Quick Start](../README.md#quick-start), and stop its `ledger-ui`
-container so port 5173 is free:
+container so port 5173 is free; Docker must print `ledger-ui`:
 
 ```shell
 docker stop ledger-ui
 ```
 
-Step 2. Install the dependencies:
+Step 2. Install the dependencies; the command must end without errors:
 
 ```shell
 cd frontend
 npm install
 ```
 
-Step 3. Start the development server:
+Step 3. Start the development server; Vite must print `Local:   http://localhost:5173/`:
 
 ```shell
 npm run dev
@@ -86,13 +86,23 @@ it is set.
 
 ### Test
 
+Step 1. Run the unit tests in `frontend`; Vitest must report `Test Files  12 passed (12)` and
+`Tests  30 passed (30)`:
+
 ```shell
 npm test
 ```
 
+<p style="text-align: justify;">
+
 The browser tests are described in [Browser Tests](#browser-tests).
 
+</p>
+
 ### Build
+
+Step 1. Build the production bundle in `frontend`; Vite must end with `built in` and the time it took, and the bundle
+is written to `dist`:
 
 ```shell
 npm run build
@@ -107,8 +117,16 @@ The image builds the application and serves it with nginx on port 80, forwarding
 
 </p>
 
+Step 1. Build the image from the root of the repository; Docker must end by naming
+`samanalishiri/nexusphere-frontend:latest`:
+
 ```shell
 docker build -t samanalishiri/nexusphere-frontend:latest frontend
+```
+
+Step 2. Run it against a ledger on the host; the sign-in page must open on http://localhost:5173:
+
+```shell
 docker run -p 5173:80 -e LEDGER_URL=http://host.docker.internal:8090 samanalishiri/nexusphere-frontend:latest
 ```
 
@@ -210,30 +228,26 @@ test signs in with the API key on the sign-in page.
 | `operator.spec.ts`  | operator sign-in with the API key and the Overview page                                                                                                                               |
 | `ask.spec.ts`       | the operator asks a question, sees the model error and then the cited answer, plan, warning and footer, and a citation chip highlights its row; the principal asks from the Dashboard |
 
-Step 1. Install the dependencies:
+Step 1. Install the dependencies; the command must end without errors:
 
 ```shell
 cd frontend
 npm ci
 ```
 
-The command must end without errors.
-
-Step 2. Point Playwright at a Chromium binary, or install its own once with `npx playwright install chromium`:
+Step 2. Point Playwright at a Chromium binary, or install its own once with `npx playwright install chromium`; the
+second command must print a Chromium version:
 
 ```shell
 export CHROMIUM_PATH=/path/to/chrome
+"$CHROMIUM_PATH" --version
 ```
 
-`"$CHROMIUM_PATH" --version` must print a Chromium version.
-
-Step 3. Run the browser tests:
+Step 3. Run the browser tests; Playwright must report `7 passed`:
 
 ```shell
 npm run e2e
 ```
-
-Playwright must report `7 passed`.
 
 ##
 
