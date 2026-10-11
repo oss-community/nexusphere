@@ -116,7 +116,7 @@ class PolicyE2ETest {
                     "target", "bank/pay_invoice", "attributes", Map.of("policy.hash", "0".repeat(64)))));
             assertThat(forged.status()).isEqualTo(400);
             assertThat(forged.json().path("details").path("fields").path("attributes").asString())
-                    .isEqualTo("names starting with policy. are set by the ledger");
+                    .isEqualTo("names starting with policy. or approval. are set by the ledger");
 
             client.post("/api/v1/checkpoints");
             JsonNode pkg = client.post("/api/v1/packages",

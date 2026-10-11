@@ -338,6 +338,14 @@ LEDGER_MANAGEMENT_PORT:
 LEDGER_RATE_LIMIT_PER_MINUTE: 1200
 LEDGER_RATE_LIMIT_BURST: 200
 LEDGER_POLICY_DEFAULT_EFFECT: permit
+LEDGER_APPROVAL_TIMEOUT: 15m
+LEDGER_APPROVAL_POLL_INTERVAL: 5s
+LEDGER_APPROVAL_WEBHOOK_URL:
+LEDGER_APPROVAL_CIBA_ENDPOINT:
+LEDGER_APPROVAL_CIBA_TOKEN_ENDPOINT:
+LEDGER_APPROVAL_CIBA_CLIENT_ID:
+LEDGER_APPROVAL_CIBA_CLIENT_SECRET:
+LEDGER_APPROVAL_CIBA_SCOPE: openid
 ```
 
 <p style="text-align: justify;">
@@ -776,15 +784,19 @@ or the peer ledger refused the A2A request without a receipt. The outcome entry 
 
 </p>
 
-| Reason code        | Decision | Meaning                                                    |
-|--------------------|----------|------------------------------------------------------------|
-| `ALLOWED_BY_GRANT` | ALLOW    | An active grant covers the action and the target           |
-| `AGENT_NOT_ACTIVE` | DENY     | The agent is unknown or disabled                           |
-| `NO_ACTIVE_GRANT`  | DENY     | The principal has no active grant for this agent           |
-| `NOT_COVERED`      | DENY     | Active grants exist, but none covers the action and target |
-| `NOT_YET_VALID`    | DENY     | The covering grant starts later                            |
-| `USES_EXHAUSTED`   | DENY     | The covering grant has used all its uses                   |
-| `POLICY_DENIED`    | DENY     | A grant covers the action, but the active policies deny it |
+| Reason code           | Decision | Meaning                                                     |
+|-----------------------|----------|-------------------------------------------------------------|
+| `ALLOWED_BY_GRANT`    | ALLOW    | An active grant covers the action and the target            |
+| `AGENT_NOT_ACTIVE`    | DENY     | The agent is unknown or disabled                            |
+| `NO_ACTIVE_GRANT`     | DENY     | The principal has no active grant for this agent            |
+| `NOT_COVERED`         | DENY     | Active grants exist, but none covers the action and target  |
+| `NOT_YET_VALID`       | DENY     | The covering grant starts later                             |
+| `USES_EXHAUSTED`      | DENY     | The covering grant has used all its uses                    |
+| `POLICY_DENIED`       | DENY     | A grant covers the action, but the active policies deny it  |
+| `APPROVAL_PENDING`    | DENY     | Policies ask for an approval that has not been answered yet |
+| `ALLOWED_BY_APPROVAL` | ALLOW    | A grant covers the action and its approval was given        |
+| `APPROVAL_DENIED`     | DENY     | The approver denied the approval                            |
+| `APPROVAL_EXPIRED`    | DENY     | Nobody answered the approval in time                        |
 
 Agent, grant and decision changes are evidence too: `agent/register`, `agent/disable`, `agent/rotate-key`,
 `agent/signing-key`, `grant/create`, `grant/approve`, `grant/deny` and `grant/revoke`, with the owner or the granting
@@ -874,6 +886,80 @@ Step 5. Export a package and verify it; the output must show
 curl -s -X POST http://localhost:8090/api/v1/checkpoints -H "Authorization: Bearer $LEDGER_API_KEY" > /dev/null
 curl -s -X POST http://localhost:8090/api/v1/packages -H "Authorization: Bearer $LEDGER_API_KEY" -H "Content-Type: application/json" -d '{"agentId":"payments-agent"}' > package.json
 java -jar verifier/target/verifier-1.0.0-SNAPSHOT-exec.jar package.json
+```
+
+### Human Approval
+
+<p style="text-align: justify;">
+
+A `forbid` policy annotated `@approval("principal")`, `@approval("operator")` or `@approval("any")` does not end
+the matter: when a grant covers the action and only such policies forbid it, the decision is `DENY` with
+`APPROVAL_PENDING` and an `approvalId`, and the ledger waits `LEDGER_APPROVAL_TIMEOUT` for the named approver. The
+operator answers with `POST /api/v1/approvals/{id}/approve` or `/deny`, the principal with the same routes under
+`/api/v1/principal/approvals` after signing in, or on their own device through OpenID Connect CIBA. When the agent
+asks again for the same action, target and input, an approved request is `ALLOW` with `ALLOWED_BY_APPROVAL` and uses
+the grant once; a denied one is `APPROVAL_DENIED`; and one nobody answered in time is `APPROVAL_EXPIRED`, so silence
+denies. The next request after that asks again. Agents read their own approvals with `GET /api/v1/approvals/{id}`.
+
+</p>
+
+<p style="text-align: justify;">
+
+Every answer is evidence: `approval/approve`, `approval/deny` or `approval/expire` with the attributes `approval.id`,
+`approval.action`, `approval.approver`, `approval.method` (`operator`, `principal`, `ciba` or `timeout`), the policy
+hash and, for a principal, the `consent.*` attributes of their token. The decision entries carry `approval.id` too,
+and a pending one `approval.expiresAt`. With `LEDGER_APPROVAL_WEBHOOK_URL` the ledger posts each new request as JSON
+of type `approval.requested`, signed as in [HTTP Message Signatures](#http-message-signatures), until an answer `2xx`
+arrives. With `LEDGER_APPROVAL_CIBA_ENDPOINT`, `LEDGER_APPROVAL_CIBA_TOKEN_ENDPOINT`, `LEDGER_APPROVAL_CIBA_CLIENT_ID`
+and `LEDGER_APPROVAL_CIBA_CLIENT_SECRET` the ledger starts a CIBA request in poll mode for every request a principal may
+answer, with the principal id as `login_hint`, and accepts the returned token only when it is valid for
+`LEDGER_OIDC_ISSUER` and names that principal. Pending requests are checked every `LEDGER_APPROVAL_POLL_INTERVAL`.
+
+</p>
+
+Step 1. Start a receiver that prints every webhook it gets:
+
+```shell
+python3 -c 'import http.server as h
+class R(h.BaseHTTPRequestHandler):
+    def do_POST(self):
+        print(self.rfile.read(int(self.headers["Content-Length"])).decode(), flush=True); self.send_response(204); self.end_headers()
+h.HTTPServer(("localhost", 9100), R).serve_forever()' &
+```
+
+Step 2. Start the ledger as in [Run](#run) with `LEDGER_APPROVAL_WEBHOOK_URL=http://localhost:9100/approvals`, then
+register the agent and its grant as in Step 1 of [Policies](#policies).
+
+Step 3. Activate a policy that lets the operator approve wire transfers; the answer must list
+`wire-needs-operator`:
+
+```shell
+cat > approvals.cedar <<'CEDAR'
+@id("wire-needs-operator")
+@approval("operator")
+forbid(principal, action, resource == Target::"bank/wire_transfer");
+CEDAR
+jq -Rs '{text: .}' approvals.cedar | curl -s -X PUT http://localhost:8090/api/v1/policies -H "Authorization: Bearer $LEDGER_API_KEY" -H "Content-Type: application/json" -d @- | jq -c '.policies'
+```
+
+Step 4. Ask for a wire transfer; the answer must show `APPROVAL_PENDING` with an `approvalId`, and the receiver must
+print an `approval.requested` with the same id:
+
+```shell
+WIRE='{"agentId":"payments-agent","principalId":"alice","action":"tools/call","target":"bank/wire_transfer"}'
+APPROVAL=$(curl -s -X POST http://localhost:8090/api/v1/decisions -H "Authorization: Bearer $LEDGER_API_KEY" -H "Content-Type: application/json" -d "$WIRE" | tee /dev/stderr | jq -r .approvalId)
+```
+
+Step 5. Approve it; the answer must show `APPROVED` by the `operator`:
+
+```shell
+curl -s -X POST http://localhost:8090/api/v1/approvals/$APPROVAL/approve -H "Authorization: Bearer $LEDGER_API_KEY" -H "Content-Type: application/json" -d '{"reason":"Invoice 42 checked"}' | jq -c '{status, method}'
+```
+
+Step 6. Ask twice more; the answers must show `ALLOWED_BY_APPROVAL`, then `APPROVAL_PENDING` for a new request:
+
+```shell
+for i in 1 2; do curl -s -X POST http://localhost:8090/api/v1/decisions -H "Authorization: Bearer $LEDGER_API_KEY" -H "Content-Type: application/json" -d "$WIRE" | jq -r .reasonCode; done
 ```
 
 ## Principal Login and Consent
@@ -1944,6 +2030,13 @@ API key, except `/api/v1/principal/**`, which requires a principal token from th
 | PUT    | `/api/v1/policies`                         | Activate a Cedar policy set `text` and answer its `hash`, policy names and default effect (operator)    |
 | GET    | `/api/v1/policies`                         | The active policy set (operator)                                                                        |
 | GET    | `/api/v1/policies/{hash}`                  | A stored policy set by its hash (operator)                                                              |
+| GET    | `/api/v1/approvals`                        | Approvals by `status`, `agentId`, `principalId` and `limit` (operator, or the agent for its own)        |
+| GET    | `/api/v1/approvals/{id}`                   | An approval with its status (operator or its agent)                                                     |
+| POST   | `/api/v1/approvals/{id}/approve`           | Approve with an optional `reason` (operator, when the policy allows)                                    |
+| POST   | `/api/v1/approvals/{id}/deny`              | Deny with an optional `reason` (operator, when the policy allows)                                       |
+| GET    | `/api/v1/principal/approvals`              | The signed-in principal's approvals by `status` and `limit`                                             |
+| POST   | `/api/v1/principal/approvals/{id}/approve` | Approve as the signed-in principal, with consent evidence                                               |
+| POST   | `/api/v1/principal/approvals/{id}/deny`    | Deny as the signed-in principal, with consent evidence                                                  |
 | PUT    | `/api/v1/prompts`                          | Store a prompt or configuration `text` and answer its `hash`; `201` when new (agent or operator)        |
 | GET    | `/api/v1/prompts/{hash}`                   | A stored prompt text with when and by whom it was stored (operator)                                     |
 | POST   | `/api/v1/index/proofs`                     | A signed proof that a `term` occurs, with its count, or never does, up to a checkpoint (operator)       |

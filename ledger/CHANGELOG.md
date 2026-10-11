@@ -102,6 +102,9 @@ agent platforms and gateways.
 * Cedar policies: the operator activates a policy set that every decision must also pass, with a default effect of
   permit or deny; a denial is `POLICY_DENIED`, each decision records the policy set hash and the deciding policies,
   and packages carry the policy texts that the verifier and SDKs check against their hashes
+* Human approval: a forbid policy annotated `@approval` turns its denial into a request that the principal or the
+  operator answers in the ledger, the principal also on their device through OpenID Connect CIBA, announced by a
+  signed webhook; an approved request is allowed once, and a request nobody answers in time is denied
 * Browser verifier: one self-contained HTML page in React and TypeScript that verifies a package with the
   TypeScript SDK, pinned to the ledger key and optional witnesses, with a Content Security Policy that blocks every
   connection

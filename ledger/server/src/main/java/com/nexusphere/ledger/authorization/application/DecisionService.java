@@ -2,6 +2,8 @@ package com.nexusphere.ledger.authorization.application;
 
 import com.nexusphere.ledger.agent.domain.model.Agent;
 import com.nexusphere.ledger.agent.domain.repository.AgentRepository;
+import com.nexusphere.ledger.approval.application.Approval;
+import com.nexusphere.ledger.approval.application.ApprovalService;
 import com.nexusphere.ledger.authorization.domain.model.DecisionRecord;
 import com.nexusphere.ledger.authorization.domain.model.DecisionRequest;
 import com.nexusphere.ledger.authorization.domain.model.DecisionResult;
@@ -12,6 +14,7 @@ import com.nexusphere.ledger.authorization.domain.model.ReasonCode;
 import com.nexusphere.ledger.authorization.domain.repository.DecisionRepository;
 import com.nexusphere.ledger.authorization.domain.repository.GrantRepository;
 import com.nexusphere.ledger.chain.EvidenceEntry;
+import com.nexusphere.ledger.chain.Timestamps;
 import com.nexusphere.ledger.evidence.application.EvidenceService;
 import com.nexusphere.ledger.evidence.domain.model.Decision;
 import com.nexusphere.ledger.evidence.domain.model.EvidenceSubmission;
@@ -39,7 +42,8 @@ public class DecisionService {
     private record Verdict(ReasonCode code, String reason, Grant grant) {
 
         Decision decision() {
-            return code == ReasonCode.ALLOWED_BY_GRANT ? Decision.ALLOW : Decision.DENY;
+            return code == ReasonCode.ALLOWED_BY_GRANT || code == ReasonCode.ALLOWED_BY_APPROVAL ? Decision.ALLOW
+                    : Decision.DENY;
         }
     }
 
@@ -48,15 +52,17 @@ public class DecisionService {
     private final AgentRepository agents;
     private final EvidenceService evidence;
     private final PolicyService policies;
+    private final ApprovalService approvals;
     private final Clock clock;
 
     DecisionService(GrantRepository grants, DecisionRepository decisions, AgentRepository agents,
-                    EvidenceService evidence, PolicyService policies, Clock clock) {
+                    EvidenceService evidence, PolicyService policies, ApprovalService approvals, Clock clock) {
         this.grants = grants;
         this.decisions = decisions;
         this.agents = agents;
         this.evidence = evidence;
         this.policies = policies;
+        this.approvals = approvals;
         this.clock = clock;
     }
 
@@ -65,9 +71,10 @@ public class DecisionService {
         Instant now = clock.instant();
         evidence.check(submission(request, Decision.ALLOW, Outcome.PENDING, null, null, now));
         if (request.attributes() != null
-                && request.attributes().keySet().stream().anyMatch(name -> name.startsWith("policy."))) {
+                && request.attributes().keySet().stream()
+                .anyMatch(name -> name.startsWith("policy.") || name.startsWith("approval."))) {
             throw LedgerException.invalid("The decision request has invalid fields.",
-                    Map.of("attributes", "names starting with policy. are set by the ledger"));
+                    Map.of("attributes", "names starting with policy. or approval. are set by the ledger"));
         }
         Optional<PolicyService.Evaluated> policy = policies.evaluate(new CedarPolicies.Request(request.agentId(),
                 request.principalId(), request.action(), request.target(), request.inputHash(), request.attributes(),
@@ -80,12 +87,27 @@ public class DecisionService {
                 attributes.put(PolicyService.IDS_ATTRIBUTE, String.join(",", p.verdict().policies()));
             }
         });
-        DecisionRequest recorded = policy.isEmpty() ? request : request.withAttributes(attributes);
-        evidence.check(submission(recorded, Decision.ALLOW, Outcome.PENDING, null, null, now));
+        evidence.check(submission(request.withAttributes(attributes), Decision.ALLOW, Outcome.PENDING, null, null,
+                now));
         Verdict verdict = evaluate(request, now);
+        Approval approval = null;
         if (verdict.decision() == Decision.ALLOW && policy.isPresent() && !policy.get().verdict().allowed()) {
-            verdict = new Verdict(ReasonCode.POLICY_DENIED, denial(request, policy.get().verdict()), null);
+            CedarPolicies.Verdict denied = policy.get().verdict();
+            if (denied.approver() == null) {
+                verdict = new Verdict(ReasonCode.POLICY_DENIED, denial(request, denied), null);
+            } else {
+                ApprovalService.Gate gate = approvals.gate(new ApprovalService.Request(request.agentId(),
+                        request.principalId(), request.action(), request.target(), request.inputHash(),
+                        policy.get().hash(), denied.policies(), denied.approver()), now);
+                approval = gate.approval();
+                attributes.put(ApprovalService.ID_ATTRIBUTE, approval.id().toString());
+                verdict = approved(request, gate, verdict);
+                if (gate.answer() == ApprovalService.Answer.PENDING) {
+                    attributes.put(ApprovalService.EXPIRES_ATTRIBUTE, Timestamps.format(approval.expiresAt()));
+                }
+            }
         }
+        DecisionRequest recorded = policy.isEmpty() ? request : request.withAttributes(attributes);
         if (verdict.grant() != null && verdict.decision() == Decision.ALLOW) {
             grants.use(verdict.grant().terms().id());
         }
@@ -97,7 +119,28 @@ public class DecisionService {
                 request.action(), request.target(), verdict.decision(), verdict.code(),
                 grantId == null ? null : UUID.fromString(grantId), entry.recordedAt(), null, null);
         decisions.insert(record);
-        return new DecisionResult(record, verdict.reason(), entry);
+        return new DecisionResult(record, verdict.reason(), entry, approval == null ? null : approval.id());
+    }
+
+    private static String who(Approval approval) {
+        return CedarPolicies.OPERATOR.equals(approval.method()) ? CedarPolicies.OPERATOR : CedarPolicies.PRINCIPAL;
+    }
+
+    private static Verdict approved(DecisionRequest request, ApprovalService.Gate gate, Verdict granted) {
+        Approval a = gate.approval();
+        return switch (gate.answer()) {
+            case APPROVED -> new Verdict(ReasonCode.ALLOWED_BY_APPROVAL, "Approval " + a.id() + " by the "
+                    + who(a) + " allows " + describe(request) + " once under grant "
+                    + granted.grant().terms().id() + ".", granted.grant());
+            case PENDING -> new Verdict(ReasonCode.APPROVAL_PENDING, "Policy " + String.join(", ", a.policies())
+                    + " needs the " + (a.approver().equals(CedarPolicies.ANY) ? "principal or the operator"
+                    : a.approver()) + " to approve " + describe(request) + "; approval " + a.id()
+                    + " waits until " + Timestamps.format(a.expiresAt()) + ".", null);
+            case DENIED -> new Verdict(ReasonCode.APPROVAL_DENIED, "Approval " + a.id() + " for "
+                    + describe(request) + " was denied by the " + who(a) + ".", null);
+            case EXPIRED -> new Verdict(ReasonCode.APPROVAL_EXPIRED, "Approval " + a.id() + " for "
+                    + describe(request) + " expired.", null);
+        };
     }
 
     @Transactional

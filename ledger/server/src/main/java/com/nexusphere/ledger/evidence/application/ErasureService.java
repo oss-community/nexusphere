@@ -190,6 +190,7 @@ public class ErasureService {
         jdbc.update("update ledger.grant_record set principal_id = :erased where principal_id = :principalId",
                 params);
         jdbc.update("update ledger.decision set principal_id = :erased where principal_id = :principalId", params);
+        jdbc.update("update ledger.approval set principal_id = :erased where principal_id = :principalId", params);
         jdbc.update("""
                 update ledger.mandate set principal_id = :erased, token = '' where principal_id = :principalId
                 """, params);
