@@ -1,0 +1,162 @@
+{
+  "environment": {
+    "cpu": "4 vCPU Intel Xeon @ 2.10GHz",
+    "memory": "15 GB",
+    "java": "OpenJDK 21.0.11",
+    "postgresql": "18 (postgres:18-alpine in Docker on the same host)",
+    "ledger": "1 instance, profiles postgresql,dev, local Ed25519 signing key",
+    "mcpServer": "ledger/demo-mcp on the same host"
+  },
+  "runs": [
+    {
+      "startedAt": "2026-10-11T01:21:58Z",
+      "url": "http://localhost:8090",
+      "concurrency": 1,
+      "durationSeconds": 30,
+      "load": [
+        {
+          "scenario": "record",
+          "concurrency": 1,
+          "requests": 7731,
+          "errors": 0,
+          "perSecond": 257.6848765776676,
+          "p50": 3.472854,
+          "p95": 6.099106,
+          "p99": 9.820681,
+          "max": 94.817781
+        },
+        {
+          "scenario": "decide",
+          "concurrency": 1,
+          "requests": 6552,
+          "errors": 0,
+          "perSecond": 218.3811649812096,
+          "p50": 4.197619,
+          "p95": 6.596121,
+          "p99": 9.984589,
+          "max": 88.363759
+        },
+        {
+          "scenario": "gateway",
+          "concurrency": 1,
+          "requests": 2625,
+          "errors": 0,
+          "perSecond": 87.48228914932412,
+          "p50": 10.653344,
+          "p95": 16.547252,
+          "p99": 21.582516,
+          "max": 98.203996
+        }
+      ],
+      "packages": []
+    },
+    {
+      "startedAt": "2026-10-11T01:23:59Z",
+      "url": "http://localhost:8090",
+      "concurrency": 16,
+      "durationSeconds": 30,
+      "load": [
+        {
+          "scenario": "record",
+          "concurrency": 16,
+          "requests": 9959,
+          "errors": 0,
+          "perSecond": 331.5158369870362,
+          "p50": 47.10346,
+          "p95": 73.949939,
+          "p99": 94.347301,
+          "max": 197.55437
+        },
+        {
+          "scenario": "decide",
+          "concurrency": 16,
+          "requests": 7375,
+          "errors": 0,
+          "perSecond": 245.3014957899184,
+          "p50": 46.725253,
+          "p95": 174.005137,
+          "p99": 299.438199,
+          "max": 818.649678
+        },
+        {
+          "scenario": "gateway",
+          "concurrency": 16,
+          "requests": 3698,
+          "errors": 0,
+          "perSecond": 122.8210192979662,
+          "p50": 106.398049,
+          "p95": 271.500049,
+          "p99": 386.996654,
+          "max": 844.537769
+        }
+      ],
+      "packages": []
+    },
+    {
+      "startedAt": "2026-10-11T01:26:01Z",
+      "url": "http://localhost:8090",
+      "concurrency": 64,
+      "durationSeconds": 30,
+      "load": [
+        {
+          "scenario": "record",
+          "concurrency": 64,
+          "requests": 9734,
+          "errors": 0,
+          "perSecond": 322.49001483764897,
+          "p50": 192.831541,
+          "p95": 326.578199,
+          "p99": 397.730117,
+          "max": 568.988859
+        },
+        {
+          "scenario": "decide",
+          "concurrency": 64,
+          "requests": 7052,
+          "errors": 0,
+          "perSecond": 233.25229019225017,
+          "p50": 252.021706,
+          "p95": 490.540099,
+          "p99": 621.704886,
+          "max": 912.158313
+        },
+        {
+          "scenario": "gateway",
+          "concurrency": 64,
+          "requests": 3690,
+          "errors": 0,
+          "perSecond": 121.36722649832046,
+          "p50": 506.772044,
+          "p95": 779.238623,
+          "p99": 916.615446,
+          "max": 1228.78028
+        }
+      ],
+      "packages": []
+    },
+    {
+      "startedAt": "2026-10-11T01:28:04Z",
+      "url": "http://localhost:8090",
+      "concurrency": 16,
+      "durationSeconds": 30,
+      "load": [],
+      "packages": [
+        {
+          "entries": 100,
+          "millis": 229.298402,
+          "bytes": 329259
+        },
+        {
+          "entries": 1000,
+          "millis": 1844.676502,
+          "bytes": 3533284
+        },
+        {
+          "entries": 10000,
+          "millis": 18106.740577,
+          "bytes": 36301209
+        }
+      ]
+    }
+  ]
+}

@@ -20,6 +20,7 @@
         <module>server</module>
         <module>verifier</module>
         <module>demo-mcp</module>
+        <module>benchmarks</module>
         <module>ledger-e2e-tests</module>
     </modules>
 

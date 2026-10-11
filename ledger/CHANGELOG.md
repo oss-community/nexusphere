@@ -112,6 +112,9 @@ agent platforms and gateways.
   the leader, the instance holding a PostgreSQL advisory lock, which another instance takes over when it stops
 * Log archives: the transparency log is served as C2SP `tlog-tiles` with immutable caching, the verifier's
   `archive` command mirrors it incrementally and its `tiles` command checks the copy and a package against it offline
+* Published benchmarks: load scenarios for recording, decisions, the MCP gateway and package export, with the results
+  of a reference machine
+* The demo MCP server sends its answers without the 40 ms Nagle delay that slowed every call through the gateway
 * Browser verifier: one self-contained HTML page in React and TypeScript that verifies a package with the
   TypeScript SDK, pinned to the ledger key and optional witnesses, with a Content Security Policy that blocks every
   connection

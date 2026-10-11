@@ -9,6 +9,7 @@
 * [Backup and Restore](#backup-and-restore)
 * [Monitoring](#monitoring)
 * [Alert Channels](#alert-channels)
+* [Capacity](#capacity)
 * [Rate Limits](#rate-limits)
 * [Production Checklist](#production-checklist)
 
@@ -330,6 +331,18 @@ posts the Alertmanager JSON to any URL, such as a ticketing system or an on-call
 Delivery was checked end to end: with email and webhook on, Prometheus fired an alert, and the message reached a
 test mail server and the webhook. In Kubernetes, give Alertmanager the same entrypoint `ledger/alertmanager/entrypoint.sh`
 with these variables, or use the Alertmanager configuration of the cluster's own monitoring stack.
+
+</p>
+
+## Capacity
+
+<p style="text-align: justify;">
+
+Every entry is appended under the lock of the chain head, so a deployment has one write ceiling however many
+instances it runs. On the reference machine of the [benchmarks](../ledger/benchmarks/README.md) (4 vCPU, PostgreSQL
+on the same host) that ceiling was about 330 entries a second; a decision is one entry and a call through a gateway
+two. Run the benchmark on your own hardware before sizing, watch `ledger_evidence_recorded_total` against it, and
+raise the per-caller rate limits so that the sum over busy agents stays below it.
 
 </p>
 
