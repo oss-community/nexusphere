@@ -39,6 +39,7 @@ describe('App', async () => {
     expect(screen.queryByRole('note')).not.toBeInTheDocument()
     expect(screen.getByText('witness.example')).toBeInTheDocument()
     expect(screen.getByText('ledger.example, tree size 4')).toBeInTheDocument()
+    await user.click(screen.getByRole('tab', { name: 'Entries' }))
     expect(screen.getAllByRole('row')).toHaveLength(3)
   })
 
@@ -56,7 +57,8 @@ describe('App', async () => {
     await user.type(screen.getByLabelText('Ledger public key'), PINNED)
     await user.click(screen.getByRole('button', { name: 'Verify' }))
     expect(await screen.findByTestId('verdict')).toHaveTextContent('VALID')
-    expect(screen.getAllByText('erased')).toHaveLength(2)
+    await user.click(screen.getByRole('tab', { name: 'Entries' }))
+    expect(await screen.findAllByText('erased')).toHaveLength(2)
   })
 
   it('shows the problems of a changed package', async () => {
@@ -148,7 +150,8 @@ describe('App', async () => {
     expect(await screen.findByTestId('verdict')).toHaveTextContent('VALID')
     expect(screen.getByText('Prompts')).toBeInTheDocument()
     expect(screen.getByText('1 prompt texts match the hashes their entries name')).toBeInTheDocument()
-    expect(screen.getByRole('columnheader', { name: 'Model' })).toBeInTheDocument()
+    await user.click(screen.getByRole('tab', { name: 'Entries' }))
+    expect(await screen.findByRole('columnheader', { name: 'Model' })).toBeInTheDocument()
     expect(screen.getByText('model-a 2026-09-01')).toBeInTheDocument()
   })
 
@@ -185,6 +188,8 @@ describe('App', async () => {
     expect(await screen.findByTestId('verdict')).toHaveTextContent('VALID')
     expect(screen.queryByText('Prompts')).not.toBeInTheDocument()
     expect(screen.queryByText('Policies')).not.toBeInTheDocument()
+    await user.click(screen.getByRole('tab', { name: 'Entries' }))
+    expect(await screen.findByRole('columnheader', { name: 'Agent' })).toBeInTheDocument()
     expect(screen.queryByRole('columnheader', { name: 'Model' })).not.toBeInTheDocument()
   })
 

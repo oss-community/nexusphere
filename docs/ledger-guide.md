@@ -257,15 +257,15 @@ For LangGraph, the OpenAI Agents SDK, Amazon Bedrock AgentCore Gateway and agent
 
 ## Present It
 
-| Step | Show                                                                     | Point                                               |
-|------|--------------------------------------------------------------------------|-----------------------------------------------------|
-| 1    | The problem in one sentence                                              | Agents act, but nobody can prove what they did      |
-| 2    | `demo.sh`: two tools allowed, `delete_file` denied                       | The decision happens before the tool runs           |
-| 3    | The web UI as `alice`: approve, then revoke a grant                      | The person, not the vendor, decides                 |
-| 4    | A package verified in the browser verifier, then one changed entry fails | Nobody can change the record, not even the operator |
-| 5    | Claude Code calling tools through the ledger                             | Works with real agents without changing them        |
-| 6    | Two ledgers and a mandate, if the audience works across organizations    | Trust between companies, not only inside one        |
-| 7    | The Reports page: a dispute package for one incident                     | Ready for an insurer, arbitrator or court           |
+| Step | Show                                                                   | Point                                               |
+|------|------------------------------------------------------------------------|-----------------------------------------------------|
+| 1    | The problem in one sentence                                            | Agents act, but nobody can prove what they did      |
+| 2    | `demo.sh`: two tools allowed, `delete_file` denied                     | The decision happens before the tool runs           |
+| 3    | The web UI as `alice`: approve, then revoke a grant                    | The person, not the vendor, decides                 |
+| 4    | A package verified in the Auditor Portal, then one changed entry fails | Nobody can change the record, not even the operator |
+| 5    | Claude Code calling tools through the ledger                           | Works with real agents without changing them        |
+| 6    | Two ledgers and a mandate, if the audience works across organizations  | Trust between companies, not only inside one        |
+| 7    | The Reports page: a dispute package for one incident                   | Ready for an insurer, arbitrator or court           |
 
 <p style="text-align: justify;">
 
