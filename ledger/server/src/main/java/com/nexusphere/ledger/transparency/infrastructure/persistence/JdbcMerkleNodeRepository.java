@@ -5,6 +5,7 @@ import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 import org.springframework.stereotype.Repository;
 
+import java.util.List;
 import java.util.Optional;
 
 @Repository
@@ -27,5 +28,14 @@ class JdbcMerkleNodeRepository implements MerkleNodeRepository {
         return jdbc.query("select hash from ledger.merkle_node where level = :level and idx = :index",
                 new MapSqlParameterSource().addValue("level", level).addValue("index", index),
                 (rs, row) -> rs.getBytes("hash")).stream().findFirst();
+    }
+
+    @Override
+    public List<byte[]> range(int level, long from, int count) {
+        return jdbc.query("""
+                        select hash from ledger.merkle_node where level = :level and idx >= :from and idx < :to
+                        order by idx""",
+                new MapSqlParameterSource().addValue("level", level).addValue("from", from).addValue("to", from + count),
+                (rs, row) -> rs.getBytes("hash"));
     }
 }

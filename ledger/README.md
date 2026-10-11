@@ -12,6 +12,7 @@
 * [Evidence Format](#evidence-format)
 * [Verification](#verification)
 * [Transparency Log and Witnesses](#transparency-log-and-witnesses)
+* [Log Archives](#log-archives)
 * [SCITT Statements and Receipts](#scitt-statements-and-receipts)
 * [Evidence Packages](#evidence-packages)
 * [Index Proofs](#index-proofs)
@@ -548,6 +549,103 @@ localhost:8090
 checkpoint that does not match the evidence is reported like a broken link.
 
 </p>
+
+## Log Archives
+
+<p style="text-align: justify;">
+
+The log is also served as C2SP `tlog-tiles`, without an API key, so anyone can keep a full copy of it. The base URL is
+`/public/v1/log/`: `checkpoint` is the latest signed note, `tile/{L}/{N}` holds 256 hashes of tree level `8L` and
+`tile/entries/{N}` holds 256 entries, each a two-byte length and the 32-byte entry hash. `N` is written in groups of
+three digits, such as `x001/x234/067`, and the last tile of a level is partial, `.p/{W}` with its width `W`. A tile
+never changes once served, so every tile carries `Cache-Control: immutable` and can sit behind any CDN or static
+mirror. Since the leaves are entry hashes, the archive discloses no evidence content.
+
+</p>
+
+<p style="text-align: justify;">
+
+The verifier's `archive` command mirrors the log into a directory. It fetches the checkpoint, then only the tiles it
+does not hold yet, and removes partial tiles a later size replaced, so running it on a schedule keeps an independent
+copy current. The directory has the same layout as the endpoints, so copying it to any static host or object store,
+for example with `aws s3 sync ledger-log s3://bucket/log`, publishes a mirror that `archive` and any C2SP client
+read like the ledger itself. The `tiles` command checks the copy offline: the checkpoint signature against the pinned key, every
+entry against its leaf, every upper tile against the leaves, and the root against the checkpoint. With `--package`,
+it also checks that every link of an evidence package is the entry the archive holds at that sequence, so a ledger
+that later rewrote its history is caught with no access to it. Both exit with `0`, `1` or `2` as the package verifier
+does.
+
+</p>
+
+Step 1. Start the ledger as in [Run](#run), then record an entry and sign a checkpoint:
+
+```shell
+curl -s -X POST http://localhost:8090/api/v1/evidence -H "Authorization: Bearer $LEDGER_API_KEY" -H "Content-Type: application/json" -d '{"agentId":"invoice-agent","principalId":"alice","action":"tools/call","target":"send_email","decision":"ALLOW","outcome":"SUCCEEDED"}' | jq .sequence
+curl -s -X POST http://localhost:8090/api/v1/checkpoints -H "Authorization: Bearer $LEDGER_API_KEY" | jq .sequence
+```
+
+Step 2. Fetch the level 0 tile of the checkpoint's tree size without an API key; it must answer `200` with
+`Cache-Control: max-age=31536000, public, immutable`:
+
+```shell
+SIZE=$(curl -s http://localhost:8090/public/v1/log/checkpoint | sed -n 2p)
+curl -s -D - -o /dev/null http://localhost:8090/public/v1/log/tile/0/000.p/$SIZE | grep -i "HTTP/\|cache-control"
+```
+
+Step 3. Build the verifier and mirror the log:
+
+```shell
+mvn -pl ledger/verifier -am package -DskipTests=true
+java -jar ledger/verifier/target/verifier-1.0.0-SNAPSHOT-exec.jar archive http://localhost:8090/public/v1/log ledger-log
+```
+
+```text
+Nexusphere Ledger log archive
+  Origin      : localhost:8090
+  Tree size   : 3
+  Fetched     : 2 tiles
+  Kept        : 0 tiles already archived
+  Removed     : 0 superseded partial tiles
+```
+
+Step 4. Export a package and check it against the copy; the result must be `VALID` and the exit code `0`:
+
+```shell
+KEY="$(curl -s http://localhost:8090/api/v1/keys -H "Authorization: Bearer $LEDGER_API_KEY" | jq -r '.[] | select(.status == "ACTIVE") | .publicKey')"
+curl -s -X POST http://localhost:8090/api/v1/packages -H "Authorization: Bearer $LEDGER_API_KEY" -H "Content-Type: application/json" -d '{"agentId":"invoice-agent"}' -o package.json
+java -jar ledger/verifier/target/verifier-1.0.0-SNAPSHOT-exec.jar tiles --public-key "$KEY" --package package.json ledger-log; echo "exit $?"
+```
+
+```text
+Nexusphere Ledger log archive verification
+  Result      : VALID
+  Origin      : localhost:8090
+  Tree size   : 3
+  Root hash   : 7s86Ob1qgo0Yb7qHu+MaJ9g7aRbBSnbVlZqqkzKbclA=
+  Tiles       : 2
+  Entries     : 3
+  Package     : 3 links found in the archive, 0 beyond it
+exit 0
+```
+
+Step 5. Change one byte of the copy; the result must be `INVALID` and the exit code `1`:
+
+```shell
+printf '\x00' | dd of=ledger-log/tile/entries/000.p/$SIZE bs=1 seek=10 conv=notrunc
+java -jar ledger/verifier/target/verifier-1.0.0-SNAPSHOT-exec.jar tiles --public-key "$KEY" ledger-log; echo "exit $?"
+```
+
+```text
+Nexusphere Ledger log archive verification
+  Result      : INVALID
+  Origin      : localhost:8090
+  Tree size   : 3
+  Root hash   : 7s86Ob1qgo0Yb7qHu+MaJ9g7aRbBSnbVlZqqkzKbclA=
+  Tiles       : 2
+  Entries     : 3
+  Problem     : Entry 1 does not hash to its leaf in tile/0
+exit 1
+```
 
 ## SCITT Statements and Receipts
 
@@ -2215,6 +2313,7 @@ API key, except `/api/v1/principal/**`, which requires a principal token from th
 | GET    | `/public/v1/keys`                          | Active and retired signing keys as a JWK set, no API key                                                |
 | GET    | `/public/v1/mandates/status`               | Signed mandate status list, no API key                                                                  |
 | GET    | `/public/v1/log/checkpoint`                | Latest log checkpoint as a signed note with its cosignatures, no API key                                |
+| GET    | `/public/v1/log/tile/{path}`               | C2SP `tlog-tiles` hash tiles and entry bundles of the log, cached as immutable, no API key              |
 | GET    | `/public/v1/log/key`                       | Verifier key of the log, no API key                                                                     |
 | GET    | `/public/v1/witness/key`                   | Verifier key this ledger cosigns with as a witness, no API key                                          |
 | POST   | `/public/v1/witness/add-checkpoint`        | C2SP witness endpoint: cosign a watched log's checkpoint, `404` when it watches none, no API key        |

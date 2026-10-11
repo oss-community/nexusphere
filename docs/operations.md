@@ -231,7 +231,9 @@ A restore can never hide a loss: a signed checkpoint held outside the ledger wit
 head shows that entries are missing, and any entry that differs fails verification against that checkpoint.
 Witnesses give the same guarantee without anyone copying checkpoints by hand: each keeps the last log checkpoint it
 cosigned and refuses a smaller or forked one, so a restored ledger that lost entries cannot get new cosignatures until
-it is back on the history the witnesses saw.
+it is back on the history the witnesses saw. An independent copy of the whole log, kept current by the verifier's
+`archive` command on a schedule outside the ledger's network, as in [Log
+Archives](../ledger/README.md#log-archives), also shows which entries a restore lost.
 
 </p>
 
@@ -364,6 +366,7 @@ to the internet, since it can also stop floods before they reach Java.
 * WAL archiving with point-in-time recovery, plus a regular logical dump, and a restore tested once, kept no longer
   than the erasure deadline of your profiles
 * Signed checkpoints copied outside the ledger, and at least one independent witness cosigning the log
+* A scheduled `archive` of the log's tiles kept by someone outside the operating team
 * `LEDGER_TIMESTAMP_URL` and `LEDGER_TIMESTAMP_CERTIFICATES` set to an RFC 3161 timestamp authority your auditors
   accept, as in [Checkpoint Timestamps](../ledger/README.md#checkpoint-timestamps)
 * `LEDGER_REKOR_URL` and `LEDGER_REKOR_KEY` set to a Rekor v2 log outside your control, with the local signing

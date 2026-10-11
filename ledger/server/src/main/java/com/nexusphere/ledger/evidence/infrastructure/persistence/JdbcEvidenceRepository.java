@@ -135,6 +135,12 @@ class JdbcEvidenceRepository implements EvidenceRepository {
     }
 
     @Override
+    public List<String> hashes(long afterSequence, int limit) {
+        return jdbc.query("select hash from ledger.evidence_record where sequence > :after order by sequence limit :limit",
+                new MapSqlParameterSource("after", afterSequence).addValue("limit", limit), (rs, row) -> rs.getString("hash"));
+    }
+
+    @Override
     public Selection select(String agentId, String principalId, long fromSequence, long toSequence) {
         StringBuilder sql = new StringBuilder("""
                 select count(*) as selected, coalesce(min(sequence), 0) as first, coalesce(max(sequence), 0) as last

@@ -47,7 +47,10 @@ public final class VerifierCli {
             [--public-key <key> | --public-key-file <file>] [--nonce <nonce>] [--require-key-binding] \
             [--index-proof <proof.json>] [--json] <token | token file | ->
                    nexusphere-ledger-verify reconcile [--public-key <key> | --public-key-file <file>] \
-            [--peer-public-key <key> | --peer-public-key-file <file>] [--json] <ours.jwt> <theirs.jwt>""";
+            [--peer-public-key <key> | --peer-public-key-file <file>] [--json] <ours.jwt> <theirs.jwt>
+                   nexusphere-ledger-verify archive [--json] <log url> <directory>
+                   nexusphere-ledger-verify tiles [--public-key <key> | --public-key-file <file>] \
+            [--package <package.json>] [--json] <directory>""";
 
     private static final int MAX_FILE = 256 * 1024 * 1024;
     private static final JsonMapper JSON = JsonMapper.builder().enable(SerializationFeature.INDENT_OUTPUT).build();
@@ -71,6 +74,12 @@ public final class VerifierCli {
         }
         if (args.length > 0 && "statement".equals(args[0])) {
             return StatementCli.run(Arrays.copyOfRange(args, 1, args.length), out, err, USAGE_TEXT);
+        }
+        if (args.length > 0 && "archive".equals(args[0])) {
+            return TileCli.archive(Arrays.copyOfRange(args, 1, args.length), out, err, USAGE_TEXT);
+        }
+        if (args.length > 0 && "tiles".equals(args[0])) {
+            return TileCli.verify(Arrays.copyOfRange(args, 1, args.length), out, err, USAGE_TEXT);
         }
         if (args.length > 0 && "report".equals(args[0])) {
             return report(Arrays.copyOfRange(args, 1, args.length), out, err);

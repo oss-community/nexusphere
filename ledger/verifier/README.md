@@ -46,6 +46,8 @@ database, so an auditor, a court or a counterparty can verify what a ledger hand
 * Check entries in evidence format v2 from their personal values and salts, or from their commitments once erased
 * Check that the prompt texts of a package match their hashes and are named by the model of a disclosed entry
 * Check that the policy set texts of a package match their hashes and are named by a disclosed entry
+* Mirror a ledger's C2SP `tlog-tiles` log with `archive`, and check the copy offline with `tiles`: the checkpoint
+  signature, every entry, every tile and the root, and with `--package` every link of a package
 * Run the [Conformance Vectors](../conformance/README.md) in `ConformanceVectorsTest`
 
 ## Dependencies
@@ -55,8 +57,8 @@ database, so an auditor, a court or a counterparty can verify what a ledger hand
 | `chain`, `mandate` | `server` |
 
 Usage is in [Evidence Packages](../README.md#evidence-packages), [SCITT Statements and
-Receipts](../README.md#scitt-statements-and-receipts), [Verifying a Mandate](../README.md#verifying-a-mandate) and
-[Reports and Dispute Packages](../README.md#reports-and-dispute-packages).
+Receipts](../README.md#scitt-statements-and-receipts), [Verifying a Mandate](../README.md#verifying-a-mandate),
+[Reports and Dispute Packages](../README.md#reports-and-dispute-packages) and [Log Archives](../README.md#log-archives).
 
 ##
 
