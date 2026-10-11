@@ -19,7 +19,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.Optional;
 
 @Component
-class PrincipalTokens {
+public class PrincipalTokens {
 
     private static final Logger log = LoggerFactory.getLogger(PrincipalTokens.class);
 
@@ -33,11 +33,11 @@ class PrincipalTokens {
         }
     }
 
-    boolean enabled() {
+    public boolean enabled() {
         return oidc != null;
     }
 
-    Optional<PrincipalIdentity> authenticate(String token) {
+    public Optional<PrincipalIdentity> authenticate(String token) {
         if (oidc == null || token.chars().filter(c -> c == '.').count() != 2) {
             return Optional.empty();
         }

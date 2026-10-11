@@ -1,8 +1,22 @@
 import { describe, expect, it } from "vitest";
-import { LedgerClient, LedgerError } from "../src/index.js";
+import { Denied, LedgerClient, LedgerError } from "../src/index.js";
 import { zip } from "./support.js";
 
 const URL = "http://ledger.example";
+
+const APPROVAL = {
+  id: "00000000-0000-4000-8000-0000000000aa",
+  agentId: "invoice-agent",
+  principalId: "acme",
+  action: "tools/call",
+  target: "pay_invoice",
+  policies: ["policy1"],
+  approver: "operator",
+  status: "PENDING",
+  expiresAt: "2026-10-01T09:00:00Z",
+  method: null,
+  used: false,
+};
 
 function fakeLedger() {
   const calls: { method: string; url: string; headers: Record<string, string>; body: unknown }[] = [];
@@ -21,6 +35,22 @@ function fakeLedger() {
       const activatedAt = path === "/api/v1/policies" ? "2026-10-01T08:00:00Z" : null;
       return Response.json({ hash: "ab".repeat(32), text: "permit(principal, action, resource);", policies: ["policy0"],
         defaultEffect: "deny", createdAt: "2026-10-01T08:00:00Z", activatedAt });
+    }
+    if (path === "/api/v1/decisions" && (body as { target?: string }).target === "pay_invoice") {
+      return Response.json({ decisionId: "00000000-0000-4000-8000-0000000000bb", decision: "DENY",
+        reasonCode: "APPROVAL_PENDING", reason: "The operator must approve.", approvalId: APPROVAL.id });
+    }
+    if (path.startsWith("/api/v1/approvals?")) {
+      return Response.json({ items: [APPROVAL] });
+    }
+    if (path === "/api/v1/approvals/" + APPROVAL.id) {
+      return Response.json(APPROVAL);
+    }
+    if (path === `/api/v1/approvals/${APPROVAL.id}/approve`) {
+      return Response.json({ ...APPROVAL, status: "APPROVED", method: "operator" });
+    }
+    if (path === `/api/v1/approvals/${APPROVAL.id}/deny`) {
+      return Response.json({ code: "APPROVAL_RESOLVED", message: "The approval is resolved." }, { status: 409 });
     }
     if (path === "/api/v1/evidence" || path === "/api/v1/decisions" || path === "/api/v1/packages") {
       return Response.json({ ok: true });
@@ -195,5 +225,45 @@ describe("LedgerClient A2A reconciliation", () => {
     expect(await client.reconcileA2a("x.y.z")).toEqual({ reconciled: true, statement: "d.e.f", evidenceSequence: 9 });
     expect(ledger.calls[1]).toMatchObject({ method: "POST", url: URL + "/api/v1/a2a/reconciliations",
       body: { statement: "x.y.z" } });
+  });
+});
+
+describe("LedgerClient approvals", () => {
+  it("lists, reads and resolves approval requests", async () => {
+    const ledger = fakeLedger();
+    const client = new LedgerClient(URL, { apiKey: "operator", fetch: ledger.fetcher });
+    expect(await client.approvals()).toEqual([APPROVAL]);
+    expect(ledger.calls[0]).toMatchObject({ method: "GET", url: URL + "/api/v1/approvals?limit=100", body: undefined });
+    await client.approvals({ status: "PENDING", agentId: "invoice-agent", principalId: "acme", limit: 5 });
+    expect(ledger.calls[1].url)
+      .toBe(URL + "/api/v1/approvals?status=PENDING&agentId=invoice-agent&principalId=acme&limit=5");
+    expect(await client.approval(APPROVAL.id)).toEqual(APPROVAL);
+    expect(ledger.calls[2]).toMatchObject({ method: "GET", url: URL + "/api/v1/approvals/" + APPROVAL.id });
+    expect((await client.approve(APPROVAL.id)).status).toBe("APPROVED");
+    expect(ledger.calls[3]).toMatchObject({ method: "POST", url: `${URL}/api/v1/approvals/${APPROVAL.id}/approve`,
+      body: {} });
+    const error = await client.denyApproval(APPROVAL.id, "Not this month.").catch((e) => e);
+    expect(error).toBeInstanceOf(LedgerError);
+    expect(error).toMatchObject({ status: 409, code: "APPROVAL_RESOLVED" });
+    expect(ledger.calls[4]).toMatchObject({ method: "POST", url: `${URL}/api/v1/approvals/${APPROVAL.id}/deny`,
+      body: { reason: "Not this month." } });
+  });
+
+  it("throws Denied with the approval when the action waits for one", async () => {
+    const ledger = fakeLedger();
+    const client = new LedgerClient(URL, { fetch: ledger.fetcher });
+    let ran = false;
+    const error = await client.act({ principalId: "acme", action: "tools/call", target: "pay_invoice" }, () => {
+      ran = true;
+    }).catch((e) => e);
+    expect(error).toBeInstanceOf(Denied);
+    expect(error.decision.reasonCode).toBe("APPROVAL_PENDING");
+    expect(error.approvalId).toBe(APPROVAL.id);
+    expect(ran).toBe(false);
+    expect(ledger.calls).toHaveLength(1);
+    const other = await client.act({ principalId: "acme", action: "tools/call", target: "read_invoice" }, () => 1)
+      .catch((e) => e);
+    expect(other).toBeInstanceOf(Denied);
+    expect(other.approvalId).toBeNull();
   });
 });

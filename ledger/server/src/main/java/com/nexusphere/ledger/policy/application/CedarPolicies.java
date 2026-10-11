@@ -4,6 +4,7 @@ import com.cedarpolicy.BasicAuthorizationEngine;
 import com.cedarpolicy.model.AuthorizationRequest;
 import com.cedarpolicy.model.AuthorizationResponse;
 import com.cedarpolicy.model.AuthorizationSuccessResponse;
+import com.cedarpolicy.model.Effect;
 import com.cedarpolicy.model.entity.Entities;
 import com.cedarpolicy.model.exception.AuthException;
 import com.cedarpolicy.model.policy.Policy;
@@ -31,6 +32,10 @@ import java.util.TreeSet;
 public final class CedarPolicies {
 
     public static final String DEFAULT_PERMIT = "ledger-default-permit";
+    public static final String PRINCIPAL = "principal";
+    public static final String OPERATOR = "operator";
+    public static final String ANY = "any";
+    private static final Set<String> APPROVERS = Set.of(PRINCIPAL, OPERATOR, ANY);
     private static final BasicAuthorizationEngine ENGINE = new BasicAuthorizationEngine();
     private static final EntityTypeName AGENT = EntityTypeName.parse("Agent").orElseThrow();
     private static final EntityTypeName ACTION = EntityTypeName.parse("Action").orElseThrow();
@@ -40,16 +45,22 @@ public final class CedarPolicies {
                           Map<String, String> attributes, AgentModel model, Instant at) {
     }
 
-    public record Verdict(boolean allowed, List<String> policies, List<String> errors) {
+    public record Verdict(boolean allowed, List<String> policies, List<String> errors, String approver) {
+
+        public Verdict(boolean allowed, List<String> policies, List<String> errors) {
+            this(allowed, policies, errors, null);
+        }
     }
 
     private final PolicySet set;
     private final Map<String, String> names;
+    private final Map<String, String> approvals;
     private final List<String> ids;
 
-    private CedarPolicies(PolicySet set, Map<String, String> names, List<String> ids) {
+    private CedarPolicies(PolicySet set, Map<String, String> names, Map<String, String> approvals, List<String> ids) {
         this.set = set;
         this.names = names;
+        this.approvals = approvals;
         this.ids = ids;
     }
 
@@ -64,20 +75,27 @@ public final class CedarPolicies {
             throw new IllegalArgumentException("Policy templates are not supported");
         }
         Map<String, String> names = new HashMap<>();
+        Map<String, String> approvals = new HashMap<>();
         Set<String> seen = new TreeSet<>();
         Set<Policy> policies = new HashSet<>(parsed.policies);
         for (Policy policy : parsed.policies) {
-            String id;
-            try {
-                id = policy.getAnnotation("id");
-            } catch (AuthException | RuntimeException e) {
-                id = null;
-            }
+            String id = annotation(policy, "id");
             String name = id == null || id.isBlank() ? policy.getID() : id;
             if (!seen.add(name)) {
                 throw new IllegalArgumentException("The policy id " + name + " is used twice");
             }
             names.put(policy.getID(), name);
+            String approval = annotation(policy, "approval");
+            if (approval != null) {
+                if (!APPROVERS.contains(approval)) {
+                    throw new IllegalArgumentException("The approval of policy " + name
+                            + " must be principal, operator or any");
+                }
+                if (!forbids(policy)) {
+                    throw new IllegalArgumentException("Only a forbid policy can ask for approval, not " + name);
+                }
+                approvals.put(name, approval);
+            }
         }
         if (defaultPermit) {
             if (seen.contains(DEFAULT_PERMIT)) {
@@ -87,7 +105,36 @@ public final class CedarPolicies {
             names.put(DEFAULT_PERMIT, DEFAULT_PERMIT);
         }
         List<String> ids = new ArrayList<>(seen);
-        return new CedarPolicies(new PolicySet(policies), Map.copyOf(names), List.copyOf(ids));
+        return new CedarPolicies(new PolicySet(policies), Map.copyOf(names), Map.copyOf(approvals),
+                List.copyOf(ids));
+    }
+
+    private static String annotation(Policy policy, String name) {
+        try {
+            return policy.getAnnotation(name);
+        } catch (AuthException | RuntimeException e) {
+            return null;
+        }
+    }
+
+    private static boolean forbids(Policy policy) {
+        try {
+            return policy.effect() == Effect.FORBID;
+        } catch (AuthException | RuntimeException e) {
+            return false;
+        }
+    }
+
+    private String approver(List<String> determining) {
+        if (determining.isEmpty() || !determining.stream().allMatch(approvals::containsKey)) {
+            return null;
+        }
+        Set<String> wanted = new TreeSet<>(determining.stream().map(approvals::get).toList());
+        wanted.remove(ANY);
+        if (wanted.size() > 1) {
+            return null;
+        }
+        return wanted.isEmpty() ? ANY : wanted.iterator().next();
     }
 
     public List<String> ids() {
@@ -137,6 +184,7 @@ public final class CedarPolicies {
                 .map(e -> names.getOrDefault(e.getPolicyId(), e.getPolicyId()) + ": " + e.getError()).toList();
         List<String> determining = success.getReason().stream().map(id -> names.getOrDefault(id, id)).sorted()
                 .toList();
-        return new Verdict(success.isAllowed() && errors.isEmpty(), determining, errors);
+        boolean allowed = success.isAllowed() && errors.isEmpty();
+        return new Verdict(allowed, determining, errors, allowed || !errors.isEmpty() ? null : approver(determining));
     }
 }

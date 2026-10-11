@@ -9,10 +9,10 @@ export function ErrorMessage({ error }: { error: unknown }) {
 }
 
 const TONES: Record<string, string> = {
-  ACTIVE: 'good', ALLOW: 'good', SHOWN: 'good', PARTLY_SHOWN: 'wait', NOT_SHOWN: 'bad', SUCCEEDED: 'good', VERIFIED: 'good', VALID: 'good', ISSUED: 'good',
-  PENDING: 'wait', NOT_YET_VALID: 'wait',
-  DENY: 'bad', DENIED: 'bad', FAILED: 'bad', REVOKED: 'bad', INVALID: 'bad', DISABLED: 'bad', MISSING: 'bad',
-  EXPIRED: 'muted', EXHAUSTED: 'muted', RETIRED: 'muted',
+  ACTIVE: 'good', ALLOW: 'good', APPROVED: 'good', ALLOWED_BY_APPROVAL: 'good', SHOWN: 'good', PARTLY_SHOWN: 'wait', NOT_SHOWN: 'bad', SUCCEEDED: 'good', VERIFIED: 'good', VALID: 'good', ISSUED: 'good',
+  PENDING: 'wait', NOT_YET_VALID: 'wait', APPROVAL_PENDING: 'wait',
+  DENY: 'bad', DENIED: 'bad', FAILED: 'bad', REVOKED: 'bad', INVALID: 'bad', DISABLED: 'bad', MISSING: 'bad', APPROVAL_DENIED: 'bad',
+  EXPIRED: 'muted', EXHAUSTED: 'muted', RETIRED: 'muted', APPROVAL_EXPIRED: 'muted',
 }
 
 export function Badge({ value }: { value: string | null | undefined }) {

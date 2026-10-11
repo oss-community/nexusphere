@@ -10,7 +10,8 @@ import java.util.Map;
 @ConfigurationProperties("ledger")
 public record LedgerProperties(Security security, Signing signing, Checkpoint checkpoint, Mcp mcp,
                                Mandate mandate, A2a a2a, Oidc oidc, Log log,
-                               Compliance compliance, Timestamp timestamp, Rekor rekor, Policy policy) {
+                               Compliance compliance, Timestamp timestamp, Rekor rekor, Policy policy,
+                               Approval approval) {
 
     public boolean consentRequired() {
         return oidc != null && oidc.enabled();
@@ -20,6 +21,16 @@ public record LedgerProperties(Security security, Signing signing, Checkpoint ch
     }
 
     public record Policy(String defaultEffect) {
+    }
+
+    public record Approval(Duration timeout, Duration pollInterval, URI webhookUrl, Ciba ciba) {
+
+        public record Ciba(URI endpoint, URI tokenEndpoint, String clientId, String clientSecret, String scope) {
+
+            public boolean enabled() {
+                return endpoint != null && !endpoint.toString().isBlank();
+            }
+        }
     }
 
     public record Signing(String provider, String privateKey, String publicKey, String previousPrivateKey,

@@ -27,6 +27,7 @@ class Denied(Exception):
     def __init__(self, decision: dict):
         super().__init__("%s: %s" % (decision.get("reasonCode"), decision.get("reason")))
         self.decision = decision
+        self.approval_id = decision.get("approvalId")
 
 
 def hash_of(data) -> str:
@@ -216,6 +217,20 @@ class LedgerClient:
 
     def revoke_grant(self, grant_id: str, reason: Optional[str] = None) -> dict:
         return self._post("/api/v1/grants/%s/revoke" % _segment(grant_id), _compact({"reason": reason}))
+
+    def approvals(self, status: Optional[str] = None, agent_id: Optional[str] = None,
+                  principal_id: Optional[str] = None, limit: int = 100) -> List[dict]:
+        return self._get("/api/v1/approvals", status=status, agentId=agent_id, principalId=principal_id,
+                         limit=limit)["items"]
+
+    def approval(self, approval_id: str) -> dict:
+        return self._get("/api/v1/approvals/" + _segment(approval_id))
+
+    def approve(self, approval_id: str, reason: Optional[str] = None) -> dict:
+        return self._post("/api/v1/approvals/%s/approve" % _segment(approval_id), _compact({"reason": reason}))
+
+    def deny_approval(self, approval_id: str, reason: Optional[str] = None) -> dict:
+        return self._post("/api/v1/approvals/%s/deny" % _segment(approval_id), _compact({"reason": reason}))
 
     def issue_mandate(self, grant_id: str, audience: Optional[str] = None, expires_at=None) -> dict:
         return self._post("/api/v1/mandates", _compact({

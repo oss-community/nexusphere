@@ -117,6 +117,28 @@ export interface Grant {
   consentedAt: string | null
 }
 
+export type ApprovalStatus = 'PENDING' | 'APPROVED' | 'DENIED' | 'EXPIRED'
+
+export interface Approval {
+  id: string
+  agentId: string
+  principalId: string
+  action: string
+  target: string | null
+  inputHash: string | null
+  policyHash: string
+  policies: string[]
+  approver: 'principal' | 'operator' | 'any'
+  status: ApprovalStatus
+  requestedAt: string
+  expiresAt: string
+  resolvedAt: string | null
+  method: 'operator' | 'principal' | 'ciba' | 'timeout' | null
+  reason: string | null
+  evidenceId: string | null
+  used: boolean
+}
+
 export interface GrantDraft {
   principalId?: string
   agentId: string

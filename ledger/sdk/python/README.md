@@ -126,6 +126,14 @@ Step 3. Check the outcome; it must print `SUCCEEDED`:
 print(action.reported["outcome"])
 ```
 
+<p style="text-align: justify;">
+
+When a policy annotated `@approval` stops the action, `act` raises `Denied` with reason code `APPROVAL_PENDING` and the
+request in `denied.approval_id`; `approvals`, `approval`, `approve` and `deny_approval` list, read and resolve approval
+requests, and once approved the identical action is allowed once with reason code `ALLOWED_BY_APPROVAL`.
+
+</p>
+
 ## Record the Model and Prompt
 
 <p style="text-align: justify;">

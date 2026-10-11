@@ -186,6 +186,8 @@ other, which watches it, to cosign its log checkpoints over the C2SP witness pro
 | `ModelE2ETest`            | The model and prompt are recorded, required and disclosed with their texts    |
 | `PolicyE2ETest`           | Policies deny what a grant allows and their text is disclosed and verified    |
 |                           | A default deny ledger allows only what a policy permits                       |
+| `ApprovalE2ETest`         | The operator approves or denies once and silence denies                       |
+|                           | The principal answers in the ledger or on their device through CIBA           |
 
 ##
 

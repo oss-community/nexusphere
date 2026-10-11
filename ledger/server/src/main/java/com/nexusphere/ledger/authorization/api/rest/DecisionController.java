@@ -1,5 +1,6 @@
 package com.nexusphere.ledger.authorization.api.rest;
 
+import com.fasterxml.jackson.annotation.JsonInclude;
 import com.nexusphere.ledger.authorization.application.DecisionService;
 import com.nexusphere.ledger.authorization.domain.model.DecisionRecord;
 import com.nexusphere.ledger.authorization.domain.model.DecisionRequest;
@@ -61,12 +62,13 @@ class DecisionController {
     }
 
     record DecisionResultResponse(UUID decisionId, String decision, String reasonCode, String reason, UUID grantId,
-                                  String outcome, EvidenceRef evidence) {
+                                  String outcome, EvidenceRef evidence,
+                                  @JsonInclude(JsonInclude.Include.NON_NULL) UUID approvalId) {
 
         static DecisionResultResponse of(DecisionResult r) {
             DecisionRecord d = r.decision();
             return new DecisionResultResponse(d.id(), d.decision().name(), d.reasonCode().name(), r.reason(),
-                    d.grantId(), r.evidence().outcome(), EvidenceRef.of(r.evidence()));
+                    d.grantId(), r.evidence().outcome(), EvidenceRef.of(r.evidence()), r.approvalId());
         }
     }
 

@@ -86,6 +86,32 @@ class CedarPoliciesTest {
     }
 
     @Test
+    void aDenialAsksForApprovalOnlyWhenEveryDecidingPolicyAllowsIt() {
+        CedarPolicies policies = CedarPolicies.compile("""
+                @id("wire") @approval("principal")
+                forbid(principal, action, resource == Target::"bank/wire_transfer");
+                @id("large") @approval("any")
+                forbid(principal, action, resource) when { context.attributes has large };
+                @id("night") @approval("operator")
+                forbid(principal, action, resource) unless { context.hour >= 9 && context.hour < 17 };
+                @id("loan")
+                forbid(principal, action, resource == Target::"bank/loan");
+                """, true);
+
+        assertThat(policies.evaluate(request("payments.pay", "bank/wire_transfer", Map.of())).approver())
+                .isEqualTo(CedarPolicies.PRINCIPAL);
+        assertThat(policies.evaluate(request("payments.pay", "acme", Map.of("large", "yes"))).approver())
+                .isEqualTo(CedarPolicies.ANY);
+        assertThat(policies.evaluate(request("payments.pay", "bank/wire_transfer", Map.of("large", "yes")))
+                .approver()).isEqualTo(CedarPolicies.PRINCIPAL);
+        assertThat(policies.evaluate(request("payments.pay", "bank/loan", Map.of())).approver()).isNull();
+        assertThat(policies.evaluate(request("payments.pay", "acme", Map.of())).approver()).isNull();
+        CedarPolicies.Request night = new CedarPolicies.Request("invoice-agent", "alice", "payments.pay",
+                "bank/wire_transfer", null, Map.of(), null, Instant.parse("2026-10-12T22:00:00Z"));
+        assertThat(policies.evaluate(night).approver()).isNull();
+    }
+
+    @Test
     void invalidPolicySetsAreRejected() {
         assertThatThrownBy(() -> CedarPolicies.compile("permit(principal, action", true))
                 .isInstanceOf(IllegalArgumentException.class).hasMessageStartingWith("The policies cannot be parsed");

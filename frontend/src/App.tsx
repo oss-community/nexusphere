@@ -1,10 +1,12 @@
 import { BrowserRouter, Navigate, NavLink, Outlet, Route, Routes } from 'react-router'
 import { SessionProvider, useSession } from './auth/session'
 import { AgentsPage } from './pages/AgentsPage'
+import { ApprovalsPage } from './pages/ApprovalsPage'
 import { Callback } from './pages/Callback'
 import { EvidencePage } from './pages/EvidencePage'
 import { ExchangesPage } from './pages/ExchangesPage'
 import { GrantsPage } from './pages/GrantsPage'
+import { MyApprovalsPage } from './pages/MyApprovalsPage'
 import { MyGrantsPage } from './pages/MyGrantsPage'
 import { Overview } from './pages/Overview'
 import { PackagesPage } from './pages/PackagesPage'
@@ -17,6 +19,7 @@ const OPERATOR_LINKS = [
   { to: '/evidence', label: 'Evidence' },
   { to: '/agents', label: 'Agents' },
   { to: '/grants', label: 'Grants' },
+  { to: '/approvals', label: 'Approvals' },
   { to: '/packages', label: 'Packages' },
   { to: '/reports', label: 'Reports' },
   { to: '/exchanges', label: 'A2A exchanges' },
@@ -25,6 +28,7 @@ const OPERATOR_LINKS = [
 
 const PRINCIPAL_LINKS = [
   { to: '/my/grants', label: 'My grants' },
+  { to: '/my/approvals', label: 'My approvals' },
   { to: '/my/evidence', label: 'Evidence about me' },
 ]
 
@@ -86,6 +90,7 @@ export function AppRoutes() {
           <Route path="/evidence" element={<EvidencePage />} />
           <Route path="/agents" element={<AgentsPage />} />
           <Route path="/grants" element={<GrantsPage />} />
+          <Route path="/approvals" element={<ApprovalsPage />} />
           <Route path="/packages" element={<PackagesPage />} />
           <Route path="/reports" element={<ReportsPage />} />
           <Route path="/exchanges" element={<ExchangesPage />} />
@@ -93,6 +98,7 @@ export function AppRoutes() {
         </Route>
         <Route element={<Guard kind="principal" />}>
           <Route path="/my/grants" element={<MyGrantsPage />} />
+          <Route path="/my/approvals" element={<MyApprovalsPage />} />
           <Route path="/my/evidence" element={<EvidencePage mine />} />
         </Route>
       </Route>
