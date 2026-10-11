@@ -163,6 +163,14 @@ try {
 }
 ```
 
+<p style="text-align: justify;">
+
+When a policy annotated `@approval` stops the action, `act` throws `Denied` with reason code `APPROVAL_PENDING` and the
+request in `e.approvalId`; `approvals`, `approval`, `approve` and `denyApproval` list, read and resolve approval
+requests, and once approved the identical action is allowed once with reason code `ALLOWED_BY_APPROVAL`.
+
+</p>
+
 ## Verify a Package
 
 Step 1. Export a package and read the ledger's public key, as the operator:

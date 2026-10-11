@@ -4,7 +4,7 @@ import unittest
 import urllib.error
 from datetime import datetime, timedelta, timezone
 
-from nexusphere_ledger import LedgerClient, LedgerError
+from nexusphere_ledger import Denied, LedgerClient, LedgerError
 
 MODEL = {"name": "model-a", "version": "1", "promptHash": "ab" * 32}
 
@@ -143,6 +143,56 @@ class Client(unittest.TestCase):
         self.assertEqual("POST", opener.requests[1].get_method())
         self.assertEqual("https://ledger.example/api/v1/a2a/reconciliations", opener.requests[1].full_url)
         self.assertEqual({"statement": "x.y.z"}, opener.body())
+
+    def test_approvals(self):
+        pending = {"id": "00000000-0000-4000-8000-0000000000aa", "agentId": "invoice-agent", "principalId": "acme",
+                   "action": "tools/call", "target": "pay_invoice", "inputHash": None, "policyHash": "ab" * 32,
+                   "policies": ["policy1"], "approver": "operator", "status": "PENDING",
+                   "requestedAt": "2026-10-01T08:00:00Z", "expiresAt": "2026-10-01T09:00:00Z", "resolvedAt": None,
+                   "method": None, "reason": None, "evidenceId": None, "used": False}
+        approved = dict(pending, status="APPROVED", method="operator", resolvedAt="2026-10-01T08:05:00Z")
+        denied = dict(pending, status="DENIED", method="operator", reason="Not this month.")
+        client, opener = self.client((200, {"items": [pending]}), (200, {"items": []}), (200, pending),
+                                     (200, approved), (200, denied),
+                                     (409, {"code": "APPROVAL_RESOLVED", "message": "The approval is resolved."}))
+        self.assertEqual([pending], client.approvals())
+        self.assertEqual("GET", opener.requests[0].get_method())
+        self.assertEqual("https://ledger.example/api/v1/approvals?limit=100", opener.requests[0].full_url)
+        self.assertEqual([], client.approvals("PENDING", "invoice-agent", "acme", 5))
+        self.assertEqual("https://ledger.example/api/v1/approvals?status=PENDING&agentId=invoice-agent"
+                         "&principalId=acme&limit=5", opener.requests[1].full_url)
+        self.assertEqual(pending, client.approval(pending["id"]))
+        self.assertEqual("https://ledger.example/api/v1/approvals/" + pending["id"], opener.requests[2].full_url)
+        self.assertEqual(approved, client.approve(pending["id"]))
+        self.assertEqual("POST", opener.requests[3].get_method())
+        self.assertEqual("https://ledger.example/api/v1/approvals/%s/approve" % pending["id"],
+                         opener.requests[3].full_url)
+        self.assertEqual({}, opener.body())
+        self.assertEqual(denied, client.deny_approval(pending["id"], "Not this month."))
+        self.assertEqual("https://ledger.example/api/v1/approvals/%s/deny" % pending["id"],
+                         opener.requests[4].full_url)
+        self.assertEqual({"reason": "Not this month."}, opener.body())
+        with self.assertRaises(LedgerError) as error:
+            client.approve(pending["id"])
+        self.assertEqual(409, error.exception.status)
+        self.assertEqual("APPROVAL_RESOLVED", error.exception.code)
+
+    def test_act_raises_denied_with_the_approval(self):
+        decision = {"decisionId": "00000000-0000-4000-8000-0000000000bb", "decision": "DENY",
+                    "reasonCode": "APPROVAL_PENDING", "reason": "The operator must approve.",
+                    "approvalId": "00000000-0000-4000-8000-0000000000aa"}
+        client, opener = self.client((200, decision), (200, dict(decision, reasonCode="NO_GRANT",
+                                                                 approvalId=None)))
+        with self.assertRaises(Denied) as error:
+            with client.act("acme", "tools/call", "pay_invoice"):
+                self.fail("the block must not run")
+        self.assertEqual(decision, error.exception.decision)
+        self.assertEqual(decision["approvalId"], error.exception.approval_id)
+        self.assertEqual(1, len(opener.requests))
+        with self.assertRaises(Denied) as error:
+            with client.act("acme", "tools/call", "pay_invoice"):
+                self.fail("the block must not run")
+        self.assertIsNone(error.exception.approval_id)
 
 
 if __name__ == "__main__":

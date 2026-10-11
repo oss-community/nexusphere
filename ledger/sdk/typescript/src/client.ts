@@ -16,8 +16,11 @@ export class LedgerError extends Error {
 }
 
 export class Denied extends Error {
+  readonly approvalId: string | null;
+
   constructor(readonly decision: Json) {
     super(`${decision.reasonCode}: ${decision.reason}`);
+    this.approvalId = (decision.approvalId as string | undefined) ?? null;
   }
 }
 
@@ -343,6 +346,23 @@ export class LedgerClient {
 
   revokeGrant(id: string, reason?: string): Promise<Json> {
     return this.post(`/api/v1/grants/${encodeURIComponent(id)}/revoke`, compact({ reason }));
+  }
+
+  async approvals(query: { status?: string; agentId?: string; principalId?: string; limit?: number } = {}):
+    Promise<Json[]> {
+    return ((await this.get("/api/v1/approvals", { ...query, limit: query.limit ?? 100 })) as { items: Json[] }).items;
+  }
+
+  approval(id: string): Promise<Json> {
+    return this.get("/api/v1/approvals/" + encodeURIComponent(id));
+  }
+
+  approve(id: string, reason?: string): Promise<Json> {
+    return this.post(`/api/v1/approvals/${encodeURIComponent(id)}/approve`, compact({ reason }));
+  }
+
+  denyApproval(id: string, reason?: string): Promise<Json> {
+    return this.post(`/api/v1/approvals/${encodeURIComponent(id)}/deny`, compact({ reason }));
   }
 
   issueMandate(grantId: string, audience?: string, expiresAt?: string | Date): Promise<Json> {

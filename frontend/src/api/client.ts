@@ -1,5 +1,5 @@
 import type {
-  Agent, Checkpoint, OfferedReport, ReportScope, SignedReport, Erasure, Evidence, Exchange, Grant, GrantDraft, Head, IssuedAgent, LegalHold, Mandate, OidcInfo,
+  Agent, Approval, Checkpoint, OfferedReport, ReportScope, SignedReport, Erasure, Evidence, Exchange, Grant, GrantDraft, Head, IssuedAgent, LegalHold, Mandate, OidcInfo,
   PackageReport, Page, Principal, RetentionSweep, SigningKey, VerificationReport,
 } from './types'
 
@@ -126,6 +126,18 @@ export class LedgerApi {
     return this.request<Mandate>('POST', `/api/v1/mandates/${id}/revoke`, { reason })
   }
 
+  approvals(query: { status?: string; agentId?: string; principalId?: string }) {
+    return this.request<{ items: Approval[] }>('GET', '/api/v1/approvals', undefined, { ...query, limit: 100 })
+  }
+
+  approveApproval(id: string, reason?: string) {
+    return this.request<Approval>('POST', `/api/v1/approvals/${id}/approve`, { reason })
+  }
+
+  denyApproval(id: string, reason?: string) {
+    return this.request<Approval>('POST', `/api/v1/approvals/${id}/deny`, { reason })
+  }
+
   exchange(id: string) {
     return this.request<Exchange>('GET', `/api/v1/a2a/exchanges/${id}`)
   }
@@ -197,6 +209,18 @@ export class LedgerApi {
 
   revokeMine(id: string, reason?: string) {
     return this.request<Grant>('POST', `/api/v1/principal/grants/${id}/revoke`, { reason })
+  }
+
+  myApprovals(status?: string) {
+    return this.request<{ items: Approval[] }>('GET', '/api/v1/principal/approvals', undefined, { status, limit: 100 })
+  }
+
+  approveMyApproval(id: string, reason?: string) {
+    return this.request<Approval>('POST', `/api/v1/principal/approvals/${id}/approve`, { reason })
+  }
+
+  denyMyApproval(id: string, reason?: string) {
+    return this.request<Approval>('POST', `/api/v1/principal/approvals/${id}/deny`, { reason })
   }
 
   myEvidence(after?: number) {

@@ -92,3 +92,25 @@ export function grant(id: string, status: string, consent: string | null = null)
     consentedAt: null,
   }
 }
+
+export function approval(id: string, status: string, method: string | null = null) {
+  return {
+    id,
+    agentId: 'invoice-agent',
+    principalId: 'alice',
+    action: 'pay_invoice',
+    target: `${id}-target`,
+    inputHash: null,
+    policyHash: 'b'.repeat(64),
+    policies: ['policy1'],
+    approver: 'operator',
+    status,
+    requestedAt: '2026-10-08T10:00:00Z',
+    expiresAt: '2026-10-08T11:00:00Z',
+    resolvedAt: method ? '2026-10-08T10:05:00Z' : null,
+    method,
+    reason: method ? 'answered' : null,
+    evidenceId: null,
+    used: false,
+  }
+}
