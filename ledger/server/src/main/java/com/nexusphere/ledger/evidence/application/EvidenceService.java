@@ -3,6 +3,7 @@ package com.nexusphere.ledger.evidence.application;
 import com.nexusphere.ledger.chain.EvidenceEntry;
 import com.nexusphere.ledger.compliance.application.Compliance;
 import com.nexusphere.ledger.evidence.domain.model.EvidenceQuery;
+import com.nexusphere.ledger.evidence.domain.model.EvidenceSearch;
 import com.nexusphere.ledger.evidence.domain.model.EvidenceSubmission;
 import com.nexusphere.ledger.evidence.domain.model.LedgerHead;
 import com.nexusphere.ledger.evidence.domain.repository.EvidenceRepository;
@@ -124,6 +125,26 @@ public class EvidenceService {
     public List<EvidenceEntry> find(EvidenceQuery query) {
         Paging.check(query.afterSequence(), query.limit(), MAX_PAGE_SIZE);
         return evidence.find(query);
+    }
+
+    @Transactional(readOnly = true)
+    public List<EvidenceEntry> search(EvidenceSearch search) {
+        return evidence.search(search);
+    }
+
+    @Transactional(readOnly = true)
+    public List<String> agentIds(int limit) {
+        return evidence.agentIds(limit);
+    }
+
+    @Transactional(readOnly = true)
+    public List<String> actions(int limit) {
+        return evidence.actions(limit);
+    }
+
+    @Transactional(readOnly = true)
+    public List<String> hashes(long afterSequence, int limit) {
+        return evidence.hashes(afterSequence, limit);
     }
 
     @Transactional(readOnly = true)

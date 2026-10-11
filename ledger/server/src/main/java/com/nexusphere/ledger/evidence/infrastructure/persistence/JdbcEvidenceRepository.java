@@ -4,6 +4,7 @@ import com.nexusphere.ledger.chain.AgentModel;
 import com.nexusphere.ledger.chain.CanonicalJson;
 import com.nexusphere.ledger.chain.EvidenceEntry;
 import com.nexusphere.ledger.evidence.domain.model.EvidenceQuery;
+import com.nexusphere.ledger.evidence.domain.model.EvidenceSearch;
 import com.nexusphere.ledger.evidence.domain.model.LedgerHead;
 import com.nexusphere.ledger.evidence.domain.model.Selection;
 import com.nexusphere.ledger.evidence.domain.repository.EvidenceRepository;
@@ -126,6 +127,49 @@ class JdbcEvidenceRepository implements EvidenceRepository {
         }
         sql.append(" order by r.sequence limit :limit");
         return jdbc.query(sql.toString(), params, this::row);
+    }
+
+    @Override
+    public List<EvidenceEntry> search(EvidenceSearch search) {
+        StringBuilder sql = new StringBuilder(SELECT).append(" where true");
+        MapSqlParameterSource params = new MapSqlParameterSource("limit", search.limit());
+        Map<String, String> equal = new LinkedHashMap<>();
+        equal.put("agent_id", search.agentId());
+        equal.put("action", search.action());
+        equal.put("decision", search.decision());
+        equal.put("outcome", search.outcome());
+        equal.forEach((column, value) -> {
+            if (value != null) {
+                sql.append(" and r.").append(column).append(" = :").append(column);
+                params.addValue(column, value);
+            }
+        });
+        if (search.principalId() != null) {
+            sql.append(" and r.principal_ref = ").append(PRINCIPAL);
+            params.addValue("principalId", search.principalId());
+        }
+        if (search.from() != null) {
+            sql.append(" and r.occurred_at >= :from");
+            params.addValue("from", Timestamp.from(search.from()));
+        }
+        if (search.to() != null) {
+            sql.append(" and r.occurred_at < :to");
+            params.addValue("to", Timestamp.from(search.to()));
+        }
+        sql.append(" order by r.sequence desc limit :limit");
+        return jdbc.query(sql.toString(), params, this::row);
+    }
+
+    @Override
+    public List<String> agentIds(int limit) {
+        return jdbc.queryForList("select distinct agent_id from ledger.evidence_record order by agent_id limit :limit",
+                Map.of("limit", limit), String.class);
+    }
+
+    @Override
+    public List<String> actions(int limit) {
+        return jdbc.queryForList("select distinct action from ledger.evidence_record order by action limit :limit",
+                Map.of("limit", limit), String.class);
     }
 
     @Override

@@ -11,7 +11,7 @@ import java.util.Map;
 public record LedgerProperties(Security security, Signing signing, Checkpoint checkpoint, Mcp mcp,
                                Mandate mandate, A2a a2a, Oidc oidc, Log log,
                                Compliance compliance, Timestamp timestamp, Rekor rekor, Policy policy,
-                               Approval approval, Anomaly anomaly, Cluster cluster) {
+                               Approval approval, Anomaly anomaly, Cluster cluster, Ask ask) {
 
     public boolean consentRequired() {
         return oidc != null && oidc.enabled();
@@ -21,6 +21,9 @@ public record LedgerProperties(Security security, Signing signing, Checkpoint ch
     }
 
     public record Policy(String defaultEffect) {
+    }
+
+    public record Ask(String model, URI url, String name, String apiKey, Duration timeout, int maxEvidence) {
     }
 
     public record Cluster(String instanceId, Duration heartbeat) {

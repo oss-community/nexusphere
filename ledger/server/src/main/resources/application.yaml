@@ -70,6 +70,13 @@ ledger:
   cluster:
     instance-id: ${LEDGER_INSTANCE_ID:}
     heartbeat: ${LEDGER_CLUSTER_HEARTBEAT:5s}
+  ask:
+    model: ${LEDGER_ASK_MODEL:builtin}
+    url: ${LEDGER_ASK_MODEL_URL:http://localhost:11434/v1}
+    name: ${LEDGER_ASK_MODEL_NAME:qwen2.5:7b}
+    api-key: ${LEDGER_ASK_MODEL_API_KEY:}
+    timeout: ${LEDGER_ASK_TIMEOUT:120s}
+    max-evidence: ${LEDGER_ASK_MAX_EVIDENCE:50}
   anomaly:
     enabled: ${LEDGER_ANOMALY_ENABLED:true}
     interval: ${LEDGER_ANOMALY_INTERVAL:5m}
