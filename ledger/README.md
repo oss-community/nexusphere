@@ -8,6 +8,7 @@
 * [Modules](#modules)
 * [Getting Started](#getting-started)
 * [Environment Variables](#environment-variables)
+* [High Availability](#high-availability)
 * [Evidence Format](#evidence-format)
 * [Verification](#verification)
 * [Transparency Log and Witnesses](#transparency-log-and-witnesses)
@@ -347,6 +348,8 @@ LEDGER_APPROVAL_CIBA_TOKEN_ENDPOINT:
 LEDGER_APPROVAL_CIBA_CLIENT_ID:
 LEDGER_APPROVAL_CIBA_CLIENT_SECRET:
 LEDGER_APPROVAL_CIBA_SCOPE: openid
+LEDGER_INSTANCE_ID:
+LEDGER_CLUSTER_HEARTBEAT: 5s
 LEDGER_ANOMALY_ENABLED: true
 LEDGER_ANOMALY_INTERVAL: 5m
 LEDGER_ANOMALY_WINDOW: 1h
@@ -375,6 +378,60 @@ schema, so the ledger can share a database with other applications. Any setting 
 openssl genpkey -algorithm ed25519 -outform DER -out ledger-signing.der
 export LEDGER_SIGNING_PRIVATE_KEY=$(base64 -w0 ledger-signing.der)
 export LEDGER_SIGNING_PUBLIC_KEY=$(openssl pkey -inform DER -in ledger-signing.der -pubout -outform DER | base64 -w0)
+```
+
+## High Availability
+
+<p style="text-align: justify;">
+
+Several ledger instances can share one PostgreSQL. Every write takes its lock in the database, such as the chain head
+for evidence and checkpoints, so requests can go to any instance and the chain stays one. The scheduled work
+(checkpoints, timestamps, Rekor anchors, witness cosignatures, retention, approval notifications and anomaly
+detection) runs on one instance only, the leader: the instance that holds the PostgreSQL session advisory lock of the
+ledger on a connection of its own. When the leader stops or loses its connection, PostgreSQL releases the lock and
+another instance takes it at its next heartbeat, every `LEDGER_CLUSTER_HEARTBEAT`. Each instance is named by
+`LEDGER_INSTANCE_ID`, by default its host name with a random suffix, and reports `ledger_leader` as 1 or 0.
+`GET /api/v1/cluster` shows the instance that answers, whether it leads, and every instance seen in the last three
+heartbeats. Rate limits count per instance.
+
+</p>
+
+Step 1. Start PostgreSQL as in [Run](#run) and build the server jar:
+
+```shell
+docker compose --file ledger/compose.yaml --project-name ledger up -d ledger-postgresql
+mvn install -DskipTests=true
+```
+
+Step 2. Start two instances on ports 8090 and 8094:
+
+```shell
+for port in 8090 8094; do
+  LEDGER_PORT=$port LEDGER_INSTANCE_ID=ledger-$port LEDGER_CLUSTER_HEARTBEAT=1s LEDGER_PROFILES=postgresql,dev LEDGER_DATABASE_PORT=5433 \
+    java -jar ledger/server/target/server-1.0.0-SNAPSHOT-exec.jar > ledger-$port.log 2>&1 &
+done
+```
+
+Step 3. Ask both; exactly one must answer `"leader":true`, and both must list `ledger-8090` and `ledger-8094`:
+
+```shell
+for port in 8090 8094; do curl -s http://localhost:$port/api/v1/cluster -H "Authorization: Bearer $LEDGER_API_KEY" | jq -c '{instanceId, leader, members: [.members[].instanceId]}'; done
+```
+
+Step 4. Record one entry through each instance; the sequences must follow each other:
+
+```shell
+for port in 8090 8094; do curl -s -X POST http://localhost:$port/api/v1/evidence -H "Authorization: Bearer $LEDGER_API_KEY" -H "Content-Type: application/json" -d '{"agentId":"invoice-agent","principalId":"alice","action":"tools/call","target":"send_email","decision":"ALLOW","outcome":"SUCCEEDED"}' | jq .sequence; done
+```
+
+Step 5. Stop the leader; within a few seconds the other instance must answer `"leader":true`:
+
+```shell
+LEADER=$(for port in 8090 8094; do curl -s http://localhost:$port/api/v1/cluster -H "Authorization: Bearer $LEDGER_API_KEY" | jq -r "select(.leader) | \"$port\""; done)
+kill $(lsof -t -i :$LEADER -sTCP:LISTEN)
+sleep 5
+OTHER=$([ "$LEADER" = 8090 ] && echo 8094 || echo 8090)
+curl -s http://localhost:$OTHER/api/v1/cluster -H "Authorization: Bearer $LEDGER_API_KEY" | jq -c '{instanceId, leader}'
 ```
 
 ## Evidence Format
@@ -2118,6 +2175,7 @@ API key, except `/api/v1/principal/**`, which requires a principal token from th
 | GET    | `/api/v1/anomalies`                        | Anomalies by `status` (`OPEN`, `RESOLVED`), `agentId` and `limit` (operator)                            |
 | GET    | `/api/v1/anomalies/{id}`                   | An anomaly with its score and evidence (operator)                                                       |
 | POST   | `/api/v1/anomalies/detect`                 | Run the anomaly check now and answer the new anomalies (operator)                                       |
+| GET    | `/api/v1/cluster`                          | This instance, whether it leads, and the instances seen recently (operator)                             |
 | PUT    | `/api/v1/prompts`                          | Store a prompt or configuration `text` and answer its `hash`; `201` when new (agent or operator)        |
 | GET    | `/api/v1/prompts/{hash}`                   | A stored prompt text with when and by whom it was stored (operator)                                     |
 | POST   | `/api/v1/index/proofs`                     | A signed proof that a `term` occurs, with its count, or never does, up to a checkpoint (operator)       |

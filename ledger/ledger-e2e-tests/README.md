@@ -190,6 +190,7 @@ other, which watches it, to cosign its log checkpoints over the C2SP witness pro
 |                           | The principal answers in the ledger or on their device through CIBA           |
 | `AnomalyE2ETest`          | A burst of denials is detected, recorded, exported and resolved               |
 |                           | A new agent is not judged before it has a history                             |
+| `ClusterE2ETest`          | One instance leads, both write one chain and the other takes over             |
 
 ##
 
