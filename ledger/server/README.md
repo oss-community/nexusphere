@@ -31,8 +31,8 @@ record.
 * Several instances on one database, with leader election by advisory lock for the scheduled work
 * MCP gateway that decides and records every tool call
 * Evidence packages with selective disclosure for auditors
-* Transparency log over the evidence with inclusion and consistency proofs, cosigned by witnesses, and a C2SP
-  witness endpoint so the ledger can witness other logs
+* Transparency log over the evidence with inclusion and consistency proofs, cosigned by witnesses, served as C2SP
+  `tlog-tiles` for archives, and a C2SP witness endpoint so the ledger can witness other logs
 * SCITT signed statements and RFC 9942 receipts for every entry
 * Signed mandates, the revocation status list and the public keys as JWKS
 * Signing key history: rotation at startup with a cross-signed rotation record, retired keys kept for verification

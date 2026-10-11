@@ -27,5 +27,7 @@ public interface EvidenceRepository {
 
     List<EvidenceEntry> range(long afterSequence, int limit);
 
+    List<String> hashes(long afterSequence, int limit);
+
     Selection select(String agentId, String principalId, long fromSequence, long toSequence);
 }

@@ -191,6 +191,8 @@ other, which watches it, to cosign its log checkpoints over the C2SP witness pro
 | `AnomalyE2ETest`          | A burst of denials is detected, recorded, exported and resolved               |
 |                           | A new agent is not judged before it has a history                             |
 | `ClusterE2ETest`          | One instance leads, both write one chain and the other takes over             |
+| `TileE2ETest`             | Tiles are public, immutable and match the signed checkpoint                   |
+|                           | An archive is mirrored incrementally and checks a package offline             |
 
 ##
 
