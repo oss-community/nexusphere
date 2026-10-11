@@ -25,6 +25,7 @@ record.
 * Evidence API on an append-only SHA-256 hash chain in PostgreSQL, single or in batches, with signed checkpoints
   and full verification
 * Agents with their own API keys, grants from principals to agents, and ALLOW or DENY decisions with outcomes
+* Cedar policy sets that the operator activates and every decision must also pass, with the policy hash in evidence
 * MCP gateway that decides and records every tool call
 * Evidence packages with selective disclosure for auditors
 * Transparency log over the evidence with inclusion and consistency proofs, cosigned by witnesses, and a C2SP

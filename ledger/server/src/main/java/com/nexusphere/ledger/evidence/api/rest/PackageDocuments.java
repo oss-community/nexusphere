@@ -7,6 +7,7 @@ import com.nexusphere.ledger.chain.EvidenceLink;
 import com.nexusphere.ledger.chain.SignedCheckpoint;
 import com.nexusphere.ledger.evidence.application.PackageService;
 import com.nexusphere.ledger.evidence.application.PromptService;
+import com.nexusphere.ledger.policy.application.PolicyService;
 import com.nexusphere.ledger.evidence.domain.model.EvidencePackage;
 import com.nexusphere.ledger.evidence.domain.model.PackageRequest;
 import com.nexusphere.ledger.server.signing.KeyController;
@@ -46,6 +47,9 @@ public class PackageDocuments {
     }
 
     public record PromptResponse(String hash, String text) {
+    }
+
+    public record PolicyResponse(String hash, String text) {
     }
 
     public record Scope(String agentId, String principalId, long fromSequence, long toSequence) {
@@ -96,7 +100,8 @@ public class PackageDocuments {
     public record PackageResponse(String format, Instant createdAt, Scope scope, List<KeyController.KeyResponse> keys,
                            CheckpointResponse anchor, CheckpointResponse checkpoint, long disclosed,
                            List<LinkResponse> links, LogResponse log,
-                           @JsonInclude(JsonInclude.Include.NON_NULL) List<PromptResponse> prompts) {
+                           @JsonInclude(JsonInclude.Include.NON_NULL) List<PromptResponse> prompts,
+                           @JsonInclude(JsonInclude.Include.NON_EMPTY) List<PolicyResponse> policies) {
     }
 
     private final PackageService packages;
@@ -105,11 +110,14 @@ public class PackageDocuments {
     private final TimestampService timestamps;
     private final RekorService rekor;
     private final PromptService promptTexts;
+    private final PolicyService policyTexts;
     private final JsonMapper json;
 
     PackageDocuments(PackageService packages, LedgerSigner signer, WitnessCollector witnesses,
-                     TimestampService timestamps, RekorService rekor, PromptService promptTexts, JsonMapper json) {
+                     TimestampService timestamps, RekorService rekor, PromptService promptTexts,
+                     PolicyService policyTexts, JsonMapper json) {
         this.promptTexts = promptTexts;
+        this.policyTexts = policyTexts;
         this.packages = packages;
         this.signer = signer;
         this.witnesses = witnesses;
@@ -128,7 +136,21 @@ public class PackageDocuments {
                 new Scope(p.agentId(), p.principalId(), p.fromSequence(), p.toSequence()),
                 keys(), CheckpointResponse.of(p.anchor()), CheckpointResponse.of(p.checkpoint()), p.disclosed(),
                 p.items().stream().map(LinkResponse::of).toList(), LogResponse.of(p.log()),
-                includePrompts ? prompts(p) : null);
+                includePrompts ? prompts(p) : null, policies(p));
+    }
+
+    private List<PolicyResponse> policies(EvidencePackage p) {
+        Set<String> hashes = new TreeSet<>();
+        for (EvidencePackage.Item item : p.items()) {
+            if (item.entry() != null && item.entry().attributes() != null) {
+                String hash = item.entry().attributes().get(PolicyService.HASH_ATTRIBUTE);
+                if (hash != null) {
+                    hashes.add(hash);
+                }
+            }
+        }
+        return policyTexts.texts(hashes).entrySet().stream()
+                .map(e -> new PolicyResponse(e.getKey(), e.getValue())).toList();
     }
 
     private List<PromptResponse> prompts(EvidencePackage p) {

@@ -132,6 +132,22 @@ class PackageVerifierTest {
     }
 
     @Test
+    void aPolicySetTextMustMatchItsHashAndBeNamedByAnEntry() {
+        String text = "forbid(principal, action, resource);";
+        String hash = Hashes.sha256(text.getBytes(StandardCharsets.UTF_8));
+        ObjectNode pkg = pkg(3, 2);
+        ArrayNode policies = pkg.putArray("policies");
+        policies.addObject().put("hash", hash).put("text", "permit(principal, action, resource);");
+        policies.addObject().put("hash", hash).put("text", text);
+
+        PackageReport report = PackageVerifier.verify(pkg, SigningKeys.encode(KEYS.getPublic()));
+
+        assertThat(report.problems()).containsExactly("policy set " + hash + " does not match its text",
+                "policy set " + hash + " is not named by a disclosed entry");
+        assertThat(report.disclosedPolicies()).isZero();
+    }
+
+    @Test
     void aGenuinePackageIsValid() {
         PackageReport report = PackageVerifier.verify(pkg(4, 2), SigningKeys.encode(KEYS.getPublic()));
 

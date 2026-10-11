@@ -16,6 +16,8 @@ import com.nexusphere.ledger.evidence.application.EvidenceService;
 import com.nexusphere.ledger.evidence.domain.model.Decision;
 import com.nexusphere.ledger.evidence.domain.model.EvidenceSubmission;
 import com.nexusphere.ledger.evidence.domain.model.Outcome;
+import com.nexusphere.ledger.policy.application.CedarPolicies;
+import com.nexusphere.ledger.policy.application.PolicyService;
 import com.nexusphere.ledger.server.web.LedgerException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -45,14 +47,16 @@ public class DecisionService {
     private final DecisionRepository decisions;
     private final AgentRepository agents;
     private final EvidenceService evidence;
+    private final PolicyService policies;
     private final Clock clock;
 
     DecisionService(GrantRepository grants, DecisionRepository decisions, AgentRepository agents,
-                    EvidenceService evidence, Clock clock) {
+                    EvidenceService evidence, PolicyService policies, Clock clock) {
         this.grants = grants;
         this.decisions = decisions;
         this.agents = agents;
         this.evidence = evidence;
+        this.policies = policies;
         this.clock = clock;
     }
 
@@ -60,13 +64,34 @@ public class DecisionService {
     public DecisionResult decide(DecisionRequest request) {
         Instant now = clock.instant();
         evidence.check(submission(request, Decision.ALLOW, Outcome.PENDING, null, null, now));
+        if (request.attributes() != null
+                && request.attributes().keySet().stream().anyMatch(name -> name.startsWith("policy."))) {
+            throw LedgerException.invalid("The decision request has invalid fields.",
+                    Map.of("attributes", "names starting with policy. are set by the ledger"));
+        }
+        Optional<PolicyService.Evaluated> policy = policies.evaluate(new CedarPolicies.Request(request.agentId(),
+                request.principalId(), request.action(), request.target(), request.inputHash(), request.attributes(),
+                request.model(), now));
+        Map<String, String> attributes = new TreeMap<>(request.attributes() == null ? Map.of() : request.attributes());
+        policy.ifPresent(p -> {
+            attributes.put(PolicyService.HASH_ATTRIBUTE, p.hash());
+            attributes.put(PolicyService.EFFECT_ATTRIBUTE, policies.defaultEffect());
+            if (!p.verdict().policies().isEmpty()) {
+                attributes.put(PolicyService.IDS_ATTRIBUTE, String.join(",", p.verdict().policies()));
+            }
+        });
+        DecisionRequest recorded = policy.isEmpty() ? request : request.withAttributes(attributes);
+        evidence.check(submission(recorded, Decision.ALLOW, Outcome.PENDING, null, null, now));
         Verdict verdict = evaluate(request, now);
+        if (verdict.decision() == Decision.ALLOW && policy.isPresent() && !policy.get().verdict().allowed()) {
+            verdict = new Verdict(ReasonCode.POLICY_DENIED, denial(request, policy.get().verdict()), null);
+        }
         if (verdict.grant() != null && verdict.decision() == Decision.ALLOW) {
             grants.use(verdict.grant().terms().id());
         }
         String grantId = verdict.decision() == Decision.ALLOW ? verdict.grant().terms().id().toString() : null;
         Outcome outcome = verdict.decision() == Decision.ALLOW ? Outcome.PENDING : Outcome.DENIED;
-        EvidenceEntry entry = evidence.record(submission(request, verdict.decision(), outcome, verdict.reason(),
+        EvidenceEntry entry = evidence.record(submission(recorded, verdict.decision(), outcome, verdict.reason(),
                 grantId, now));
         DecisionRecord record = new DecisionRecord(entry.id(), request.agentId(), request.principalId(),
                 request.action(), request.target(), verdict.decision(), verdict.code(),
@@ -161,6 +186,16 @@ public class DecisionService {
         }
         return new Verdict(ReasonCode.NO_ACTIVE_GRANT, "No active grant from " + request.principalId() + " to "
                 + request.agentId() + ".", null);
+    }
+
+    private static String denial(DecisionRequest request, CedarPolicies.Verdict verdict) {
+        if (!verdict.errors().isEmpty()) {
+            return "The policies could not decide " + describe(request) + ": " + String.join("; ", verdict.errors());
+        }
+        if (verdict.policies().isEmpty()) {
+            return "No policy permits " + describe(request) + ".";
+        }
+        return "Policy " + String.join(", ", verdict.policies()) + " forbids " + describe(request) + ".";
     }
 
     private static String describe(DecisionRequest request) {
