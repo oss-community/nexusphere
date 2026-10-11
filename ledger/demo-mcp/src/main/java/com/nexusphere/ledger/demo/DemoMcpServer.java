@@ -28,6 +28,7 @@ public final class DemoMcpServer {
     }
 
     public static void main(String[] args) throws IOException {
+        System.setProperty("sun.net.httpserver.nodelay", "true");
         String host = System.getenv().getOrDefault("DEMO_MCP_HOST", "0.0.0.0");
         int port = Integer.parseInt(System.getenv().getOrDefault("DEMO_MCP_PORT", "8091"));
         DemoMcpServer demo = new DemoMcpServer(host, port);
