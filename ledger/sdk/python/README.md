@@ -10,8 +10,9 @@
 * [Decide and Report](#decide-and-report)
 * [Record the Model and Prompt](#record-the-model-and-prompt)
 * [Verify a Package](#verify-a-package)
+* [Verify a Report](#verify-a-report)
+* [Verify an Index Proof](#verify-an-index-proof)
 * [Verify a Statement and Receipt](#verify-a-statement-and-receipt)
-* [Prove That Something Never Happened](#prove-that-something-never-happened)
 * [Verify a Mandate](#verify-a-mandate)
 * [Present a Key-Bound Mandate](#present-a-key-bound-mandate)
 * [Verify an Agent Track Record](#verify-an-agent-track-record)
@@ -130,9 +131,9 @@ print(action.reported["outcome"])
 
 When a policy annotated `@approval` stops the action, `act` raises `Denied` with reason code `APPROVAL_PENDING` and the
 request in `denied.approval_id`; `approvals`, `approval`, `approve` and `deny_approval` list, read and resolve approval
-requests, and once approved the identical action is allowed once with reason code `ALLOWED_BY_APPROVAL`.
-`anomalies`, `anomaly` and `detect_anomalies` list, read and trigger the operator's anomaly checks on agent volume, denials
-and failures.
+requests, and once approved the identical action is allowed once with reason code `ALLOWED_BY_APPROVAL`. `anomalies`,
+`anomaly` and `detect_anomalies` list, read and trigger the operator's anomaly checks on agent volume, denials and
+failures.
 
 </p>
 
@@ -209,25 +210,27 @@ print(report.valid, report.disclosed_entries, report.problems)
 
 <p style="text-align: justify;">
 
-Pass witness verifier keys as the third argument and the number of cosignatures needed as the fourth, as with the
-Java verifier. A key in the package is trusted only when it is the pinned key or signed key rotations lead to it from
-the pinned key. Pass `key_list` with the list from `GET /api/v1/keys` to apply key revocations, as the
-[Ledger README](../../README.md#key-revocation) describes; the command takes it as `--keys keys.json`.
-`report.to_dict()` has the same fields as the Java `PackageReport`. `report.compliance_profiles` lists the id and
-digest of each [compliance profile](../../README.md#compliance-profiles) the checkpoint signs, and
-`client.compliance()` returns the active profiles and their combined rules from the ledger. An entry whose personal
-fields were [erased](../../README.md#erasure) still verifies from its commitments, and
-`client.erase_principal(principal_id, reason)` asks the ledger to erase a principal. `place_legal_hold`,
-`release_legal_hold`, `legal_holds` and `sweep_retention` manage [legal holds](../../README.md#retention-and-legal-holds)
-and the retention pass. `timestamp_certificates`, a list of certificates or PEM text, pins the authority of the
-[checkpoint timestamp](../../README.md#checkpoint-timestamps), `require_timestamp=True` refuses a checkpoint without
-one, and `report.timestamped_at` and `report.timestamp_authority` say when and by whom it was timestamped.
-`rekor_keys`, a list of verifier keys, pins the log of the [Rekor entry](../../README.md#rekor-anchoring),
-`require_rekor=True` refuses a checkpoint without one, and `report.rekor_log_index` and `report.rekor_origin` say
-where it was anchored. `report.disclosed_prompts` counts the prompt texts that match the hashes their entries name.
-`report.disclosed_policies` counts the policy set texts that match the hashes their entries name.
+Pass witness verifier keys as the third argument and the number of cosignatures needed as the fourth, as with the Java
+verifier. A key in the package is trusted only when it is the pinned key or signed key rotations lead to it from the
+pinned key. Pass `key_list` with the list from `GET /api/v1/keys` to apply key revocations, as the [Ledger
+README](../../README.md#key-revocation) describes; the command takes it as `--keys keys.json`. `report.to_dict()` has
+the same fields as the Java `PackageReport`. `report.compliance_profiles` lists the id and digest of each [compliance
+profile](../../README.md#compliance-profiles) the checkpoint signs, and `client.compliance()` returns the active
+profiles and their combined rules from the ledger. An entry whose personal fields were [erased](../../README.md#erasure)
+still verifies from its commitments, and `client.erase_principal(principal_id, reason)` asks the ledger to erase a
+principal. `place_legal_hold`, `release_legal_hold`, `legal_holds` and `sweep_retention` manage [legal
+holds](../../README.md#retention-and-legal-holds) and the retention pass. `timestamp_certificates`, a list of
+certificates or PEM text, pins the authority of the [checkpoint timestamp](../../README.md#checkpoint-timestamps),
+`require_timestamp=True` refuses a checkpoint without one, and `report.timestamped_at` and `report.timestamp_authority`
+say when and by whom it was timestamped. `rekor_keys`, a list of verifier keys, pins the log of the [Rekor
+entry](../../README.md#rekor-anchoring), `require_rekor=True` refuses a checkpoint without one, and
+`report.rekor_log_index` and `report.rekor_origin` say where it was anchored. `report.disclosed_prompts` counts the
+prompt texts that match the hashes their entries name. `report.disclosed_policies` counts the policy set texts that
+match the hashes their entries name.
 
 </p>
+
+## Verify a Report
 
 <p style="text-align: justify;">
 
@@ -236,22 +239,23 @@ where it was anchored. `report.disclosed_prompts` counts the prompt texts that m
 `client.create_dispute(title, description, agent_id=...)` returns the bytes of a dispute package zip.
 `verify_report(report, package, public_key)` checks the signature of a report with the keys the package is verified
 with, and that it was made for the checkpoint, scope and disclosed entries of that package; `check.valid`,
-`check.statuses` and `check.problems` give the result.
+`check.statuses` and `check.problems` give the result. Verify the package itself with `verify_package`.
 
 </p>
 
-## Verify a Statement and Receipt
+Step 1. Make a dispute report over the package of the agent and verify both; it must print `True` with the count of
+each status:
 
 ```python
-from nexusphere_ledger import EvidenceStatement, LogReceipt, PublicKey
+from nexusphere_ledger import verify_package, verify_report
 
-key = PublicKey.from_base64(public_key)
-statement = EvidenceStatement.parse(agent.statement(entry["id"]))
-receipt = LogReceipt.parse(agent.receipt(entry["id"]))
-print(statement.verify(key), receipt.verify(statement.leaf_hash, key))
+package = operator.export_package(agent_id="invoice-agent")
+report = operator.create_report("dispute", agent_id="invoice-agent")
+check = verify_report(report, package, public_key)
+print(verify_package(package, public_key).valid and check.valid, check.statuses, check.problems)
 ```
 
-## Prove That Something Never Happened
+## Verify an Index Proof
 
 <p style="text-align: justify;">
 
@@ -293,6 +297,20 @@ present = verify_index_proof(recorded, public_key)
 absent = verify_index_proof(never, public_key)
 print(present.valid, present.present, present.count, present.first_sequence, present.last_sequence)
 print(absent.valid, absent.present, absent.sequence, absent.problems)
+```
+
+## Verify a Statement and Receipt
+
+Step 1. Fetch the SCITT statement and receipt of the entry recorded in [Record Evidence](#record-evidence) and verify
+them with the ledger's key; it must print `True True`:
+
+```python
+from nexusphere_ledger import EvidenceStatement, LogReceipt, PublicKey
+
+key = PublicKey.from_base64(public_key)
+statement = EvidenceStatement.parse(agent.statement(entry["id"]))
+receipt = LogReceipt.parse(agent.receipt(entry["id"]))
+print(statement.verify(key), receipt.verify(statement.leaf_hash, key))
 ```
 
 ## Verify a Mandate
@@ -514,7 +532,7 @@ the output must show `Prompts     : 1 prompt texts match the hashes their entrie
 nexusphere-ledger-verify --public-key "$LEDGER_PUBLIC_KEY" package.json
 ```
 
-Step 9. Save the proof of absence from [Prove That Something Never Happened](#prove-that-something-never-happened)
+Step 9. Save the proof of absence from [Verify an Index Proof](#verify-an-index-proof)
 with `json.dump(never, open("proof.json", "w"))` and verify it; the output must show
 `Finding     : no entry up to sequence` and `Result: VALID`:
 

@@ -73,10 +73,29 @@ gateway          3698        0      122.8    106.40    271.50    387.00    844.5
 exit 0
 ```
 
-Step 4. Run the package scenario:
+Step 4. Run the package scenario; it must print one `package` line for each of 100, 1000 and 10000 entries with the
+median export time and the package size in bytes, and the exit code must be `0`:
 
 ```shell
-java -jar ledger/benchmarks/target/benchmarks-1.0.0-SNAPSHOT-exec.jar --url http://localhost:8090 --api-key nexusphere-ledger-development-key-change-me --scenarios package --package-sizes 100,1000,10000
+java -jar ledger/benchmarks/target/benchmarks-1.0.0-SNAPSHOT-exec.jar --url http://localhost:8090 --api-key nexusphere-ledger-development-key-change-me --scenarios package --package-sizes 100,1000,10000; echo "exit $?"
+```
+
+```text
+Nexusphere Ledger benchmark against http://localhost:8090, 16 clients, 30 s per scenario
+Scenario     Requests   Errors Per second    p50 ms    p95 ms    p99 ms    Max ms
+Package       Entries    Median ms        Bytes
+package           100        229.3       329259
+package          1000       1844.7      3533284
+package         10000      18106.7     36301209
+exit 0
+```
+
+Step 5. Stop the ledger and the demo MCP server, then PostgreSQL; Docker must report the `ledger-postgresql`
+container as removed:
+
+```shell
+kill $(lsof -t -i :8090 -sTCP:LISTEN) $(lsof -t -i :8091 -sTCP:LISTEN)
+docker compose --file ledger/compose.yaml --project-name ledger down
 ```
 
 ## Results

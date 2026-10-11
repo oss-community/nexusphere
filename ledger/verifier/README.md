@@ -52,13 +52,17 @@ database, so an auditor, a court or a counterparty can verify what a ledger hand
 
 ## Dependencies
 
-| Depends on         | Used by  |
-|--------------------|----------|
-| `chain`, `mandate` | `server` |
+| Depends on         | Used by                      |
+|--------------------|------------------------------|
+| `chain`, `mandate` | `server`, `ledger-e2e-tests` |
+
+<p style="text-align: justify;">
 
 Usage is in [Evidence Packages](../README.md#evidence-packages), [SCITT Statements and
 Receipts](../README.md#scitt-statements-and-receipts), [Verifying a Mandate](../README.md#verifying-a-mandate),
 [Reports and Dispute Packages](../README.md#reports-and-dispute-packages) and [Log Archives](../README.md#log-archives).
+
+</p>
 
 ##
 

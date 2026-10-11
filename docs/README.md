@@ -101,21 +101,22 @@ server's API.
 
 </p>
 
-| Module                                                            | Responsibility                                                                      |
-|-------------------------------------------------------------------|-------------------------------------------------------------------------------------|
-| [`ledger/chain`](../ledger/chain/README.md)                       | Evidence format, hash chain, Merkle log, signed notes, COSE statements and receipts |
-| [`ledger/mandate`](../ledger/mandate/README.md)                   | SD-JWT VC mandates, status lists, JWK keys and the mandate verifier SDK             |
-| [`ledger/server`](../ledger/server/README.md)                     | Evidence API, gateways, grants, consent, checkpoints, witnesses and verification    |
-| [`ledger/verifier`](../ledger/verifier/README.md)                 | Offline verifier for packages, statements and mandates, as a library and a jar      |
-| [`ledger/demo-mcp`](../ledger/demo-mcp/README.md)                 | Demo MCP server and the demo script                                                 |
-| [`ledger/ledger-e2e-tests`](../ledger/ledger-e2e-tests/README.md) | End-to-end tests against the server and PostgreSQL                                  |
-| [`ledger/conformance`](../ledger/conformance/README.md)           | Conformance vectors for every format                                                |
-| [`ledger/sdk/python`](../ledger/sdk/python/README.md)             | Python client and offline verifier, on the same conformance vectors                 |
-| [`ledger/sdk/typescript`](../ledger/sdk/typescript/README.md)     | TypeScript client and offline verifier for Node and browsers                        |
-| [`ledger/otel-exporter`](../ledger/otel-exporter/README.md)       | OpenTelemetry Collector exporter from agent spans to evidence                       |
-| [`ledger/adapters`](../ledger/adapters/README.md)                 | Adapters for LangGraph, OpenAI Agents SDK, AgentCore and agentgateway               |
-| [`ledger/verifier-web`](../ledger/verifier-web/README.md)         | Auditor Portal in the browser, as one HTML file with no network access              |
-| [`frontend`](../frontend/README.md)                               | Web UI for operators and principals                                                 |
+| Module                                                            | Responsibility                                                                                    |
+|-------------------------------------------------------------------|---------------------------------------------------------------------------------------------------|
+| [`ledger/chain`](../ledger/chain/README.md)                       | Evidence format, hash chain, Merkle log, signed notes, COSE statements and receipts               |
+| [`ledger/mandate`](../ledger/mandate/README.md)                   | SD-JWT VC mandates, status lists, JWK keys and the mandate verifier SDK                           |
+| [`ledger/server`](../ledger/server/README.md)                     | Evidence API, gateways, grants, consent, checkpoints, witnesses and verification                  |
+| [`ledger/verifier`](../ledger/verifier/README.md)                 | Offline verifier for packages, statements and mandates, as a library and a jar                    |
+| [`ledger/demo-mcp`](../ledger/demo-mcp/README.md)                 | Demo MCP server and the demo script                                                               |
+| [`ledger/benchmarks`](../ledger/benchmarks/README.md)             | Load scenarios for recording, decisions, the MCP gateway and packages, with the published results |
+| [`ledger/ledger-e2e-tests`](../ledger/ledger-e2e-tests/README.md) | End-to-end tests against the server and PostgreSQL                                                |
+| [`ledger/conformance`](../ledger/conformance/README.md)           | Conformance vectors for every format                                                              |
+| [`ledger/sdk/python`](../ledger/sdk/python/README.md)             | Python client and offline verifier, on the same conformance vectors                               |
+| [`ledger/sdk/typescript`](../ledger/sdk/typescript/README.md)     | TypeScript client and offline verifier for Node and browsers                                      |
+| [`ledger/otel-exporter`](../ledger/otel-exporter/README.md)       | OpenTelemetry Collector exporter from agent spans to evidence                                     |
+| [`ledger/adapters`](../ledger/adapters/README.md)                 | Adapters for LangGraph, OpenAI Agents SDK, AgentCore and agentgateway                             |
+| [`ledger/verifier-web`](../ledger/verifier-web/README.md)         | Auditor Portal in the browser, as one HTML file with no network access                            |
+| [`frontend`](../frontend/README.md)                               | Web UI for operators and principals                                                               |
 
 ### Stack
 
@@ -132,13 +133,21 @@ server's API.
 
 ```text
 com.nexusphere.ledger
-├── evidence      evidence entries, the hash chain, checkpoints and packages
-├── transparency  Merkle log, log checkpoints, proofs, witnesses, SCITT statements and receipts
-├── agent         agents and their API keys
+├── a2a           A2A gateway, inbound verification, receipts, statements and reconciliation
+├── agent         agents, their API keys and signing keys, and track records
+├── anomaly       anomaly detection per agent against its own baseline
+├── approval      human approval of decisions that policies hold back, and its notifications
+├── ask           questions in plain language answered from verified evidence
 ├── authorization grants, consent, decisions and mandates
+├── compliance    compliance profiles with the evidence fields and retention they require
+├── evidence      evidence entries, the hash chain, checkpoints, packages, verification, prompts, erasure,
+│                 retention, legal holds and key revocation
 ├── mcp           MCP gateway
-├── a2a           A2A gateway, inbound verification and receipts
-└── server        configuration, security, signing keys, rate limits and errors
+├── policy        Cedar policy sets
+├── reporting     signed reports and dispute packages
+├── server        cluster leadership, configuration, security, signing keys, rate limits and errors
+└── transparency  Merkle log, log checkpoints, proofs, tiles, witnesses, SCITT statements and receipts, index proofs,
+                  checkpoint timestamps and Rekor anchoring
 ```
 
 ## Standards
@@ -162,7 +171,7 @@ com.nexusphere.ledger
 
 * Running agents or hosting models; the ledger only records and decides their actions
 * Replacing agent platforms and gateways; the ledger sits beside them
-* A policy language; grants are explicit lists of actions and targets
+* A policy language of its own; grants are explicit lists of actions and targets, and policies are written in Cedar
 * Payments; AP2 and other payment protocols carry the money, the ledger keeps the proof
 * Certification for a regulation; the ledger provides evidence that audits can use
 

@@ -7,8 +7,8 @@
 * [Purpose](#purpose)
 * [Install](#install)
 * [Record Evidence](#record-evidence)
-* [Record the Model and Prompt](#record-the-model-and-prompt)
 * [Decide and Report](#decide-and-report)
+* [Record the Model and Prompt](#record-the-model-and-prompt)
 * [Verify a Package](#verify-a-package)
 * [Verify a Report](#verify-a-report)
 * [Verify an Index Proof](#verify-an-index-proof)
@@ -97,38 +97,6 @@ await agent.recordBatch([
 ]);
 ```
 
-## Record the Model and Prompt
-
-<p style="text-align: justify;">
-
-Evidence and decisions may name the [model](../../README.md#model-and-prompt) the agent ran in `model`: its `name`,
-`version`, and the lowercase SHA-256 `promptHash` and `configHash` of its system prompt and configuration. The content
-hash covers the model; entries without one hash as before. `client.storePrompt(text)` stores a prompt or configuration
-text and resolves to its hash, and `client.prompt(hash)` reads it back, as the operator. `client.activatePolicies(text)`
-activates a Cedar policy set, and `client.activePolicies()` and `client.policySet(hash)` read it back, as the operator.
-
-</p>
-
-Step 1. Store the system prompt and record an action with its model; the answer must show the model:
-
-```typescript
-const promptHash = await agent.storePrompt("You pay approved invoices of Acme up to 500 EUR.");
-const modelled = await agent.record({
-  agentId: "invoice-agent", principalId: "acme", action: "tools/call", outcome: "SUCCEEDED",
-  model: { name: "claude-sonnet-5-5", version: "2026-09-01", promptHash },
-});
-console.log(modelled.model);
-```
-
-Step 2. Export a package with the prompt texts its entries name; `disclosedPrompts` must be `1`:
-
-```typescript
-import { verifyPackage } from "@nexusphere/ledger";
-
-const pkg = await operator.exportPackage({ agentId: "invoice-agent", includePrompts: true });
-console.log((await verifyPackage(pkg, await operator.activePublicKey())).disclosedPrompts);
-```
-
 ## Decide and Report
 
 <p style="text-align: justify;">
@@ -167,11 +135,43 @@ try {
 
 When a policy annotated `@approval` stops the action, `act` throws `Denied` with reason code `APPROVAL_PENDING` and the
 request in `e.approvalId`; `approvals`, `approval`, `approve` and `denyApproval` list, read and resolve approval
-requests, and once approved the identical action is allowed once with reason code `ALLOWED_BY_APPROVAL`.
-`anomalies`, `anomaly` and `detectAnomalies` list, read and trigger the operator's anomaly checks on agent volume, denials
-and failures.
+requests, and once approved the identical action is allowed once with reason code `ALLOWED_BY_APPROVAL`. `anomalies`,
+`anomaly` and `detectAnomalies` list, read and trigger the operator's anomaly checks on agent volume, denials and
+failures.
 
 </p>
+
+## Record the Model and Prompt
+
+<p style="text-align: justify;">
+
+Evidence and decisions may name the [model](../../README.md#model-and-prompt) the agent ran in `model`: its `name`,
+`version`, and the lowercase SHA-256 `promptHash` and `configHash` of its system prompt and configuration. The content
+hash covers the model; entries without one hash as before. `client.storePrompt(text)` stores a prompt or configuration
+text and resolves to its hash, and `client.prompt(hash)` reads it back, as the operator. `client.activatePolicies(text)`
+activates a Cedar policy set, and `client.activePolicies()` and `client.policySet(hash)` read it back, as the operator.
+
+</p>
+
+Step 1. Store the system prompt and record an action with its model; the answer must show the model:
+
+```typescript
+const promptHash = await agent.storePrompt("You pay approved invoices of Acme up to 500 EUR.");
+const modelled = await agent.record({
+  agentId: "invoice-agent", principalId: "acme", action: "tools/call", outcome: "SUCCEEDED",
+  model: { name: "claude-sonnet-5-5", version: "2026-09-01", promptHash },
+});
+console.log(modelled.model);
+```
+
+Step 2. Export a package with the prompt texts its entries name; `disclosedPrompts` must be `1`:
+
+```typescript
+import { verifyPackage } from "@nexusphere/ledger";
+
+const pkg = await operator.exportPackage({ agentId: "invoice-agent", includePrompts: true });
+console.log((await verifyPackage(pkg, await operator.activePublicKey())).disclosedPrompts);
+```
 
 ## Verify a Package
 
@@ -194,15 +194,17 @@ console.log(report.valid, report.disclosedEntries, report.problems);
 <p style="text-align: justify;">
 
 Pass `{ witnesses: [verifierKey], requiredWitnesses: 1 }` as the third argument to require witness cosignatures, and
-`keys` with the list from `GET /api/v1/keys` to apply key revocations, as the
-[Ledger README](../../README.md#key-revocation) describes; the command takes it as `--keys keys.json`. The report has
-the same fields as the Java `PackageReport`. `report.complianceProfiles` lists the id and digest of each
-[compliance profile](../../README.md#compliance-profiles) the checkpoint signs, and `client.compliance()` returns the
-active profiles and their combined rules from the ledger. An entry whose personal fields were
-[erased](../../README.md#erasure) still verifies from its commitments, and `client.erasePrincipal(principalId, reason)`
-asks the ledger to erase a principal. A package exported with `includePrompts: true` carries `prompts`; each text must
-match its hash and be named by a disclosed entry, and `report.disclosedPrompts` counts those that do. A package carries `policies` the same way; each policy set text must match its hash and be named by the `policy.hash` attribute of a disclosed entry, and `report.disclosedPolicies` counts those that do. `placeLegalHold`, `releaseLegalHold`, `legalHolds` and `sweepRetention` manage
-[legal holds](../../README.md#retention-and-legal-holds) and the retention pass.
+`keys` with the list from `GET /api/v1/keys` to apply key revocations, as the [Ledger
+README](../../README.md#key-revocation) describes; the command takes it as `--keys keys.json`. The report has the same
+fields as the Java `PackageReport`. `report.complianceProfiles` lists the id and digest of each [compliance
+profile](../../README.md#compliance-profiles) the checkpoint signs, and `client.compliance()` returns the active
+profiles and their combined rules from the ledger. An entry whose personal fields were [erased](../../README.md#erasure)
+still verifies from its commitments, and `client.erasePrincipal(principalId, reason)` asks the ledger to erase a
+principal. A package exported with `includePrompts: true` carries `prompts`; each text must match its hash and be named
+by a disclosed entry, and `report.disclosedPrompts` counts those that do. A package carries `policies` the same way;
+each policy set text must match its hash and be named by the `policy.hash` attribute of a disclosed entry, and
+`report.disclosedPolicies` counts those that do. `placeLegalHold`, `releaseLegalHold`, `legalHolds` and `sweepRetention`
+manage [legal holds](../../README.md#retention-and-legal-holds) and the retention pass.
 
 </p>
 
@@ -246,12 +248,13 @@ console.log(report.rekorLogIndex, report.rekorOrigin);
 
 <p style="text-align: justify;">
 
-The ledger signs [reports and dispute packages](../../README.md#reports-and-dispute-packages) that map the evidence of
-a package to requirements. `client.reports()` lists the reports the ledger offers, `client.createReport(id, scope)`
-and `client.createReportHtml(id, scope)` make one, and `client.createDispute({ title, description, ...scope })` returns
-the dispute package as zip bytes; each takes `includePrompts: true` in its scope to add the prompt texts. `verifyReport(report, pkg, { publicKey, keys })` checks the signature with the keys
-the package is trusted with, and that the report names the package's checkpoint, scope and disclosed entries; verify
-the package itself with `verifyPackage`.
+The ledger signs [reports and dispute packages](../../README.md#reports-and-dispute-packages) that map the evidence of a
+package to requirements. `client.reports()` lists the reports the ledger offers, `client.createReport(id, scope)` and
+`client.createReportHtml(id, scope)` make one, and `client.createDispute({ title, description, ...scope })` returns the
+dispute package as zip bytes; each takes `includePrompts: true` in its scope to add the prompt texts.
+`verifyReport(report, pkg, { publicKey, keys })` checks the signature with the keys the package is trusted with, and
+that the report names the package's checkpoint, scope and disclosed entries; verify the package itself with
+`verifyPackage`.
 
 </p>
 
@@ -305,6 +308,9 @@ console.log(missing.valid, missing.present);
 ```
 
 ## Verify a Statement and Receipt
+
+Step 1. Fetch the SCITT statement and receipt of the entry recorded in [Record Evidence](#record-evidence) and verify
+them with the ledger's key; it must print `true true`:
 
 ```typescript
 import { EvidenceStatement, LogReceipt, PublicKey } from "@nexusphere/ledger";

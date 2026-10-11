@@ -20,8 +20,9 @@ with harmless tools and the script that walks through the whole flow against the
 ## Responsibilities
 
 * Serve the MCP tools `read_file`, `send_email` and `delete_file` over Streamable HTTP on port 8091
-* `demo.sh`: register an agent, ask `alice` for a grant and approve it with a Keycloak sign-in, call tools through the gateway, see an allowed and a denied call,
-  export a package and verify it, then show that a tampered package fails
+* `demo.sh`: register an agent, ask `alice` for a grant and approve it with a Keycloak sign-in, call tools through
+  the gateway, see an allowed and a denied call, export a package and verify it, then show that a tampered package
+  fails
 
 ## Dependencies
 
@@ -29,7 +30,11 @@ with harmless tools and the script that walks through the whole flow against the
 |------------|---------|
 | none       | none    |
 
-How to run it is in [Demo](../README.md#demo).
+<p style="text-align: justify;">
+
+How to run it is in [Dockerized](../README.md#dockerized), Step 4.
+
+</p>
 
 ##
 

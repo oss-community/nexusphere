@@ -1,16 +1,16 @@
 # <p align="center">Nexusphere Auditor Portal</p>
 
-<p align="center">One HTML file that loads an evidence package or a dispute package and verifies it fully in the browser, the chain, log proofs, witnesses, receipts and reports, with no server and no network.</p>
+<p align="center">One HTML file that verifies evidence and dispute packages in the browser, with no network.</p>
 
 ## <p align="center">Table of Content</p>
 
 * [Purpose](#purpose)
 * [Build](#build)
 * [Verify a Package](#verify-a-package)
-* [Investigate a Package](#investigate-a-package)
-* [Verify a Dispute Package](#verify-a-dispute-package)
 * [Verify an Index Proof](#verify-an-index-proof)
 * [Verify a Track Record](#verify-a-track-record)
+* [Investigate a Package](#investigate-a-package)
+* [Verify a Dispute Package](#verify-a-dispute-package)
 * [What It Checks](#what-it-checks)
 * [Develop](#develop)
 * [Test](#test)
@@ -78,9 +78,11 @@ Rekor log keys and tick Require a Rekor entry.
 Step 4. Press Verify; the page must show `VALID` and, in the Overview tab, the signing key, the checkpoint, its
 timestamp and Rekor entry, the log and the proofs. The Entries tab lists the disclosed entries, with `erased` in place
 of the principal and target of an entry whose personal fields were erased. When the entries name their
-[model](../README.md#model-and-prompt), the table adds a Model column with its name and version, and a package exported with `"includePrompts": true` adds a Prompts line with the number of prompt texts
-that match the hashes their entries name; a package that carries `policies` adds a Policies line with the number of
-Cedar policy set texts that match the hashes their entries name in their `policy.hash` attribute. Change one character of an entry in the file and verify again; the page must show `INVALID` and name the entry.
+[model](../README.md#model-and-prompt), the table adds a Model column with its name and version, and a package exported
+with `"includePrompts": true` adds a Prompts line with the number of prompt texts that match the hashes their entries
+name; a package that carries `policies` adds a Policies line with the number of Cedar policy set texts that match the
+hashes their entries name in their `policy.hash` attribute. Change one character of an entry in the file and verify
+again; the page must show `INVALID` and name the entry.
 
 <p style="text-align: justify;">
 

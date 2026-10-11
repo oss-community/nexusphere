@@ -25,7 +25,12 @@ with its own authorization policies; the ledger records.
 ## Run
 
 Step 1. Start the ledger and the Collector as in the [Quick Start](../../../README.md#quick-start); the compose file
-runs the Collector as `otel-collector` on 4317 and the demo MCP server on 8091.
+runs the Collector as `otel-collector` on 4317 and the demo MCP server on 8091, and both must show as running:
+
+```shell
+docker compose --file ledger/compose.yaml --project-name ledger up -d --build
+docker compose --file ledger/compose.yaml --project-name ledger ps otel-collector demo-mcp
+```
 
 Step 2. Install agentgateway as its [documentation](https://agentgateway.dev/docs) describes, and check it; the
 command must print the version:
@@ -101,6 +106,13 @@ not exist, waits for the Collector, and checks that the ledger holds a `SUCCEEDE
 `AGENTGATEWAY_URL`, `NEXUSPHERE_LEDGER_URL` and `NEXUSPHERE_LEDGER_API_KEY`, and defaults to the local setup above.
 
 </p>
+
+Step 1. With the ledger, the Collector and agentgateway running as in [Run](#run), run the check; it prints the
+evidence it found for the new agent and must end with `Result: PASSED`:
+
+```shell
+ledger/adapters/agentgateway/e2e.sh
+```
 
 ##
 
