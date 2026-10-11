@@ -1,8 +1,9 @@
 package com.nexusphere.ledger.anomaly.application;
 
+import com.nexusphere.ledger.server.cluster.Leadership;
+import com.nexusphere.ledger.server.cluster.LeadershipChanged;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.boot.context.event.ApplicationReadyEvent;
 import org.springframework.context.event.EventListener;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
@@ -13,15 +14,21 @@ class AnomalyScheduler {
     private static final Logger log = LoggerFactory.getLogger(AnomalyScheduler.class);
 
     private final AnomalyService anomalies;
+    private final Leadership leadership;
 
-    AnomalyScheduler(AnomalyService anomalies) {
+    AnomalyScheduler(AnomalyService anomalies, Leadership leadership) {
         this.anomalies = anomalies;
+        this.leadership = leadership;
     }
 
-    @EventListener(ApplicationReadyEvent.class)
-    void restore() {
+    @EventListener
+    void leadership(LeadershipChanged change) {
         try {
-            anomalies.refreshMetrics();
+            if (change.leader()) {
+                anomalies.refreshMetrics();
+            } else {
+                anomalies.clearMetrics();
+            }
         } catch (RuntimeException e) {
             log.warn("Open anomalies cannot be read: {}", e.getMessage());
         }
@@ -29,7 +36,7 @@ class AnomalyScheduler {
 
     @Scheduled(fixedDelayString = "${ledger.anomaly.interval}", initialDelayString = "${ledger.anomaly.interval}")
     void detect() {
-        if (!anomalies.enabled()) {
+        if (!anomalies.enabled() || !leadership.isLeader()) {
             return;
         }
         try {

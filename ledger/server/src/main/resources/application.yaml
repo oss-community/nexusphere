@@ -67,6 +67,9 @@ ledger:
       client-id: ${LEDGER_APPROVAL_CIBA_CLIENT_ID:}
       client-secret: ${LEDGER_APPROVAL_CIBA_CLIENT_SECRET:}
       scope: ${LEDGER_APPROVAL_CIBA_SCOPE:openid}
+  cluster:
+    instance-id: ${LEDGER_INSTANCE_ID:}
+    heartbeat: ${LEDGER_CLUSTER_HEARTBEAT:5s}
   anomaly:
     enabled: ${LEDGER_ANOMALY_ENABLED:true}
     interval: ${LEDGER_ANOMALY_INTERVAL:5m}

@@ -108,6 +108,8 @@ agent platforms and gateways.
 * Anomaly alerts: each agent's volume, denial share and failure share are compared with its own baseline, new
   anomalies are recorded as evidence and exported as `ledger_anomaly_score`, and Alertmanager delivers
   `LedgerAgentAnomaly`
+* High availability: several instances share one PostgreSQL and one chain, and the scheduled work runs only on
+  the leader, the instance holding a PostgreSQL advisory lock, which another instance takes over when it stops
 * Browser verifier: one self-contained HTML page in React and TypeScript that verifies a package with the
   TypeScript SDK, pinned to the ledger key and optional witnesses, with a Content Security Policy that blocks every
   connection

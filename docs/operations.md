@@ -251,15 +251,17 @@ By default these share the application port. Set `LEDGER_MANAGEMENT_PORT` to ser
 
 ### Metrics
 
-| Metric                           | Meaning                                          |
-|----------------------------------|--------------------------------------------------|
-| `ledger_head_sequence`           | Sequence of the last evidence entry              |
-| `ledger_checkpoint_sequence`     | Sequence covered by the latest signed checkpoint |
-| `ledger_checkpoint_lag`          | Entries not yet covered by a signed checkpoint   |
-| `ledger_checkpoint_age_seconds`  | Seconds since the latest signed checkpoint       |
-| `ledger_evidence_recorded_total` | Entries appended, by `decision` and `outcome`    |
-| `http_server_requests_seconds`   | Requests, latency and status                     |
-| `jvm_*`, `hikaricp_*`            | Memory, threads and database connection pools    |
+| Metric                           | Meaning                                           |
+|----------------------------------|---------------------------------------------------|
+| `ledger_head_sequence`           | Sequence of the last evidence entry               |
+| `ledger_checkpoint_sequence`     | Sequence covered by the latest signed checkpoint  |
+| `ledger_checkpoint_lag`          | Entries not yet covered by a signed checkpoint    |
+| `ledger_checkpoint_age_seconds`  | Seconds since the latest signed checkpoint        |
+| `ledger_evidence_recorded_total` | Entries appended, by `decision` and `outcome`     |
+| `ledger_leader`                  | 1 on the instance that runs the scheduled work    |
+| `ledger_anomaly_score`           | Score of each open anomaly, by `agent` and `kind` |
+| `http_server_requests_seconds`   | Requests, latency and status                      |
+| `jvm_*`, `hikaricp_*`            | Memory, threads and database connection pools     |
 
 ### Prometheus
 
@@ -367,6 +369,8 @@ to the internet, since it can also stop floods before they reach Java.
 * `LEDGER_REKOR_URL` and `LEDGER_REKOR_KEY` set to a Rekor v2 log outside your control, with the local signing
   provider, as in [Rekor Anchoring](../ledger/README.md#rekor-anchoring)
 * Prometheus scraping the ledger, and at least one alert channel on
+* At least two ledger instances behind the load balancer, each with its own `LEDGER_INSTANCE_ID`, as in
+  [High Availability](../ledger/README.md#high-availability)
 * Rate limits sized for the expected traffic, plus a limit at the reverse proxy for internet-facing deployments
 * `LEDGER_OIDC_*` set so principals approve grants with their own sign-in
 * `LEDGER_COMPLIANCE_PROFILES` and `LEDGER_COMPLIANCE_REGION` set for the jurisdictions you answer to, reviewed with

@@ -1,5 +1,6 @@
 package com.nexusphere.ledger.approval.application;
 
+import com.nexusphere.ledger.server.cluster.Leadership;
 import com.nexusphere.ledger.server.config.LedgerProperties;
 import com.nexusphere.ledger.server.security.PrincipalIdentity;
 import com.nexusphere.ledger.server.security.PrincipalTokens;
@@ -37,6 +38,7 @@ class ApprovalNotifier {
     private final HttpClient http = HttpClient.newBuilder().connectTimeout(TIMEOUT)
             .followRedirects(HttpClient.Redirect.NEVER).build();
     private final ApprovalService approvals;
+    private final Leadership leadership;
     private final LedgerSigner signer;
     private final PrincipalTokens tokens;
     private final JsonMapper json;
@@ -45,8 +47,9 @@ class ApprovalNotifier {
     private final LedgerProperties.Approval.Ciba ciba;
 
     ApprovalNotifier(ApprovalService approvals, LedgerSigner signer, PrincipalTokens tokens, JsonMapper json,
-                     LedgerProperties properties, Clock clock) {
+                     LedgerProperties properties, Leadership leadership, Clock clock) {
         this.approvals = approvals;
+        this.leadership = leadership;
         this.signer = signer;
         this.tokens = tokens;
         this.json = json;
@@ -71,6 +74,9 @@ class ApprovalNotifier {
     @Scheduled(fixedDelayString = "${ledger.approval.poll-interval}",
             initialDelayString = "${ledger.approval.poll-interval}")
     void tick() {
+        if (!leadership.isLeader()) {
+            return;
+        }
         try {
             approvals.expireDue();
             if (webhook != null) {

@@ -1,5 +1,6 @@
 package com.nexusphere.ledger.evidence.application;
 
+import com.nexusphere.ledger.server.cluster.Leadership;
 import com.nexusphere.ledger.transparency.application.RekorService;
 import com.nexusphere.ledger.transparency.application.TimestampService;
 import com.nexusphere.ledger.transparency.application.WitnessCollector;
@@ -17,9 +18,11 @@ class CheckpointScheduler {
     private final WitnessCollector witnesses;
     private final TimestampService timestamps;
     private final RekorService rekor;
+    private final Leadership leadership;
 
     CheckpointScheduler(CheckpointService checkpoints, WitnessCollector witnesses, TimestampService timestamps,
-                        RekorService rekor) {
+                        RekorService rekor, Leadership leadership) {
+        this.leadership = leadership;
         this.checkpoints = checkpoints;
         this.witnesses = witnesses;
         this.timestamps = timestamps;
@@ -28,6 +31,9 @@ class CheckpointScheduler {
 
     @Scheduled(fixedDelayString = "${ledger.checkpoint.interval}", initialDelayString = "${ledger.checkpoint.interval}")
     void checkpoint() {
+        if (!leadership.isLeader()) {
+            return;
+        }
         try {
             checkpoints.checkpointHead().ifPresent(signed ->
                     log.debug("Checkpoint at sequence {}", signed.checkpoint().sequence()));

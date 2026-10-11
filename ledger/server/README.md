@@ -28,6 +28,7 @@ record.
 * Cedar policy sets that the operator activates and every decision must also pass, with the policy hash in evidence
 * Human approval of decisions that policies hold back, by the operator, the principal or CIBA, with a webhook
 * Anomaly detection per agent against its own baseline, recorded as evidence and alerted through Alertmanager
+* Several instances on one database, with leader election by advisory lock for the scheduled work
 * MCP gateway that decides and records every tool call
 * Evidence packages with selective disclosure for auditors
 * Transparency log over the evidence with inclusion and consistency proofs, cosigned by witnesses, and a C2SP

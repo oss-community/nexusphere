@@ -157,6 +157,10 @@ public class AnomalyService {
                 .toList(), true);
     }
 
+    public void clearMetrics() {
+        scores.register(List.of(), true);
+    }
+
     private List<Finding> findings(Counts now, Baseline baseline) {
         List<Finding> findings = new ArrayList<>();
         AnomalyStatistics.volume(now.total(), baseline.buckets(), settings.threshold(), settings.minEvents())
