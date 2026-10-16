@@ -146,14 +146,21 @@ Step 2. Run the unit tests:
 mvn test
 ```
 
-Step 3. Run every test, including the integration and end-to-end tests; Docker must be running for Testcontainers:
+Step 3. Run the unit and integration tests; Docker must be running for Testcontainers:
 
 ```shell
 mvn verify
+```
+
+Step 4. Run the end-to-end tests as well, only when you want them; Docker must be running, and Maven must end with
+`BUILD SUCCESS`:
+
+```shell
+mvn verify -Pe2e
 docker volume prune -f
 ```
 
-Step 4. Build the jars without tests:
+Step 5. Build the jars without tests:
 
 ```shell
 mvn package -DskipTests=true
@@ -161,7 +168,8 @@ mvn package -DskipTests=true
 
 <p style="text-align: justify;">
 
-The web UI is built and tested with npm, as described in [Nexusphere Frontend](frontend/README.md). The SDKs, the
+The end-to-end tests never run on their own: `mvn verify`, `mvn install` and the pipeline skip them, and only the
+`e2e` profile runs them. `-DskipTests=true` skips the integration tests too. The web UI is built and tested with npm, as described in [Nexusphere Frontend](frontend/README.md). The SDKs, the
 exporter, the adapters and the auditor portal use their own tools, as described in
 [Python SDK](ledger/sdk/python/README.md#test), [TypeScript SDK](ledger/sdk/typescript/README.md#test),
 [OpenTelemetry Exporter](ledger/otel-exporter/README.md#test), [Adapters](ledger/adapters/README.md#test) and
