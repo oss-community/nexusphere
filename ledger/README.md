@@ -277,10 +277,11 @@ docker compose --file ledger/compose.yaml --project-name ledger down
 
 ### Verify
 
-Step 1. Run the unit, integration and end-to-end tests; Docker must be running for Testcontainers:
+Step 1. Run the unit, integration and end-to-end tests; Docker must be running for Testcontainers, and the
+end-to-end tests run only with the `e2e` profile:
 
 ```shell
-mvn -pl ledger/ledger-e2e-tests -am verify
+mvn -pl ledger/ledger-e2e-tests -am verify -Pe2e
 ```
 
 ### Release

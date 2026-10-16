@@ -13,11 +13,12 @@
     <name>Nexusphere Ledger End-to-End Tests</name>
     <description>
         Black-box tests of the ledger API. The server is started against PostgreSQL in Testcontainers; tests talk to
-        it over HTTP only and check signatures with the chain library. Run with: mvn verify
+        it over HTTP only and check signatures with the chain library. Run with: mvn verify -Pe2e
     </description>
 
     <properties>
         <maven.deploy.skip>true</maven.deploy.skip>
+        <e2e.skip>true</e2e.skip>
     </properties>
 
     <dependencies>
@@ -71,6 +72,7 @@
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-failsafe-plugin</artifactId>
                 <configuration>
+                    <skipITs>${e2e.skip}</skipITs>
                     <includes>
                         <include>**/*E2ETest.java</include>
                     </includes>
@@ -78,4 +80,13 @@
             </plugin>
         </plugins>
     </build>
+
+    <profiles>
+        <profile>
+            <id>e2e</id>
+            <properties>
+                <e2e.skip>${skipTests}</e2e.skip>
+            </properties>
+        </profile>
+    </profiles>
 </project>

@@ -20,7 +20,8 @@
 
 <p style="text-align: justify;">
 
-Every command runs in the root of the repository, and Docker must be running for Testcontainers.
+Every command runs in the root of the repository, and Docker must be running for Testcontainers. The end-to-end
+tests run only when asked, with the `e2e` profile; `mvn verify`, `mvn install` and the pipeline skip them.
 
 </p>
 
@@ -29,7 +30,7 @@ Every command runs in the root of the repository, and Docker must be running for
 Step 1. Build the modules it needs and run every end-to-end test; Maven must end with `BUILD SUCCESS`:
 
 ```shell
-mvn -pl ledger/ledger-e2e-tests -am verify
+mvn -pl ledger/ledger-e2e-tests -am verify -Pe2e
 ```
 
 ### Run One Test Class
@@ -38,7 +39,7 @@ Step 1. Run only `VerificationE2ETest`, or any class from [Test Classes](#test-c
 with `BUILD SUCCESS`:
 
 ```shell
-mvn -pl ledger/ledger-e2e-tests -am verify -Dit.test=VerificationE2ETest -Dfailsafe.failIfNoSpecifiedTests=false -Dsurefire.failIfNoSpecifiedTests=false
+mvn -pl ledger/ledger-e2e-tests -am verify -Pe2e -Dit.test=VerificationE2ETest -Dfailsafe.failIfNoSpecifiedTests=false -Dsurefire.failIfNoSpecifiedTests=false
 ```
 
 ## Test Harness
